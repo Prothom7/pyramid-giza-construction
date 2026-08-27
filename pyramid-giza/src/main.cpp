@@ -6,16 +6,14 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// stb_image is a "header-only" library: normally just declarations, but
-// defining STB_IMAGE_IMPLEMENTATION once (and only once, in one .cpp file)
-// tells it to also compile its actual function bodies here.
 #define STB_IMAGE_IMPLEMENTATION
 #include "../external/stb_image.h"
 
 #include "Shader.h"
 #include "Camera.h"
+#include "Pyramid.h"
 
-Camera camera(glm::vec3(0.0f, 2.0f, 6.0f));
+Camera camera(glm::vec3(0.0f, 40.0f, 100.0f));
 
 float lastX = 1280.0f / 2.0f;
 float lastY = 720.0f / 2.0f;
@@ -65,29 +63,22 @@ void processInput(GLFWwindow* window)
         camera.ProcessKeyboard(CameraMovement::RIGHT, deltaTime);
 }
 
-// Loads an image from disk and uploads it to the GPU as a texture object.
-// Returns the OpenGL texture ID, which we bind before drawing.
 unsigned int loadTexture(const char* path)
 {
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
     int width, height, nrChannels;
-    // stb_image loads the raw pixel bytes from the file into memory.
     unsigned char* data = stbi_load(path, &width, &height, &nrChannels, 0);
 
     if (data)
     {
-        // JPGs are typically 3 channels (RGB); PNGs with alpha are 4 (RGBA).
         GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
 
         glBindTexture(GL_TEXTURE_2D, textureID);
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        // GL_REPEAT means texture coordinates outside 0-1 wrap around and
-        // tile -- this is what lets a small sand image repeat across our
-        // huge 200x200 plane instead of stretching into a blurry mess.
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -98,7 +89,6 @@ unsigned int loadTexture(const char* path)
         std::cerr << "ERROR::TEXTURE: Failed to load texture at path: " << path << std::endl;
     }
 
-    // Free the CPU-side copy of the image -- it's now safely on the GPU.
     stbi_image_free(data);
 
     return textureID;
@@ -141,12 +131,7 @@ int main()
 
     Shader basicShader("shaders/basic.vert", "shaders/basic.frag");
 
-    // ---- Cube geometry (now with UVs added -- 5 floats per vertex: x,y,z,u,v) ----
-    // For the cube we just reuse a simple 0-1 UV pattern per face; it's
-    // still using the flat texture sampler, so this only matters visually
-    // once we bind a texture to it too (we're not doing that yet -- cube
-    // will end up textured with whatever's bound last, which is fine
-    // since we're deleting this placeholder cube in Phase 4 anyway).
+    // ---- Cube geometry (reused for every pyramid block) ----
     float cubeVertices[] = {
         -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
          0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
@@ -199,21 +184,18 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
 
-    // Position attribute (location 0): 3 floats, stride is now 5 floats total.
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    // UV attribute (location 1): 2 floats, offset by 3 floats (past the position).
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    // ---- Ground plane geometry (now with UVs, and tiled 40x across the plane) ----
+    // ---- Ground plane geometry ----
     float planeSize = 100.0f;
-    float tiling = 40.0f; // how many times the texture repeats across the plane
+    float tiling = 40.0f;
     float planeVertices[] = {
-        // positions                          // texcoords
         -planeSize, 0.0f, -planeSize,          0.0f,    0.0f,
          planeSize, 0.0f, -planeSize,          tiling,  0.0f,
          planeSize, 0.0f,  planeSize,          tiling,  tiling,
@@ -241,6 +223,11 @@ int main()
 
     // ---- Load the sand texture ----
     unsigned int sandTexture = loadTexture("assets/textures/sand.jpg");
+
+    // ---- Create the pyramid ----
+    // 60-unit base, 20 courses, 3-unit blocks.
+    Pyramid pyramid(60.0f, 20, 3.0f);
+    std::cout << "Pyramid generated with " << pyramid.getBlockCount() << " blocks." << std::endl;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -270,7 +257,6 @@ int main()
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-        // Bind the sand texture to texture unit 0 before drawing anything.
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, sandTexture);
 
@@ -280,14 +266,17 @@ int main()
         glBindVertexArray(planeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
-        // ---- Draw the placeholder cube (still bound to the sand texture --
-        // fine for now, this cube is getting deleted in Phase 4) ----
-        glm::mat4 cubeModel = glm::mat4(1.0f);
-        cubeModel = glm::translate(cubeModel, glm::vec3(0.0f, 5.0f, 0.0f));
-        cubeModel = glm::scale(cubeModel, glm::vec3(5.0f, 5.0f, 5.0f));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(cubeModel));
+        // ---- Draw the pyramid: one draw call per block (naive approach --
+        // we'll replace this with instanced rendering in Phase 8) ----
         glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        for (const BlockInstance& block : pyramid.getBlocks())
+        {
+            glm::mat4 blockModel = glm::mat4(1.0f);
+            blockModel = glm::translate(blockModel, block.position);
+            blockModel = glm::scale(blockModel, glm::vec3(3.0f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(blockModel));
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
