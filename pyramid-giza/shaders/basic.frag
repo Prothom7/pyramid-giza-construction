@@ -2,7 +2,13 @@
 
 out vec4 FragColor;
 
+in vec2 TexCoord;
+
+// A "sampler2D" is GLSL's type for a bound texture we can read from.
+uniform sampler2D texture1;
+
 void main()
 {
-    FragColor = vec4(0.85f, 0.55f, 0.25f, 1.0f);
+    // texture() looks up the color at coordinate TexCoord in the bound image.
+    FragColor = texture(texture1, TexCoord);
 }

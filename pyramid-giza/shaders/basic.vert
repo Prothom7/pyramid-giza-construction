@@ -1,16 +1,18 @@
 #version 330 core
 
 layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec2 aTexCoord;
 
-// "Uniforms" are values set once per draw call from the CPU side (main.cpp),
-// shared across every vertex processed in that call. This is how we pass
-// our three matrices into the shader.
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
+// Passed to the fragment shader so it knows which part of the
+// texture image corresponds to this pixel.
+out vec2 TexCoord;
+
 void main()
 {
-    // Apply Model, then View, then Projection -- read right to left.
     gl_Position = projection * view * model * vec4(aPos, 1.0);
+    TexCoord = aTexCoord;
 }
