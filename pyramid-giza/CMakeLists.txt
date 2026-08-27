@@ -19,7 +19,7 @@ add_library(glm INTERFACE)
 target_include_directories(glm INTERFACE external/glm)
 
 # ---- Our executable ----
-add_executable(PyramidGiza src/main.cpp src/Shader.cpp)
+add_executable(PyramidGiza src/main.cpp src/Shader.cpp src/Camera.cpp)
 
 target_include_directories(PyramidGiza PRIVATE
     external/glfw/include

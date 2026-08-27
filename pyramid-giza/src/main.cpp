@@ -7,10 +7,66 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "Shader.h"
+#include "Camera.h"
+
+// Global camera object -- simplest approach for now. We'll consider
+// wrapping this more cleanly once we have more systems interacting
+// with input (Phase 13).
+Camera camera(glm::vec3(0.0f, 2.0f, 6.0f));
+
+// Tracks the last known mouse position so we can compute how far
+// the mouse moved between frames.
+float lastX = 1280.0f / 2.0f;
+float lastY = 720.0f / 2.0f;
+bool firstMouse = true;
+
+// Delta time bookkeeping, used for frame-rate-independent movement.
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+// Called automatically by GLFW whenever the mouse moves.
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
+{
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yposIn);
+
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    // Reversed since y-coordinates go from bottom to top on screen
+    // but top to bottom in window pixel coordinates.
+    float yoffset = lastY - ypos;
+
+    lastX = xpos;
+    lastY = ypos;
+
+    camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+// Checks held-down keys every frame and moves the camera accordingly.
+void processInput(GLFWwindow* window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        camera.ProcessKeyboard(CameraMovement::FORWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        camera.ProcessKeyboard(CameraMovement::BACKWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        camera.ProcessKeyboard(CameraMovement::LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        camera.ProcessKeyboard(CameraMovement::RIGHT, deltaTime);
 }
 
 int main()
@@ -36,6 +92,11 @@ int main()
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
+    // Hide and lock the cursor to the window, giving us raw mouse-look
+    // input instead of a visible OS cursor.
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         std::cerr << "Failed to initialize GLAD" << std::endl;
@@ -43,18 +104,11 @@ int main()
     }
 
     glViewport(0, 0, 1280, 720);
-
-    // Enable depth testing so closer faces of the cube correctly draw
-    // in front of farther ones (without this, faces render in whatever
-    // order they happen to be drawn, causing visual glitches).
     glEnable(GL_DEPTH_TEST);
 
     Shader basicShader("shaders/basic.vert", "shaders/basic.frag");
 
-    // 36 vertices (6 faces * 2 triangles * 3 vertices) forming a unit cube
-    // centered at the origin, spanning -0.5 to 0.5 on each axis.
     float vertices[] = {
-        // positions
         -0.5f, -0.5f, -0.5f,
          0.5f, -0.5f, -0.5f,
          0.5f,  0.5f, -0.5f,
@@ -115,31 +169,25 @@ int main()
 
     while (!glfwWindowShouldClose(window))
     {
+        // ---- Delta time calculation ----
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        processInput(window);
+
         glClearColor(0.76f, 0.60f, 0.42f, 1.0f);
-        // Clear both the color buffer AND the depth buffer each frame.
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         basicShader.use();
 
-        // ---- Build the Model matrix ----
-        // Start with identity (no transformation), then slowly rotate the
-        // cube over time so we can visually confirm it's really 3D.
+        // Cube stays fixed in place now -- the camera moves around it.
         glm::mat4 model = glm::mat4(1.0f);
-        float angle = (float)glfwGetTime() * glm::radians(50.0f);
-        model = glm::rotate(model, angle, glm::vec3(0.5f, 1.0f, 0.0f));
 
-        // ---- Build the View matrix ----
-        // Camera sits at (0,0,3), looking at the origin (0,0,0),
-        // with "up" being the positive Y axis.
-        glm::mat4 view = glm::lookAt(
-            glm::vec3(0.0f, 0.0f, 3.0f),
-            glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f)
-        );
+        // View matrix now comes from our Camera object instead of a
+        // hardcoded lookAt() call.
+        glm::mat4 view = camera.GetViewMatrix();
 
-        // ---- Build the Projection matrix ----
-        // 45-degree field of view, aspect ratio matching our window,
-        // near plane 0.1, far plane 100.0.
         glm::mat4 projection = glm::perspective(
             glm::radians(45.0f),
             1280.0f / 720.0f,
@@ -147,7 +195,6 @@ int main()
             100.0f
         );
 
-        // ---- Upload all three matrices to the shader as uniforms ----
         unsigned int modelLoc = glGetUniformLocation(basicShader.ID, "model");
         unsigned int viewLoc = glGetUniformLocation(basicShader.ID, "view");
         unsigned int projLoc = glGetUniformLocation(basicShader.ID, "projection");
