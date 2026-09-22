@@ -1,291 +1,277 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+#include <cstdint>
+#include <fstream>
 #include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "../external/stb_image.h"
-
-#include "Shader.h"
 #include "Camera.h"
-#include "Pyramid.h"
+#include "graphics/GeometryValidation.h"
+#include "graphics/ShowcaseScene.h"
 
-Camera camera(glm::vec3(0.0f, 40.0f, 100.0f));
+namespace
+{
+constexpr int initialWidth = 1280;
+constexpr int initialHeight = 720;
 
-float lastX = 1280.0f / 2.0f;
-float lastY = 720.0f / 2.0f;
-bool firstMouse = true;
+struct AppState
+{
+    Camera camera{{0.0f, 0.25f, 10.5f}, {0.0f, 1.0f, 0.0f}, -90.0f, 0.0f};
+    float lastMouseX = initialWidth * 0.5f;
+    float lastMouseY = initialHeight * 0.5f;
+    float deltaTime = 0.0f;
+    bool firstMouse = true;
+    bool cullingEnabled = true;
+    bool wireframeEnabled = false;
+};
 
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
+void glfwErrorCallback(int code, const char* description)
+{
+    std::cerr << "GLFW error " << code << ": " << description << '\n';
+}
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebufferSizeCallback(GLFWwindow*, int width, int height)
 {
     glViewport(0, 0, width, height);
 }
 
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
+void mouseCallback(GLFWwindow* window, double xPosition, double yPosition)
 {
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
+    auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if (state == nullptr)
+        return;
 
-    if (firstMouse)
+    const float x = static_cast<float>(xPosition);
+    const float y = static_cast<float>(yPosition);
+    if (state->firstMouse)
     {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
+        state->lastMouseX = x;
+        state->lastMouseY = y;
+        state->firstMouse = false;
     }
 
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
-
-    lastX = xpos;
-    lastY = ypos;
-
-    camera.ProcessMouseMovement(xoffset, yoffset);
+    state->camera.ProcessMouseMovement(x - state->lastMouseX, state->lastMouseY - y);
+    state->lastMouseX = x;
+    state->lastMouseY = y;
 }
 
-void processInput(GLFWwindow* window)
+void keyCallback(GLFWwindow* window, int key, int, int action, int)
+{
+    if (action != GLFW_PRESS)
+        return;
+
+    auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if (state == nullptr)
+        return;
+
+    if (key == GLFW_KEY_C)
+    {
+        state->cullingEnabled = !state->cullingEnabled;
+        if (state->cullingEnabled)
+            glEnable(GL_CULL_FACE);
+        else
+            glDisable(GL_CULL_FACE);
+        std::cout << "Back-face culling: " << (state->cullingEnabled ? "ON" : "OFF") << '\n';
+    }
+    else if (key == GLFW_KEY_F)
+    {
+        state->wireframeEnabled = !state->wireframeEnabled;
+        glPolygonMode(GL_FRONT_AND_BACK, state->wireframeEnabled ? GL_LINE : GL_FILL);
+        std::cout << "Wireframe: " << (state->wireframeEnabled ? "ON" : "OFF") << '\n';
+    }
+}
+
+void processInput(GLFWwindow* window, AppState& state)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(CameraMovement::FORWARD, deltaTime);
+        state.camera.ProcessKeyboard(CameraMovement::FORWARD, state.deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(CameraMovement::BACKWARD, deltaTime);
+        state.camera.ProcessKeyboard(CameraMovement::BACKWARD, state.deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(CameraMovement::LEFT, deltaTime);
+        state.camera.ProcessKeyboard(CameraMovement::LEFT, state.deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(CameraMovement::RIGHT, deltaTime);
+        state.camera.ProcessKeyboard(CameraMovement::RIGHT, state.deltaTime);
 }
 
-unsigned int loadTexture(const char* path)
+bool checkOpenGLErrors()
 {
-    unsigned int textureID;
-    glGenTextures(1, &textureID);
-
-    int width, height, nrChannels;
-    unsigned char* data = stbi_load(path, &width, &height, &nrChannels, 0);
-
-    if (data)
+    bool clean = true;
+    for (GLenum error = glGetError(); error != GL_NO_ERROR; error = glGetError())
     {
-        GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        clean = false;
+        std::cerr << "OpenGL error: 0x" << std::hex << error << std::dec << '\n';
     }
-    else
-    {
-        std::cerr << "ERROR::TEXTURE: Failed to load texture at path: " << path << std::endl;
-    }
-
-    stbi_image_free(data);
-
-    return textureID;
+    return clean;
 }
 
-int main()
+void captureFramebuffer(const std::string& path, int width, int height)
 {
-    if (!glfwInit())
+    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width) * height * 3);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_BACK);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+    std::ofstream output(path, std::ios::binary);
+    if (!output)
+        throw std::runtime_error("Could not create framebuffer capture: " + path);
+    output << "P6\n" << width << ' ' << height << "\n255\n";
+    const std::size_t rowBytes = static_cast<std::size_t>(width) * 3;
+    for (int row = height - 1; row >= 0; --row)
     {
-        std::cerr << "Failed to initialize GLFW" << std::endl;
-        return -1;
+        const char* rowStart = reinterpret_cast<const char*>(pixels.data() + rowBytes * row);
+        output.write(rowStart, static_cast<std::streamsize>(rowBytes));
+    }
+    std::cout << "Framebuffer capture written to " << path << '\n';
+}
+} // namespace
+
+int main(int argc, char** argv)
+{
+    bool validationOnly = false;
+    bool smokeTest = false;
+    std::string capturePath;
+    for (int argument = 1; argument < argc; ++argument)
+    {
+        const std::string option = argv[argument];
+        if (option == "--validate-geometry")
+            validationOnly = true;
+        else if (option == "--smoke-test")
+            smokeTest = true;
+        else if (option == "--capture" && argument + 1 < argc)
+            capturePath = argv[++argument];
+        else
+        {
+            std::cerr << "Unknown or incomplete option: " << option << '\n';
+            return 2;
+        }
+    }
+
+    if (!validatePrimitiveFoundation(std::cout))
+        return 1;
+    if (validationOnly)
+        return 0;
+
+    glfwSetErrorCallback(glfwErrorCallback);
+    if (glfwInit() == GLFW_FALSE)
+    {
+        std::cerr << "Failed to initialize GLFW.\n";
+        return 1;
     }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+#endif
+    if (smokeTest)
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Pyramid at Giza: Construction Site", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
+                                          "Pyramid at Giza - Phase 1 Primitive Foundation",
+                                          nullptr, nullptr);
     if (window == nullptr)
     {
-        std::cerr << "Failed to create GLFW window" << std::endl;
+        std::cerr << "Failed to create an OpenGL 3.3 Core window.\n";
         glfwTerminate();
-        return -1;
+        return 1;
     }
 
     glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetCursorPosCallback(window, mouse_callback);
-
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    if (gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)) == 0)
     {
-        std::cerr << "Failed to initialize GLAD" << std::endl;
-        return -1;
+        std::cerr << "Failed to initialize GLAD.\n";
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return 1;
     }
 
-    glViewport(0, 0, 1280, 720);
+    std::cout << "OpenGL: " << glGetString(GL_VERSION) << '\n'
+              << "Renderer: " << glGetString(GL_RENDERER) << '\n';
+
+    AppState state;
+    glfwSetWindowUserPointer(window, &state);
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+    glfwSetKeyCallback(window, keyCallback);
+    if (!smokeTest)
+    {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        glfwSetCursorPosCallback(window, mouseCallback);
+        std::cout << "Controls: W/A/S/D move, mouse looks, C toggles culling, "
+                     "F toggles wireframe, ESC exits.\n";
+    }
+    glfwSwapInterval(smokeTest ? 0 : 1);
+
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
 
-    Shader basicShader("shaders/basic.vert", "shaders/basic.frag");
-
-    // ---- Cube geometry (reused for every pyramid block) ----
-    float cubeVertices[] = {
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-    };
-
-    unsigned int cubeVAO, cubeVBO;
-    glGenVertexArrays(1, &cubeVAO);
-    glGenBuffers(1, &cubeVBO);
-
-    glBindVertexArray(cubeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-
-    // ---- Ground plane geometry ----
-    float planeSize = 100.0f;
-    float tiling = 40.0f;
-    float planeVertices[] = {
-        -planeSize, 0.0f, -planeSize,          0.0f,    0.0f,
-         planeSize, 0.0f, -planeSize,          tiling,  0.0f,
-         planeSize, 0.0f,  planeSize,          tiling,  tiling,
-
-         planeSize, 0.0f,  planeSize,          tiling,  tiling,
-        -planeSize, 0.0f,  planeSize,          0.0f,    tiling,
-        -planeSize, 0.0f, -planeSize,          0.0f,    0.0f,
-    };
-
-    unsigned int planeVAO, planeVBO;
-    glGenVertexArrays(1, &planeVAO);
-    glGenBuffers(1, &planeVBO);
-
-    glBindVertexArray(planeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-
-    // ---- Load the sand texture ----
-    unsigned int sandTexture = loadTexture("assets/textures/sand.jpg");
-
-    // ---- Create the pyramid ----
-    // 60-unit base, 20 courses, 3-unit blocks.
-    Pyramid pyramid(60.0f, 20, 3.0f);
-    std::cout << "Pyramid generated with " << pyramid.getBlockCount() << " blocks." << std::endl;
-
-    while (!glfwWindowShouldClose(window))
+    bool runtimeSucceeded = true;
+    try
     {
-        float currentFrame = static_cast<float>(glfwGetTime());
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+        ShowcaseScene scene;
+        float previousTime = static_cast<float>(glfwGetTime());
+        int renderedFrames = 0;
 
-        processInput(window);
-
-        glClearColor(0.53f, 0.75f, 0.90f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        basicShader.use();
-
-        glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 projection = glm::perspective(
-            glm::radians(45.0f),
-            1280.0f / 720.0f,
-            0.1f,
-            300.0f
-        );
-
-        unsigned int viewLoc = glGetUniformLocation(basicShader.ID, "view");
-        unsigned int projLoc = glGetUniformLocation(basicShader.ID, "projection");
-        unsigned int modelLoc = glGetUniformLocation(basicShader.ID, "model");
-
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, sandTexture);
-
-        // ---- Draw the ground plane ----
-        glm::mat4 planeModel = glm::mat4(1.0f);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(planeModel));
-        glBindVertexArray(planeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        // ---- Draw the pyramid: one draw call per block (naive approach --
-        // we'll replace this with instanced rendering in Phase 8) ----
-        glBindVertexArray(cubeVAO);
-        for (const BlockInstance& block : pyramid.getBlocks())
+        while (glfwWindowShouldClose(window) == GLFW_FALSE)
         {
-            glm::mat4 blockModel = glm::mat4(1.0f);
-            blockModel = glm::translate(blockModel, block.position);
-            blockModel = glm::scale(blockModel, glm::vec3(3.0f));
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(blockModel));
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+            const float currentTime = static_cast<float>(glfwGetTime());
+            state.deltaTime = currentTime - previousTime;
+            previousTime = currentTime;
+            if (!smokeTest)
+                processInput(window, state);
 
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+            int framebufferWidth = 0;
+            int framebufferHeight = 0;
+            glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+            if (framebufferWidth == 0 || framebufferHeight == 0)
+            {
+                glfwPollEvents();
+                continue;
+            }
+
+            glViewport(0, 0, framebufferWidth, framebufferHeight);
+            glClearColor(0.055f, 0.075f, 0.11f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            const glm::mat4 projection = glm::perspective(
+                glm::radians(45.0f),
+                static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight),
+                0.1f, 100.0f);
+            scene.render(state.camera.GetViewMatrix(), projection, state.camera.Position,
+                         smokeTest ? 0.0f : currentTime);
+
+            ++renderedFrames;
+            if (smokeTest && renderedFrames == 3 && !capturePath.empty())
+                captureFramebuffer(capturePath, framebufferWidth, framebufferHeight);
+
+            runtimeSucceeded = checkOpenGLErrors() && runtimeSucceeded;
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+
+            if (smokeTest && renderedFrames >= 3)
+                break;
+        }
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Runtime failure: " << error.what() << '\n';
+        runtimeSucceeded = false;
     }
 
-    glDeleteVertexArrays(1, &cubeVAO);
-    glDeleteBuffers(1, &cubeVBO);
-    glDeleteVertexArrays(1, &planeVAO);
-    glDeleteBuffers(1, &planeVBO);
+    glfwDestroyWindow(window);
     glfwTerminate();
-    return 0;
+    if (smokeTest)
+        std::cout << (runtimeSucceeded ? "OpenGL smoke test passed.\n"
+                                       : "OpenGL smoke test failed.\n");
+    return runtimeSucceeded ? 0 : 1;
 }

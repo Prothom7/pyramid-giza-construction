@@ -1,6 +1,7 @@
 # Build directories
 build/
 out/
+cmake-build-*/
 
 # CMake cache/generated files
 CMakeFiles/
@@ -13,6 +14,7 @@ Makefile
 *.o
 *.obj
 main
+*.ppm
 
 # VS Code
 .vscode/

@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.10)
-project(PyramidGiza)
+cmake_minimum_required(VERSION 3.16)
+project(PyramidGiza VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,18 +18,22 @@ target_include_directories(glad PUBLIC external/glad/include)
 add_library(glm INTERFACE)
 target_include_directories(glm INTERFACE external/glm)
 
-# ---- Our executable ----
+# ---- Phase 1 executable ----
 add_executable(PyramidGiza
     src/main.cpp
     src/Shader.cpp
     src/Camera.cpp
-    src/Pyramid.cpp
+    src/graphics/Mesh.cpp
+    src/graphics/PrimitiveGenerator.cpp
+    src/graphics/GeometryValidation.cpp
+    src/graphics/ShowcaseScene.cpp
 )
 
 target_include_directories(PyramidGiza PRIVATE
     external/glfw/include
     external/glad/include
     external/glm
+    src
 )
 
 target_link_libraries(PyramidGiza PRIVATE
@@ -41,3 +45,22 @@ target_link_libraries(PyramidGiza PRIVATE
 if(WIN32)
     target_link_libraries(PyramidGiza PRIVATE opengl32)
 endif()
+
+if(MSVC)
+    target_compile_options(PyramidGiza PRIVATE /W4 /permissive-)
+else()
+    target_compile_options(PyramidGiza PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+set_target_properties(PyramidGiza PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+add_custom_command(TARGET PyramidGiza POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/shaders
+            $<TARGET_FILE_DIR:PyramidGiza>/shaders
+)
+
+enable_testing()
+add_test(NAME Phase1GeometryValidation COMMAND PyramidGiza --validate-geometry)

@@ -1,14 +1,28 @@
 #version 330 core
 
-out vec4 FragColor;
-
+in vec3 WorldPosition;
+in vec3 WorldNormal;
 in vec2 TexCoord;
 
-// A "sampler2D" is GLSL's type for a bound texture we can read from.
-uniform sampler2D texture1;
+out vec4 FragColor;
+
+uniform vec3 objectColor;
+uniform vec3 lightDirection;
+uniform vec3 lightColor;
+uniform vec3 viewPosition;
 
 void main()
 {
-    // texture() looks up the color at coordinate TexCoord in the bound image.
-    FragColor = texture(texture1, TexCoord);
+    vec3 normal = normalize(WorldNormal);
+    vec3 toLight = normalize(-lightDirection);
+
+    float diffuseStrength = max(dot(normal, toLight), 0.0);
+    vec3 viewDirection = normalize(viewPosition - WorldPosition);
+    vec3 halfwayDirection = normalize(toLight + viewDirection);
+    float specularStrength = pow(max(dot(normal, halfwayDirection), 0.0), 32.0);
+
+    vec3 ambient = 0.20 * objectColor;
+    vec3 diffuse = 0.75 * diffuseStrength * objectColor * lightColor;
+    vec3 specular = 0.20 * specularStrength * lightColor;
+    FragColor = vec4(ambient + diffuse + specular, 1.0);
 }
