@@ -91,9 +91,14 @@ void Shader::use() const
 
 int Shader::uniformLocation(const std::string& name) const
 {
+    const auto cached = uniformLocations_.find(name);
+    if (cached != uniformLocations_.end())
+        return cached->second;
+
     const int location = glGetUniformLocation(id_, name.c_str());
     if (location < 0)
         throw std::runtime_error("Shader uniform is missing or inactive: " + name);
+    uniformLocations_.emplace(name, location);
     return location;
 }
 

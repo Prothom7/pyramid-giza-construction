@@ -13,7 +13,8 @@
 
 #include "Camera.h"
 #include "graphics/GeometryValidation.h"
-#include "graphics/ShowcaseScene.h"
+#include "scene/PyramidLayout.h"
+#include "scene/StaticGizaScene.h"
 
 namespace
 {
@@ -22,7 +23,7 @@ constexpr int initialHeight = 720;
 
 struct AppState
 {
-    Camera camera{{0.0f, 0.25f, 10.5f}, {0.0f, 1.0f, 0.0f}, -90.0f, 0.0f};
+    Camera camera{{28.0f, 18.0f, 38.0f}, {0.0f, 1.0f, 0.0f}, -128.0f, -18.0f};
     float lastMouseX = initialWidth * 0.5f;
     float lastMouseY = initialHeight * 0.5f;
     float deltaTime = 0.0f;
@@ -30,6 +31,28 @@ struct AppState
     bool cullingEnabled = true;
     bool wireframeEnabled = false;
 };
+
+void setCameraPreset(AppState& state, int preset)
+{
+    switch (preset)
+    {
+    case 2:
+        state.camera.SetPose({0.0f, 8.5f, 16.0f}, -90.0f, -13.0f);
+        break;
+    case 3:
+        state.camera.SetPose({-8.0f, 7.0f, 18.0f}, -124.0f, -18.0f);
+        break;
+    case 4:
+        state.camera.SetPose({8.0f, 6.0f, 20.0f}, -115.0f, -11.0f);
+        break;
+    case 1:
+    default:
+        state.camera.SetPose({28.0f, 18.0f, 38.0f}, -128.0f, -18.0f);
+        break;
+    }
+    state.firstMouse = true;
+    std::cout << "Camera preset " << preset << " selected.\n";
+}
 
 void glfwErrorCallback(int code, const char* description)
 {
@@ -85,6 +108,8 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int)
         glPolygonMode(GL_FRONT_AND_BACK, state->wireframeEnabled ? GL_LINE : GL_FILL);
         std::cout << "Wireframe: " << (state->wireframeEnabled ? "ON" : "OFF") << '\n';
     }
+    else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_4)
+        setCameraPreset(*state, key - GLFW_KEY_0);
 }
 
 void processInput(GLFWwindow* window, AppState& state)
@@ -99,6 +124,10 @@ void processInput(GLFWwindow* window, AppState& state)
         state.camera.ProcessKeyboard(CameraMovement::LEFT, state.deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         state.camera.ProcessKeyboard(CameraMovement::RIGHT, state.deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        state.camera.ProcessKeyboard(CameraMovement::DOWN, state.deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        state.camera.ProcessKeyboard(CameraMovement::UP, state.deltaTime);
 }
 
 bool checkOpenGLErrors()
@@ -135,16 +164,36 @@ void captureFramebuffer(const std::string& path, int width, int height)
 
 int main(int argc, char** argv)
 {
-    bool validationOnly = false;
+    bool geometryValidationOnly = false;
+    bool sceneValidationOnly = false;
     bool smokeTest = false;
+    bool startWireframe = false;
+    bool startWithCulling = true;
+    int cameraPreset = 1;
     std::string capturePath;
     for (int argument = 1; argument < argc; ++argument)
     {
         const std::string option = argv[argument];
         if (option == "--validate-geometry")
-            validationOnly = true;
+            geometryValidationOnly = true;
+        else if (option == "--validate-scene")
+            sceneValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
+        else if (option == "--wireframe")
+            startWireframe = true;
+        else if (option == "--no-cull")
+            startWithCulling = false;
+        else if (option == "--preset" && argument + 1 < argc)
+        {
+            const std::string value = argv[++argument];
+            if (value.size() != 1 || value[0] < '1' || value[0] > '4')
+            {
+                std::cerr << "Camera preset must be 1, 2, 3, or 4.\n";
+                return 2;
+            }
+            cameraPreset = value[0] - '0';
+        }
         else if (option == "--capture" && argument + 1 < argc)
             capturePath = argv[++argument];
         else
@@ -154,10 +203,12 @@ int main(int argc, char** argv)
         }
     }
 
-    if (!validatePrimitiveFoundation(std::cout))
+    if (geometryValidationOnly)
+        return validatePrimitiveFoundation(std::cout) ? 0 : 1;
+    if (sceneValidationOnly)
+        return validatePyramidLayout(std::cout) ? 0 : 1;
+    if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout))
         return 1;
-    if (validationOnly)
-        return 0;
 
     glfwSetErrorCallback(glfwErrorCallback);
     if (glfwInit() == GLFW_FALSE)
@@ -176,7 +227,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 1 Primitive Foundation",
+                                          "Pyramid at Giza - Phase 2 Static Construction World",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -198,6 +249,7 @@ int main(int argc, char** argv)
               << "Renderer: " << glGetString(GL_RENDERER) << '\n';
 
     AppState state;
+    setCameraPreset(state, cameraPreset);
     glfwSetWindowUserPointer(window, &state);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     glfwSetKeyCallback(window, keyCallback);
@@ -205,8 +257,8 @@ int main(int argc, char** argv)
     {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetCursorPosCallback(window, mouseCallback);
-        std::cout << "Controls: W/A/S/D move, mouse looks, C toggles culling, "
-                     "F toggles wireframe, ESC exits.\n";
+        std::cout << "Controls: W/A/S/D move, Q/E move vertically, mouse looks, "
+                     "1-4 select views, C toggles culling, F toggles wireframe, ESC exits.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
 
@@ -214,11 +266,19 @@ int main(int argc, char** argv)
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
+    state.cullingEnabled = startWithCulling;
+    state.wireframeEnabled = startWireframe;
+    if (!startWithCulling)
+        glDisable(GL_CULL_FACE);
+    if (startWireframe)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    std::cout << "Raster mode: " << (startWireframe ? "wireframe" : "filled")
+              << ", back-face culling: " << (startWithCulling ? "ON" : "OFF") << '\n';
 
     bool runtimeSucceeded = true;
     try
     {
-        ShowcaseScene scene;
+        StaticGizaScene scene;
         float previousTime = static_cast<float>(glfwGetTime());
         int renderedFrames = 0;
 
@@ -240,15 +300,14 @@ int main(int argc, char** argv)
             }
 
             glViewport(0, 0, framebufferWidth, framebufferHeight);
-            glClearColor(0.055f, 0.075f, 0.11f, 1.0f);
+            glClearColor(0.47f, 0.68f, 0.86f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             const glm::mat4 projection = glm::perspective(
                 glm::radians(45.0f),
                 static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight),
                 0.1f, 100.0f);
-            scene.render(state.camera.GetViewMatrix(), projection, state.camera.Position,
-                         smokeTest ? 0.0f : currentTime);
+            scene.render(state.camera.GetViewMatrix(), projection, state.camera.Position);
 
             ++renderedFrames;
             if (smokeTest && renderedFrames == 3 && !capturePath.empty())

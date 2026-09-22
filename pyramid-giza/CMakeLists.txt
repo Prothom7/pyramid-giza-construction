@@ -26,7 +26,8 @@ add_executable(PyramidGiza
     src/graphics/Mesh.cpp
     src/graphics/PrimitiveGenerator.cpp
     src/graphics/GeometryValidation.cpp
-    src/graphics/ShowcaseScene.cpp
+    src/scene/PyramidLayout.cpp
+    src/scene/StaticGizaScene.cpp
 )
 
 target_include_directories(PyramidGiza PRIVATE
@@ -64,3 +65,4 @@ add_custom_command(TARGET PyramidGiza POST_BUILD
 
 enable_testing()
 add_test(NAME Phase1GeometryValidation COMMAND PyramidGiza --validate-geometry)
+add_test(NAME Phase2SceneValidation COMMAND PyramidGiza --validate-scene)

@@ -1,0 +1,15 @@
+ObjectGroup,Primitive,OriginX,OriginY,OriginZ,ScaleX,ScaleY,ScaleZ,RotationX,RotationY,RotationZ,GenerationRule,Notes
+Desert Ground,Plane,0,0,-4,90,1,72,0,0,0,Single transformed canonical plane,Sand-colored world base
+Main Pyramid,Cube,0,0,-10,1.15,0.62,1.15,0,0,0,baseBlocksPerSide=15; completedLevels=10; partialFromLevel=6; spacing=0.07; centered shrinking square levels,1162 blocks share one cube mesh
+Main Ramp Deck,Cube,0,2,5.35,4.6,0.42,19.6,10,0,0,Single inclined cuboid from ground to level-6 opening,Earth-colored deck
+Main Ramp Rails,Cube,+/-2.35,2.23,5.35,0.20,0.30,19.8,10,0,0,Two inclined side rails,Reuse cube mesh
+Ramp Cross Logs,Cylinder,0,rampHeight(z)+0.28,-3.0 to 13.65,0.24,4.9,0.24,0,0,90,10 samples at z step 1.85,Cylinder Y axis rotated across ramp
+Ramp Supports,Cylinder,+/-2.0,height/2,1;6;11,0.28,height,0.28,0,0,0,Three support stations with two poles each,Height follows ramp slope
+Ramp Crossbeams,Cube,0,height,1;6;11,4.5,0.20,0.30,0,0,0,One beam per support station,Dark wood
+Quarry Loose Stones,Cube,-22 to -14.95,scaleY/2,-1.5 to 5.25,1.35 to 1.89,0.62 to 0.86,1.10 to 1.42,0,-21 to 21,0,4 x 4 deterministic grid with patterned scale and rotation,16 irregularly arranged cuboids
+Quarry Cut Face,Cube,-23 to -18.9,0.425 to 2.125,-5.0 to -6.44,2.0,0.85,1.25,0,0,0,Three rows by three stepped levels,9 blocks create quarry wall
+Prepared Stockpile,Cube,9.5 to 13.94,0.34 to 1.02,3.0 to 5.56,1.30,0.68,1.05,0,0,0,12 ground blocks plus 3 second-course blocks,15 prepared stones
+Work Frame Poles,Cylinder,15 or 19,1.8,-8 or -3.5,0.34,3.6,0.34,0,0,0,Four corner poles,Static work area
+Work Frame Beams,Cube,15 to 19,3.45,-8 to -3.5,varies,0.28,varies,0,0,0,Two cross beams plus two side beams,Static work area
+Loose Work Logs,Cylinder,15.5 to 18.3,0.24,0,0.38,2.4,0.38,0,0,90,Five horizontal logs at x step 0.7,Static materials
+World Scale,N/A,0,0,0,,,,,,,World coordinates intentionally exceed [-1;+1],View and projection map visible geometry to the CVV

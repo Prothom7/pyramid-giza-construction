@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 
 #include <glm/glm.hpp>
 
@@ -21,6 +22,7 @@ public:
 
 private:
     unsigned int id_ = 0;
+    mutable std::unordered_map<std::string, int> uniformLocations_;
 
     static std::string readFile(const std::string& path);
     static unsigned int compile(unsigned int type, const std::string& source,

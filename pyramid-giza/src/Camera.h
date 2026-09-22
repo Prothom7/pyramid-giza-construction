@@ -11,7 +11,9 @@ enum class CameraMovement
     FORWARD,
     BACKWARD,
     LEFT,
-    RIGHT
+    RIGHT,
+    UP,
+    DOWN
 };
 
 class Camera
@@ -46,6 +48,9 @@ public:
 
     // Called every frame from main.cpp with raw mouse movement deltas.
     void ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch = true);
+
+    // Used by the Phase 2 demonstration camera presets.
+    void SetPose(const glm::vec3& position, float yaw, float pitch);
 
 private:
     // Recalculates Front, Right, and Up from the current Yaw/Pitch.
