@@ -13,6 +13,7 @@
 
 #include "Camera.h"
 #include "graphics/GeometryValidation.h"
+#include "objects/CompositeValidation.h"
 #include "scene/PyramidLayout.h"
 #include "scene/StaticGizaScene.h"
 
@@ -44,6 +45,9 @@ void setCameraPreset(AppState& state, int preset)
         break;
     case 4:
         state.camera.SetPose({8.0f, 6.0f, 20.0f}, -115.0f, -11.0f);
+        break;
+    case 5:
+        state.camera.SetPose({15.5f, 5.0f, 14.5f}, -132.0f, -13.0f);
         break;
     case 1:
     default:
@@ -108,7 +112,7 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int)
         glPolygonMode(GL_FRONT_AND_BACK, state->wireframeEnabled ? GL_LINE : GL_FILL);
         std::cout << "Wireframe: " << (state->wireframeEnabled ? "ON" : "OFF") << '\n';
     }
-    else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_4)
+    else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_5)
         setCameraPreset(*state, key - GLFW_KEY_0);
 }
 
@@ -166,6 +170,7 @@ int main(int argc, char** argv)
 {
     bool geometryValidationOnly = false;
     bool sceneValidationOnly = false;
+    bool compositeValidationOnly = false;
     bool smokeTest = false;
     bool startWireframe = false;
     bool startWithCulling = true;
@@ -178,6 +183,8 @@ int main(int argc, char** argv)
             geometryValidationOnly = true;
         else if (option == "--validate-scene")
             sceneValidationOnly = true;
+        else if (option == "--validate-composites")
+            compositeValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
         else if (option == "--wireframe")
@@ -187,9 +194,9 @@ int main(int argc, char** argv)
         else if (option == "--preset" && argument + 1 < argc)
         {
             const std::string value = argv[++argument];
-            if (value.size() != 1 || value[0] < '1' || value[0] > '4')
+            if (value.size() != 1 || value[0] < '1' || value[0] > '5')
             {
-                std::cerr << "Camera preset must be 1, 2, 3, or 4.\n";
+                std::cerr << "Camera preset must be 1, 2, 3, 4, or 5.\n";
                 return 2;
             }
             cameraPreset = value[0] - '0';
@@ -207,7 +214,10 @@ int main(int argc, char** argv)
         return validatePrimitiveFoundation(std::cout) ? 0 : 1;
     if (sceneValidationOnly)
         return validatePyramidLayout(std::cout) ? 0 : 1;
-    if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout))
+    if (compositeValidationOnly)
+        return validateCompositeObjects(std::cout) ? 0 : 1;
+    if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
+        !validateCompositeObjects(std::cout))
         return 1;
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -227,7 +237,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 2 Static Construction World",
+                                          "Pyramid at Giza - Phase 3 Composite Construction Objects",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -258,7 +268,7 @@ int main(int argc, char** argv)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetCursorPosCallback(window, mouseCallback);
         std::cout << "Controls: W/A/S/D move, Q/E move vertically, mouse looks, "
-                     "1-4 select views, C toggles culling, F toggles wireframe, ESC exits.\n";
+                     "1-5 select views, C toggles culling, F toggles wireframe, ESC exits.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
 

@@ -5,37 +5,14 @@
 #include <stdexcept>
 
 #include <glm/gtc/matrix_inverse.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 #include "graphics/PrimitiveGenerator.h"
+#include "objects/ConstructionProps.h"
+#include "objects/Sledge.h"
+#include "objects/Worker.h"
 
 namespace
 {
-struct Palette
-{
-    const glm::vec3 sand{0.76f, 0.60f, 0.35f};
-    const glm::vec3 limestone{0.82f, 0.72f, 0.50f};
-    const glm::vec3 limestoneVariation{0.72f, 0.61f, 0.40f};
-    const glm::vec3 quarryStone{0.50f, 0.43f, 0.34f};
-    const glm::vec3 preparedStone{0.88f, 0.78f, 0.57f};
-    const glm::vec3 rampEarth{0.48f, 0.31f, 0.17f};
-    const glm::vec3 wood{0.34f, 0.18f, 0.08f};
-    const glm::vec3 darkWood{0.23f, 0.11f, 0.045f};
-};
-
-const Palette colors;
-
-glm::mat4 makeModel(const glm::vec3& translation, const glm::vec3& rotationDegrees,
-                    const glm::vec3& scale)
-{
-    glm::mat4 model{1.0f};
-    model = glm::translate(model, translation);
-    model = glm::rotate(model, glm::radians(rotationDegrees.y), {0.0f, 1.0f, 0.0f});
-    model = glm::rotate(model, glm::radians(rotationDegrees.x), {1.0f, 0.0f, 0.0f});
-    model = glm::rotate(model, glm::radians(rotationDegrees.z), {0.0f, 0.0f, 1.0f});
-    return glm::scale(model, scale);
-}
-
 float rampHeightAt(float z)
 {
     constexpr float centerY = 2.0f;
@@ -44,21 +21,14 @@ float rampHeightAt(float z)
     return centerY - (z - centerZ) * std::tan(glm::radians(slopeDegrees));
 }
 
-bool finiteMatrix(const glm::mat4& matrix)
-{
-    for (int column = 0; column < 4; ++column)
-        for (int row = 0; row < 4; ++row)
-            if (!std::isfinite(matrix[column][row]))
-                return false;
-    return true;
-}
 } // namespace
 
 StaticGizaScene::StaticGizaScene()
     : shader_("shaders/basic.vert", "shaders/basic.frag"),
       plane_(PrimitiveGenerator::createPlane()),
       cube_(PrimitiveGenerator::createCube()),
-      cylinder_(PrimitiveGenerator::createCylinder())
+      cylinder_(PrimitiveGenerator::createCylinder()),
+      sphere_(PrimitiveGenerator::createSphere())
 {
     objects_.reserve(1280);
     buildGround();
@@ -67,6 +37,7 @@ StaticGizaScene::StaticGizaScene()
     buildQuarry();
     buildStockpile();
     buildConstructionProps();
+    buildCompositeObjects();
     stats_.totalDrawCalls = objects_.size();
 
     const PyramidLayoutStats pyramidStats = PyramidLayout::statistics(
@@ -75,22 +46,35 @@ StaticGizaScene::StaticGizaScene()
               << stats_.totalDrawCalls << " total draw calls\n"
               << "Pyramid footprint: " << pyramidStats.baseWidth << " x "
               << pyramidStats.baseDepth << ", completed height: "
-              << pyramidStats.completedHeight << '\n';
+              << pyramidStats.completedHeight << '\n'
+              << "Composite objects: " << stats_.workerInstances << " workers ("
+              << stats_.workerParts << " body-part draws), " << stats_.sledgeInstances
+              << " sledges\n";
 }
 
 void StaticGizaScene::addObject(ScenePrimitive primitive, const glm::mat4& model,
-                                const glm::vec3& color)
+                                MaterialId material)
 {
-    if (!finiteMatrix(model) || std::abs(glm::determinant(glm::mat3(model))) < 1.0e-8f)
+    if (!isFiniteNonSingularTransform(model))
         throw std::runtime_error("Static scene contains an invalid model transform");
-    objects_.push_back({primitive, model, color});
+    static_cast<void>(materialDefinition(material));
+    objects_.push_back({primitive, model, material});
+}
+
+void StaticGizaScene::addComposite(const glm::mat4& root,
+                                   const std::vector<ObjectPart>& parts)
+{
+    if (!isFiniteNonSingularTransform(root))
+        throw std::runtime_error("Composite object contains an invalid root transform");
+    for (const ObjectPart& part : parts)
+        addObject(part.primitive, root * part.localTransform, part.material);
 }
 
 void StaticGizaScene::buildGround()
 {
     addObject(ScenePrimitive::Plane,
-              makeModel({0.0f, 0.0f, -4.0f}, {0.0f, 0.0f, 0.0f}, {90.0f, 1.0f, 72.0f}),
-              colors.sand);
+              makeTransform({0.0f, 0.0f, -4.0f}, {}, {90.0f, 1.0f, 72.0f}),
+              MaterialId::Sand);
 }
 
 void StaticGizaScene::buildPyramid()
@@ -98,10 +82,10 @@ void StaticGizaScene::buildPyramid()
     const std::vector<PyramidBlockPlacement> blocks = PyramidLayout::generate(pyramidConfig_);
     for (const PyramidBlockPlacement& block : blocks)
     {
-        const glm::vec3 color = (block.level % 3 == 1) ? colors.limestoneVariation
-                                                       : colors.limestone;
+        const MaterialId material = (block.level % 3 == 1) ? MaterialId::LimestoneVariation
+                                                            : MaterialId::Limestone;
         addObject(ScenePrimitive::Cube,
-                  makeModel(block.position, {0.0f, 0.0f, 0.0f}, block.scale), color);
+                  makeTransform(block.position, {}, block.scale), material);
     }
     stats_.pyramidBlocks = blocks.size();
 }
@@ -111,20 +95,20 @@ void StaticGizaScene::buildRamp()
     const std::size_t start = objects_.size();
     constexpr float slope = 10.0f;
     addObject(ScenePrimitive::Cube,
-              makeModel({0.0f, 2.0f, 5.35f}, {slope, 0.0f, 0.0f}, {4.6f, 0.42f, 19.6f}),
-              colors.rampEarth);
+              makeTransform({0.0f, 2.0f, 5.35f}, {slope, 0.0f, 0.0f}, {4.6f, 0.42f, 19.6f}),
+              MaterialId::RampEarth);
     for (float x : {-2.35f, 2.35f})
         addObject(ScenePrimitive::Cube,
-                  makeModel({x, 2.23f, 5.35f}, {slope, 0.0f, 0.0f}, {0.20f, 0.30f, 19.8f}),
-                  colors.darkWood);
+                  makeTransform({x, 2.23f, 5.35f}, {slope, 0.0f, 0.0f}, {0.20f, 0.30f, 19.8f}),
+                  MaterialId::DarkWood);
 
     for (int sample = 0; sample < 10; ++sample)
     {
         const float z = -3.0f + sample * 1.85f;
         addObject(ScenePrimitive::Cylinder,
-                  makeModel({0.0f, rampHeightAt(z) + 0.28f, z}, {0.0f, 0.0f, 90.0f},
+                  makeTransform({0.0f, rampHeightAt(z) + 0.28f, z}, {0.0f, 0.0f, 90.0f},
                             {0.24f, 4.9f, 0.24f}),
-                  colors.wood);
+                  MaterialId::Wood);
     }
 
     for (float z : {1.0f, 6.0f, 11.0f})
@@ -132,12 +116,12 @@ void StaticGizaScene::buildRamp()
         const float height = rampHeightAt(z) - 0.10f;
         for (float x : {-2.0f, 2.0f})
             addObject(ScenePrimitive::Cylinder,
-                      makeModel({x, height * 0.5f, z}, {0.0f, 0.0f, 0.0f},
+                      makeTransform({x, height * 0.5f, z}, {},
                                 {0.28f, height, 0.28f}),
-                      colors.wood);
+                      MaterialId::Wood);
         addObject(ScenePrimitive::Cube,
-                  makeModel({0.0f, height, z}, {0.0f, 0.0f, 0.0f}, {4.5f, 0.20f, 0.30f}),
-                  colors.darkWood);
+                  makeTransform({0.0f, height, z}, {}, {4.5f, 0.20f, 0.30f}),
+                  MaterialId::DarkWood);
     }
     stats_.rampComponents = objects_.size() - start;
 }
@@ -157,8 +141,8 @@ void StaticGizaScene::buildQuarry()
                                      scale.y * 0.5f,
                                      -1.5f + row * 2.25f};
             addObject(ScenePrimitive::Cube,
-                      makeModel(position, {0.0f, static_cast<float>((row - column) * 7), 0.0f}, scale),
-                      (pattern % 2 == 0) ? colors.quarryStone : colors.limestoneVariation);
+                      makeTransform(position, {0.0f, static_cast<float>((row - column) * 7), 0.0f}, scale),
+                      (pattern % 2 == 0) ? MaterialId::QuarryStone : MaterialId::LimestoneVariation);
         }
     }
 
@@ -168,10 +152,10 @@ void StaticGizaScene::buildQuarry()
         {
             const glm::vec3 scale{2.0f, 0.85f, 1.25f};
             addObject(ScenePrimitive::Cube,
-                      makeModel({-23.0f + column * 2.05f, 0.425f + level * 0.85f,
+                      makeTransform({-23.0f + column * 2.05f, 0.425f + level * 0.85f,
                                  -5.0f - level * 0.72f},
-                                {0.0f, 0.0f, 0.0f}, scale),
-                      colors.quarryStone);
+                                {}, scale),
+                      MaterialId::QuarryStone);
         }
     stats_.quarryBlocks = objects_.size() - start;
 }
@@ -183,15 +167,15 @@ void StaticGizaScene::buildStockpile()
     for (int row = 0; row < 3; ++row)
         for (int column = 0; column < 4; ++column)
             addObject(ScenePrimitive::Cube,
-                      makeModel({9.5f + column * 1.48f, blockScale.y * 0.5f,
+                      makeTransform({9.5f + column * 1.48f, blockScale.y * 0.5f,
                                  3.0f + row * 1.28f},
-                                {0.0f, 0.0f, 0.0f}, blockScale),
-                      colors.preparedStone);
+                                {}, blockScale),
+                      MaterialId::PreparedStone);
     for (int column = 0; column < 3; ++column)
         addObject(ScenePrimitive::Cube,
-                  makeModel({10.25f + column * 1.48f, blockScale.y * 1.5f, 4.28f},
-                            {0.0f, 0.0f, 0.0f}, blockScale),
-                  colors.preparedStone);
+                  makeTransform({10.25f + column * 1.48f, blockScale.y * 1.5f, 4.28f},
+                            {}, blockScale),
+                  MaterialId::PreparedStone);
     stats_.stockpileBlocks = objects_.size() - start;
 }
 
@@ -201,23 +185,59 @@ void StaticGizaScene::buildConstructionProps()
     for (float x : {15.0f, 19.0f})
         for (float z : {-8.0f, -3.5f})
             addObject(ScenePrimitive::Cylinder,
-                      makeModel({x, 1.8f, z}, {0.0f, 0.0f, 0.0f}, {0.34f, 3.6f, 0.34f}),
-                      colors.wood);
+                      makeTransform({x, 1.8f, z}, {}, {0.34f, 3.6f, 0.34f}),
+                      MaterialId::Wood);
     for (float z : {-8.0f, -3.5f})
         addObject(ScenePrimitive::Cube,
-                  makeModel({17.0f, 3.45f, z}, {0.0f, 0.0f, 0.0f}, {4.5f, 0.28f, 0.32f}),
-                  colors.darkWood);
+                  makeTransform({17.0f, 3.45f, z}, {}, {4.5f, 0.28f, 0.32f}),
+                  MaterialId::DarkWood);
     for (float x : {15.0f, 19.0f})
         addObject(ScenePrimitive::Cube,
-                  makeModel({x, 3.45f, -5.75f}, {0.0f, 0.0f, 0.0f}, {0.32f, 0.28f, 4.8f}),
-                  colors.darkWood);
+                  makeTransform({x, 3.45f, -5.75f}, {}, {0.32f, 0.28f, 4.8f}),
+                  MaterialId::DarkWood);
 
     for (int log = 0; log < 5; ++log)
         addObject(ScenePrimitive::Cylinder,
-                  makeModel({15.5f + log * 0.7f, 0.24f, 0.0f}, {0.0f, 0.0f, 90.0f},
+                  makeTransform({15.5f + log * 0.7f, 0.24f, 0.0f}, {0.0f, 0.0f, 90.0f},
                             {0.38f, 2.4f, 0.38f}),
-                  colors.wood);
+                  MaterialId::Wood);
     stats_.constructionProps = objects_.size() - start;
+}
+
+void StaticGizaScene::buildCompositeObjects()
+{
+    const auto addWorker = [&](const glm::vec3& position, float rotationY, WorkerPose pose,
+                               MaterialId clothing) {
+        const std::vector<ObjectPart> parts = Worker::create(pose, {clothing, MaterialId::Headwear});
+        addComposite(makeTransform(position, {0.0f, rotationY, 0.0f}, {1.0f, 1.0f, 1.0f}), parts);
+        ++stats_.workerInstances;
+        stats_.workerParts += parts.size();
+    };
+
+    // Two pullers face the loaded sledge's rope and the pyramid approach.
+    addWorker({5.55f, 0.0f, 5.25f}, 0.0f, WorkerPose::PullingReady, MaterialId::ClothingLinen);
+    addWorker({6.45f, 0.0f, 5.25f}, 0.0f, WorkerPose::PullingReady, MaterialId::ClothingBlue);
+    addWorker({-17.0f, 0.0f, 1.2f}, -80.0f, WorkerPose::Standing, MaterialId::ClothingBlue);
+    addWorker({-19.0f, 0.0f, 6.5f}, 155.0f, WorkerPose::CarryingReady, MaterialId::ClothingLinen);
+    addWorker({3.55f, 0.0f, -1.8f}, -35.0f, WorkerPose::CarryingReady, MaterialId::ClothingBlue);
+    addWorker({14.8f, 0.0f, -0.8f}, 90.0f, WorkerPose::LeverReady, MaterialId::ClothingLinen);
+    addWorker({11.2f, 0.0f, 7.1f}, 170.0f, WorkerPose::Standing, MaterialId::ClothingBlue);
+
+    addComposite(makeTransform({6.0f, 0.0f, 9.15f}, {}, {1.0f, 1.0f, 1.0f}),
+                 Sledge::create(true));
+    addComposite(makeTransform({-12.5f, 0.0f, 6.8f}, {0.0f, -55.0f, 0.0f}, {0.9f, 0.9f, 0.9f}),
+                 Sledge::create(false));
+    stats_.sledgeInstances = 2;
+
+    const std::vector<ObjectPart> lever = ConstructionProps::createLever();
+    const std::vector<ObjectPart> mallet = ConstructionProps::createMallet();
+    const std::vector<ObjectPart> frame = ConstructionProps::createWoodenFrame();
+    const std::vector<ObjectPart> roller = ConstructionProps::createRoller();
+    addComposite(makeTransform({13.3f, 0.0f, -1.6f}, {0.0f, 90.0f, 0.0f}, {1.0f, 1.0f, 1.0f}), lever);
+    addComposite(makeTransform({17.0f, 0.0f, -1.1f}, {0.0f, 18.0f, 18.0f}, {1.0f, 1.0f, 1.0f}), mallet);
+    addComposite(makeTransform({-10.5f, 0.0f, 8.5f}, {0.0f, 20.0f, 0.0f}, {1.0f, 1.0f, 1.0f}), frame);
+    addComposite(makeTransform({-13.2f, 0.0f, 3.7f}, {0.0f, 35.0f, 0.0f}, {1.0f, 1.0f, 1.0f}), roller);
+    stats_.compositeEquipmentParts = lever.size() + mallet.size() + frame.size() + roller.size();
 }
 
 const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
@@ -228,6 +248,8 @@ const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
         return plane_;
     case ScenePrimitive::Cylinder:
         return cylinder_;
+    case ScenePrimitive::Sphere:
+        return sphere_;
     case ScenePrimitive::Cube:
     default:
         return cube_;
@@ -248,7 +270,11 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
     {
         shader_.setMat4("model", object.model);
         shader_.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(object.model))));
-        shader_.setVec3("objectColor", object.color);
+        const Material& material = materialDefinition(object.material);
+        shader_.setVec3("objectColor", material.color);
+        shader_.setFloat("materialAmbient", material.ambient);
+        shader_.setFloat("materialDiffuse", material.diffuse);
+        shader_.setFloat("materialSpecular", material.specular);
         meshFor(object.primitive).draw();
     }
 }

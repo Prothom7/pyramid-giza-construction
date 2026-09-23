@@ -1,0 +1,14 @@
+InstanceID,ObjectType,WorldX,WorldY,WorldZ,RotationY,Scale,Pose,Purpose
+PullerLeft,Worker,5.55,0,5.25,0,1.0,PullingReady,Left worker at loaded sledge rope
+PullerRight,Worker,6.45,0,5.25,0,1.0,PullingReady,Right worker at loaded sledge rope
+QuarryObserver,Worker,-17.0,0,1.2,-80,1.0,Standing,Quarry work group
+QuarryCarrier,Worker,-19.0,0,6.5,155,1.0,CarryingReady,Quarry load handling
+RampCarrier,Worker,3.55,0,-1.8,-35,1.0,CarryingReady,Ramp-side worker
+LeverOperator,Worker,14.8,0,-0.8,90,1.0,LeverReady,Work-area lever operator
+StockpileWorker,Worker,11.2,0,7.1,170,1.0,Standing,Prepared-stone staging worker
+LoadedSledge,Sledge,6.0,0,9.15,0,1.0,Loaded,Stone transport composition
+QuarrySledge,Sledge,-12.5,0,6.8,-55,0.9,Unloaded,Quarry transport prop
+WorkLever,Lever,13.3,0,-1.6,90,1.0,Static,Lever and lift-stone arrangement
+WorkMallet,Mallet,17.0,0,-1.1,18,1.0,Static,Simple hand tool
+QuarryFrame,WoodenFrame,-10.5,0,8.5,20,1.0,Static,Reusable construction support
+LooseTimber,TimberProp,-13.2,0,3.7,35,1.0,Static,Generic cylindrical construction prop

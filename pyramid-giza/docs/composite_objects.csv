@@ -1,0 +1,38 @@
+ObjectType,PartName,Primitive,LocalTranslateX,LocalTranslateY,LocalTranslateZ,LocalRotateX,LocalRotateY,LocalRotateZ,LocalScaleX,LocalScaleY,LocalScaleZ,Material,ParentHint,Notes
+Worker,Pelvis,Cube,0,1.14,0,0,0,0,0.48,0.24,0.28,ClothingLinen,WorkerRoot,Baseline standing pose
+Worker,Torso,Cube,0,1.52,0,0,0,0,0.65,0.62,0.34,ClothingLinen,Pelvis,Baseline standing pose
+Worker,Neck,Cylinder,0,1.78,0,0,0,0,0.15,0.16,0.15,Skin,Torso,Canonical cylinder axis is local Y
+Worker,Head,Sphere,0,1.94,0,0,0,0,0.36,0.40,0.36,Skin,Neck,Approximate top at Y 2.14
+Worker,Headwear,Cylinder,0,2.075,0,0,0,0,0.42,0.11,0.42,Headwear,Head,Thin cap shape
+Worker,LeftUpperArm,Cylinder,-0.43,1.43,0,0,0,-5,0.17,0.47,0.17,Skin,Torso,Pose-specific transform
+Worker,LeftForearm,Cylinder,-0.45,1.04,0,0,0,-2,0.15,0.38,0.15,Skin,LeftUpperArm,Pose-specific transform
+Worker,LeftHand,Sphere,-0.46,0.80,0,0,0,0,0.17,0.17,0.17,Skin,LeftForearm,Pose-specific transform
+Worker,RightUpperArm,Cylinder,0.43,1.43,0,0,0,5,0.17,0.47,0.17,Skin,Torso,Pose-specific transform
+Worker,RightForearm,Cylinder,0.45,1.04,0,0,0,2,0.15,0.38,0.15,Skin,RightUpperArm,Pose-specific transform
+Worker,RightHand,Sphere,0.46,0.80,0,0,0,0,0.17,0.17,0.17,Skin,RightForearm,Pose-specific transform
+Worker,LeftThigh,Cylinder,-0.16,0.88,0,0,0,-3,0.20,0.52,0.20,Skin,Pelvis,Baseline all poses
+Worker,LeftLowerLeg,Cylinder,-0.18,0.43,0,0,0,0,0.17,0.45,0.17,Skin,LeftThigh,Baseline all poses
+Worker,LeftFoot,Cube,-0.18,0.10,-0.07,0,0,0,0.28,0.20,0.46,Skin,LeftLowerLeg,Bottom rests on local ground
+Worker,RightThigh,Cylinder,0.16,0.88,0,0,0,3,0.20,0.52,0.20,Skin,Pelvis,Baseline all poses
+Worker,RightLowerLeg,Cylinder,0.18,0.43,0,0,0,0,0.17,0.45,0.17,Skin,RightThigh,Baseline all poses
+Worker,RightFoot,Cube,0.18,0.10,-0.07,0,0,0,0.28,0.20,0.46,Skin,RightLowerLeg,Bottom rests on local ground
+Sledge,LeftRunner,Cube,-0.62,0.16,0,0,0,0,0.24,0.22,2.75,DarkWood,SledgeRoot,Shared cube mesh
+Sledge,RightRunner,Cube,0.62,0.16,0,0,0,0,0.24,0.22,2.75,DarkWood,SledgeRoot,Shared cube mesh
+Sledge,RearBrace,Cube,0,0.32,-0.86,0,0,0,1.55,0.18,0.20,Wood,Runners,Cross support
+Sledge,MiddleBrace,Cube,0,0.32,0,0,0,0,1.55,0.18,0.20,Wood,Runners,Cross support
+Sledge,FrontBrace,Cube,0,0.32,0.86,0,0,0,1.55,0.18,0.20,Wood,Runners,Cross support
+Sledge,Platform,Cube,0,0.46,-0.08,0,0,0,1.50,0.18,2.05,Wood,CrossBraces,Load platform
+Sledge,TowBar,Cube,0,0.32,-1.76,0,0,0,1.02,0.16,1.35,DarkWood,Runners,Front attachment
+Sledge,PullingRope,Cylinder,0,0.36,-3.25,90,0,0,0.08,2.05,0.08,Rope,TowBar,Straight static rope
+Sledge,TransportStone,Cube,0,1.04,-0.02,0,0,0,1.20,0.98,1.38,PreparedStone,Platform,Only in loaded variant
+Lever,Fulcrum,Cube,0,0.28,0,0,0,45,0.55,0.55,0.70,QuarryStone,LeverRoot,Stone support
+Lever,LeverBeam,Cylinder,0,0.70,0,0,0,68,0.16,3.10,0.16,Wood,Fulcrum,Long wooden beam
+Lever,LiftStone,Cube,-1.25,0.35,0,0,0,0,0.90,0.70,0.90,PreparedStone,LeverRoot,Ordinary shared cube
+Mallet,MalletHandle,Cylinder,0,0.48,0,0,0,0,0.10,0.95,0.10,Wood,MalletRoot,Simple hand tool
+Mallet,MalletHead,Cube,0,0.96,0,0,0,0,0.58,0.28,0.30,DarkWood,MalletHandle,Simple hand tool
+WoodenFrame,LeftPost,Cylinder,-0.90,1.15,0,0,0,0,0.20,2.30,0.20,Wood,FrameRoot,Vertical support
+WoodenFrame,RightPost,Cylinder,0.90,1.15,0,0,0,0,0.20,2.30,0.20,Wood,FrameRoot,Vertical support
+WoodenFrame,TopBeam,Cube,0,2.25,0,0,0,0,2.15,0.22,0.24,DarkWood,Posts,Horizontal support
+WoodenFrame,CrossBeam,Cube,0,1.24,0,0,0,0,1.80,0.18,0.20,Wood,Posts,Horizontal brace
+WoodenFrame,HangingRope,Cylinder,0,1.73,0,0,0,0,0.07,0.82,0.07,Rope,TopBeam,Static rope segment
+TimberProp,TimberRoller,Cylinder,0,0.22,0,0,0,90,0.36,2.20,0.36,Wood,RollerRoot,Generic cylindrical timber prop
