@@ -1,0 +1,4 @@
+RampID,StartX,StartY,StartZ,EndX,EndY,EndZ,Width,Thickness,Role,AnimatedRoute,Notes
+MainHaulingRamp,0,0.35,45,0,8.20,-0.60,7.0,0.70,Primary stone haul,Yes,46.27 units long with 9.77 degree incline
+WestAccessRamp,-63,0.30,-25,-41.6,5.30,-25,4.5,0.60,Quarry-side access,No,Connects west work zone to pyramid side
+UpperConnector,9,8.40,0.20,20,13.20,-11,3.6,0.52,Upper work connector,No,Links main active face and higher platform

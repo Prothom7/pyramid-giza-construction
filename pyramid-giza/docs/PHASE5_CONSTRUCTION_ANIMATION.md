@@ -57,21 +57,22 @@ Pose fields use linear interpolation followed by the existing Phase 4 joint-limi
 The loaded sledge uses one normalized progress value:
 
 ```text
-stockpile start (6, 0, 9.15)
+stockpile start (10, 0, 40)
         |
-ground turn (0, 0, 13.5)
+ground turn (0, 0, 47)
         |
-ramp entry (0, rampHeight, 12.5)
+ramp entry (0, rampHeight, 45)
         |
-ramp top (0, rampHeight, -1)
+ramp top (0, rampHeight, -0.6)
 ```
 
 Ground pulling uses progress 0.00-0.35, the turn/ramp approach uses 0.35-0.45, and ramp
 pulling uses 0.45-1.00. Heading comes from the current horizontal path direction. Ramp
-pitch is 10 degrees. The ramp surface is:
+pitch is approximately 9.77 degrees. Since Phase 5.5 the ramp surface is derived from the
+central main-ramp descriptor:
 
 ```text
-y = 2.0 - (z - 5.35) * tan(10 degrees) + 0.24
+surfacePoint = mix(ramp.base, ramp.top, progress) + rampUp * thickness/2
 ```
 
 Both puller positions are derived from the same sledge frame: 3.7 units ahead along the

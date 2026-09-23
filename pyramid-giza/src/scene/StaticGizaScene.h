@@ -16,10 +16,14 @@ struct StaticGizaSceneStats
 {
     std::size_t pyramidBlocks = 0;
     std::size_t rampComponents = 0;
+    std::size_t scaffoldModules = 0;
     std::size_t quarryBlocks = 0;
     std::size_t stockpileBlocks = 0;
     std::size_t constructionProps = 0;
     std::size_t workerInstances = 0;
+    std::size_t heroWorkers = 0;
+    std::size_t secondaryWorkers = 0;
+    std::size_t backgroundWorkers = 0;
     std::size_t workerParts = 0;
     std::size_t sledgeInstances = 0;
     std::size_t compositeEquipmentParts = 0;
@@ -61,17 +65,26 @@ private:
         WorkerPose pose = WorkerPose::Standing;
         WorkerJointAngles jointAngles;
         WorkerStyle style;
+        bool isHero = false;
+        bool isSecondary = false;
         bool isDemoWorker = false;
+        float animationPhase = 0.0f;
     };
 
     void addObject(ScenePrimitive primitive, const glm::mat4& model, MaterialId material);
     void addComposite(const glm::mat4& root, const std::vector<ObjectPart>& parts);
+    void addWorker(const glm::vec3& position, float rotationY, WorkerPose pose,
+                   MaterialId clothing, bool hero, bool secondary,
+                   bool demoWorker = false, float phase = 0.0f);
+    void addStaticSledge(const glm::vec3& position, float rotationY, float scale = 1.0f);
     void buildGround();
     void buildPyramid();
-    void buildRamp();
-    void buildQuarry();
-    void buildStockpile();
-    void buildConstructionProps();
+    void buildRampNetwork();
+    void buildScaffolding();
+    void buildQuarryAndCutting();
+    void buildStockpiles();
+    void buildTransportLanes();
+    void buildTimberAndCamp();
     void buildCompositeObjects();
     const Mesh& meshFor(ScenePrimitive primitive) const;
 

@@ -17,6 +17,7 @@
 #include "objects/CompositeValidation.h"
 #include "objects/WorkerHierarchyValidation.h"
 #include "scene/PyramidLayout.h"
+#include "scene/MonumentalSite.h"
 #include "scene/StaticGizaScene.h"
 
 namespace
@@ -26,7 +27,7 @@ constexpr int initialHeight = 720;
 
 struct AppState
 {
-    Camera camera{{28.0f, 18.0f, 38.0f}, {0.0f, 1.0f, 0.0f}, -128.0f, -18.0f};
+    Camera camera{{110.0f, 65.0f, 100.0f}, {0.0f, 1.0f, 0.0f}, -131.0f, -17.0f};
     float lastMouseX = initialWidth * 0.5f;
     float lastMouseY = initialHeight * 0.5f;
     float deltaTime = 0.0f;
@@ -41,23 +42,26 @@ void setCameraPreset(AppState& state, int preset)
     switch (preset)
     {
     case 2:
-        state.camera.SetPose({0.0f, 8.5f, 16.0f}, -90.0f, -13.0f);
+        state.camera.SetPose({0.0f, 12.0f, 32.0f}, -90.0f, -8.0f);
         break;
     case 3:
-        state.camera.SetPose({-8.0f, 7.0f, 18.0f}, -124.0f, -18.0f);
+        state.camera.SetPose({-35.0f, 22.0f, 35.0f}, -125.0f, -19.0f);
         break;
     case 4:
-        state.camera.SetPose({8.0f, 6.0f, 20.0f}, -115.0f, -11.0f);
+        state.camera.SetPose({28.0f, 15.0f, 53.0f}, -126.0f, -12.0f);
         break;
     case 5:
-        state.camera.SetPose({15.5f, 5.0f, 14.5f}, -132.0f, -13.0f);
+        state.camera.SetPose({24.0f, 8.0f, 50.0f}, -140.0f, -9.0f);
         break;
     case 6:
-        state.camera.SetPose({22.0f, 5.5f, 8.0f}, -133.0f, -18.0f);
+        state.camera.SetPose({25.0f, 18.0f, 18.0f}, -140.0f, -16.0f);
+        break;
+    case 7:
+        state.camera.SetPose({-120.0f, 90.0f, 120.0f}, -49.0f, -23.0f);
         break;
     case 1:
     default:
-        state.camera.SetPose({28.0f, 18.0f, 38.0f}, -128.0f, -18.0f);
+        state.camera.SetPose({110.0f, 65.0f, 100.0f}, -131.0f, -17.0f);
         break;
     }
     state.firstMouse = true;
@@ -160,7 +164,7 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int)
         state->scene->adjustAnimationSpeed(-0.25f);
         std::cout << "Animation speed: " << state->scene->animationSpeed() << "x\n";
     }
-    else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_6)
+    else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_7)
         setCameraPreset(*state, key - GLFW_KEY_0);
 }
 
@@ -221,6 +225,7 @@ int main(int argc, char** argv)
     bool compositeValidationOnly = false;
     bool hierarchyValidationOnly = false;
     bool animationValidationOnly = false;
+    bool siteValidationOnly = false;
     bool smokeTest = false;
     bool startWireframe = false;
     bool startWithCulling = true;
@@ -240,6 +245,8 @@ int main(int argc, char** argv)
             hierarchyValidationOnly = true;
         else if (option == "--validate-animation")
             animationValidationOnly = true;
+        else if (option == "--validate-site")
+            siteValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
         else if (option == "--wireframe")
@@ -249,9 +256,9 @@ int main(int argc, char** argv)
         else if (option == "--preset" && argument + 1 < argc)
         {
             const std::string value = argv[++argument];
-            if (value.size() != 1 || value[0] < '1' || value[0] > '6')
+            if (value.size() != 1 || value[0] < '1' || value[0] > '7')
             {
-                std::cerr << "Camera preset must be between 1 and 6.\n";
+                std::cerr << "Camera preset must be between 1 and 7.\n";
                 return 2;
             }
             cameraPreset = value[0] - '0';
@@ -292,9 +299,11 @@ int main(int argc, char** argv)
         return validateWorkerHierarchy(std::cout) ? 0 : 1;
     if (animationValidationOnly)
         return validateConstructionAnimation(std::cout) ? 0 : 1;
+    if (siteValidationOnly)
+        return validateMonumentalSite(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
-        !validateConstructionAnimation(std::cout))
+        !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout))
         return 1;
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -314,7 +323,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 5 Coordinated Construction Animation",
+                                          "Pyramid at Giza - Phase 5.5 Monumental Construction Site",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -345,7 +354,7 @@ int main(int argc, char** argv)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetCursorPosCallback(window, mouseCallback);
         std::cout << "Controls: W/A/S/D move, Q/E move vertically, mouse looks, "
-                     "1-6 views, C culling, F wireframe, Space pause, R reset, "
+                     "1-7 views, C culling, F wireframe, Space pause, R reset, "
                      "N next state, L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
@@ -401,7 +410,7 @@ int main(int argc, char** argv)
             const glm::mat4 projection = glm::perspective(
                 glm::radians(45.0f),
                 static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight),
-                0.1f, 100.0f);
+                0.5f, 350.0f);
             scene.render(state.camera.GetViewMatrix(), projection, state.camera.Position);
 
             ++renderedFrames;

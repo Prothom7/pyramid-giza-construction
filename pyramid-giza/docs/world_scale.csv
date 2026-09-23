@@ -1,0 +1,14 @@
+Element,ReferenceDimension,Value,UnitConvention,RelativeToWorker,Notes
+Worker,Height,2.26,world units,1.00,Phase 4 articulated worker
+Common pyramid block,Width,2.80,world units,1.24,Canonical cube scaled by model matrix
+Common pyramid block,Height,2.00,world units,0.88,Large construction stone but below worker height
+Common pyramid block,Depth,2.80,world units,1.24,Shared cube mesh
+Loaded sledge,Body length,2.75,world units,1.22,Runners excluding tow rope
+Main hauling ramp,Width,7.00,world units,3.10,Wide enough for sledge and pulling team
+Scaffold module,Level height,2.70,world units,1.19,One reusable module story
+Main pyramid,Base width,81.64,world units,36.12,28 blocks plus spacing
+Main pyramid,Completed height,46.00,world units,20.35,23 constructed levels
+Main pyramid,Target implied height,56.00,world units,24.78,Upper levels deliberately absent
+Quarry,Center distance,72.00,world units,31.86,Separated west of monument
+Desert,Footprint X,220.00,world units,97.35,Expanded ground plane
+Desert,Footprint Z,190.00,world units,84.07,Expanded ground plane

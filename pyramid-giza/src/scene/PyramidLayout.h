@@ -8,14 +8,16 @@
 
 struct PyramidLayoutConfig
 {
-    unsigned int baseBlocksPerSide = 15;
-    unsigned int completedLevels = 10;
-    unsigned int partialFromLevel = 6;
-    float blockWidth = 1.15f;
-    float blockHeight = 0.62f;
-    float blockDepth = 1.15f;
-    float horizontalSpacing = 0.07f;
-    glm::vec3 origin{0.0f, 0.0f, -10.0f};
+    PyramidLayoutConfig();
+
+    unsigned int baseBlocksPerSide;
+    unsigned int completedLevels;
+    unsigned int partialFromLevel;
+    float blockWidth;
+    float blockHeight;
+    float blockDepth;
+    float horizontalSpacing;
+    glm::vec3 origin;
 };
 
 struct PyramidBlockPlacement

@@ -9,6 +9,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "scene/SceneTypes.h"
+#include "scene/MonumentalSite.h"
 
 namespace
 {
@@ -23,18 +24,15 @@ constexpr float leverDuration = 3.0f;
 constexpr float placementDuration = 2.0f;
 constexpr float completeDuration = 2.0f;
 
-constexpr glm::vec3 sledgeStart{6.0f, 0.0f, 9.15f};
-constexpr glm::vec3 groundTurn{0.0f, 0.0f, 13.5f};
-constexpr glm::vec3 rampEntry{0.0f, 0.0f, 12.5f};
-constexpr glm::vec3 rampTop{0.0f, 0.0f, -1.0f};
+constexpr glm::vec3 sledgeStart{10.0f, 0.0f, 40.0f};
+constexpr glm::vec3 groundTurn{0.0f, 0.0f, 47.0f};
 constexpr float groundEndProgress = 0.35f;
 constexpr float rampEntryProgress = 0.45f;
-constexpr float rampDegrees = 10.0f;
 
 constexpr std::array<glm::vec3, 7> staticPositions{{
-    {4.0f, 0.0f, 3.4f}, {8.0f, 0.0f, 3.4f}, {-17.0f, 0.0f, 1.2f},
-    {-19.0f, 0.0f, 6.5f}, {3.55f, 0.0f, -1.8f}, {14.8f, 0.0f, -0.8f},
-    {11.2f, 0.0f, 7.1f}
+    {7.5f, 0.0f, 35.0f}, {12.0f, 0.0f, 35.0f}, {-73.0f, 0.0f, -18.0f},
+    {-66.0f, 0.0f, -10.0f}, {5.0f, 0.0f, 2.0f}, {23.0f, 0.0f, 12.0f},
+    {14.0f, 0.0f, 32.0f}
 }};
 constexpr std::array<float, 7> staticHeadings{{0.0f, 0.0f, -80.0f, 155.0f, -35.0f, 90.0f, 170.0f}};
 
@@ -217,22 +215,23 @@ const char* ConstructionAnimationController::stateName(ConstructionState state)
 
 float ConstructionAnimationController::rampSurfaceHeight(float z)
 {
-    constexpr float centerHeight = 2.0f;
-    constexpr float centerZ = 5.35f;
-    constexpr float deckTopOffset = 0.24f;
-    return centerHeight - (z - centerZ) * std::tan(glm::radians(rampDegrees)) + deckTopOffset;
+    return MonumentalSite::mainRampSurfaceHeight(z);
 }
 
 TransportFrame ConstructionAnimationController::transportAt(float progress)
 {
+    const RampDescriptor& ramp = MonumentalSite::mainRamp();
+    const glm::vec3 rampEntry{ramp.base.x, rampSurfaceHeight(ramp.base.z), ramp.base.z};
+    const glm::vec3 rampTop{ramp.top.x, rampSurfaceHeight(ramp.top.z), ramp.top.z};
+    const float rampDegrees = MonumentalSite::mainRampPitchDegrees();
     const float p = saturate(progress);
     glm::vec3 position;
     glm::vec3 direction;
     float pitch = 0.0f;
     float heading = 0.0f;
 
-    const glm::vec3 entryWithHeight{rampEntry.x, rampSurfaceHeight(rampEntry.z), rampEntry.z};
-    const glm::vec3 topWithHeight{rampTop.x, rampSurfaceHeight(rampTop.z), rampTop.z};
+    const glm::vec3 entryWithHeight = rampEntry;
+    const glm::vec3 topWithHeight = rampTop;
     const glm::vec3 groundDirection = horizontalDirection(sledgeStart, groundTurn);
 
     if (p <= groundEndProgress)
@@ -347,7 +346,7 @@ glm::mat4 ConstructionAnimationController::toolAttachmentRoot(const glm::mat4& h
 
 glm::mat4 ConstructionAnimationController::leverRoot()
 {
-    return makeTransform({13.3f, 0.0f, -1.6f}, {0.0f, 90.0f, 0.0f}, {1.0f, 1.0f, 1.0f});
+    return makeTransform({23.0f, 0.0f, 12.0f}, {0.0f, 90.0f, 0.0f}, {1.0f, 1.0f, 1.0f});
 }
 
 glm::mat4 ConstructionAnimationController::leverPivotFrame(float angleDegrees)

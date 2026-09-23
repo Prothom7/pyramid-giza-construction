@@ -6,6 +6,8 @@
 #include <ostream>
 #include <stdexcept>
 
+#include "scene/MonumentalSite.h"
+
 namespace
 {
 void validateConfig(const PyramidLayoutConfig& config)
@@ -33,7 +35,8 @@ bool isConstructionOpening(const PyramidLayoutConfig& config, unsigned int level
     const float center = 0.5f * static_cast<float>(side - 1);
     const bool inFrontRows = z + missingRows >= side;
     const bool inOpeningWidth = std::abs(static_cast<float>(x) - center) <= openingHalfWidth;
-    return inFrontRows && inOpeningWidth;
+    const bool preservesSideEdges = x > 0 && x + 1 < side;
+    return inFrontRows && inOpeningWidth && preservesSideEdges;
 }
 
 bool finiteVector(const glm::vec3& value)
@@ -41,6 +44,19 @@ bool finiteVector(const glm::vec3& value)
     return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
 }
 } // namespace
+
+PyramidLayoutConfig::PyramidLayoutConfig()
+{
+    const WorldScale& world = MonumentalSite::scale();
+    baseBlocksPerSide = world.pyramidBaseBlocks;
+    completedLevels = world.pyramidCompletedLevels;
+    partialFromLevel = world.pyramidPartialFromLevel;
+    blockWidth = world.blockWidth;
+    blockHeight = world.blockHeight;
+    blockDepth = world.blockDepth;
+    horizontalSpacing = world.blockSpacing;
+    origin = world.pyramidOrigin;
+}
 
 std::vector<PyramidBlockPlacement> PyramidLayout::generate(const PyramidLayoutConfig& config)
 {
@@ -136,7 +152,7 @@ bool validatePyramidLayout(std::ostream& output)
         valid = valid && std::abs(0.5f * (minimumZ + maximumZ) - config.origin.z) < 1.0e-5f;
     }
 
-    valid = valid && stats.totalBlocks == 1162;
+    valid = valid && stats.totalBlocks == 7561;
     output << "Phase 2 pyramid layout validation\n"
            << "  completed levels: " << config.completedLevels << '\n'
            << "  blocks per level:";

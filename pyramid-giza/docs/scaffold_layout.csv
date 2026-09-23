@@ -1,0 +1,4 @@
+ScaffoldID,ModuleType,WorldX,WorldY,WorldZ,RotationY,Levels,Bays,ModuleWidth,ModuleCount,Purpose,Notes
+FrontWest,RigidPrimitiveModule,-24,0,1.6,0,3,3,4.6,9,Lower active face,Three levels across three bays
+FrontEast,RigidPrimitiveModule,12,0,1.6,0,3,3,4.6,9,Lower active face,Frames main hauling ramp
+RampTop,RigidPrimitiveModule,-5,8.55,-0.2,0,2,2,4.6,4,Ramp-top staging,Supports upper work platform

@@ -1,0 +1,10 @@
+Zone,CenterX,CenterY,CenterZ,ExtentX,ExtentY,ExtentZ,PrimaryObjects,Purpose,Notes
+PyramidZone,0,23,-42,42,23,42,Pyramid blocks,Main monument,Active face is positive Z
+RampNetwork,0,5,22,34,8,24,Three ramps and platforms,Construction access,Main route occupies center corridor
+ScaffoldZone,0,8,1.5,31,9,4,Scaffold modules and workers,Active-face access,Placed outside block faces
+QuarryZone,-72,2.5,-20,18,5,20,Rough blocks and stepped cut face,Stone extraction,Deterministic rough-block patterns
+CuttingZone,-49,2,18,12,4,12,Cutting beds and prepared stones,Stone preparation,Between quarry and transport lane
+StockpileZone,14,2,33,15,4,12,Prepared and transport-ready blocks,Organized storage,Near hero transport start
+TransportZone,0,1,40,32,2,8,Sledges workers and compacted lane,Open hauling corridor,Hero sequence uses one local stage
+TimberYard,48,2,7,13,4,14,Logs beams frames and sledge,Wood storage,Repeated cube and cylinder primitives
+WorkCamp,51,2.5,-25,14,5,12,Shelters tools and workers,Support area,Two simple four-pole shelters

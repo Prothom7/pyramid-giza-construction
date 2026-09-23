@@ -1,0 +1,12 @@
+Group,ObjectType,Count,Origin,GenerationRule,PrimitiveSource,Material,Notes
+Main pyramid,Stone block,7561,"(0,0,-42)",Centered shrinking square levels with active-face opening,Cube,Limestone variants,One shared cube mesh
+Ramp network,Ramp deck,3,Descriptor endpoints,Oriented cuboid between base and top,Cube,RampEarth,Main plus two auxiliary ramps
+Scaffolding,Scaffold module,22,Three descriptor groups,Bays times levels using one 13-part module,Cube and Cylinder,Wood variants,286 static part draws
+Quarry rough field,Rough stone,42,"(-84,0,-33)",7 columns by 6 rows with deterministic variation,Cube,QuarryStone variants,No random seed required
+Quarry cut face,Cut stone,24,"(-86,0,-39)",Six columns by four stepped levels,Cube,QuarryStone,Reads as an extraction wall
+Prepared stockpiles,Prepared stone,36,"(10,0,31)",Tiered stack plus transport and ramp staging,Cube,PreparedStone,Three visually distinct groups
+Workers,Articulated worker,25,Seven site groups,7 hero plus 9 secondary plus 9 background,Cube Cylinder Sphere,Worker palette,Shared 17-node hierarchy
+Sledges,Sledge,6,Transport zones,One animated loaded plus five static instances,Cube and Cylinder,Wood and Rope,Shared part definition
+Timber logs,Log,15,"(42,0,5)",Three deterministic stacked layers,Cylinder,Wood,Shared cylinder mesh
+Timber beams,Squared beam,12,"(43,0,11)",Four stacks by three layers,Cube,Wood variants,Shared cube mesh
+Shelters,Shade structure,2,"(45,0,-26)",Four poles plus roof per shelter,Cylinder and Cube,Wood variants,Simple support architecture

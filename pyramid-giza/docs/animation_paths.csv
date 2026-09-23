@@ -1,10 +1,10 @@
 Path,Point,Progress,X,Y,Z,GenerationRule,Notes
-LoadedSledge,Start,0.00,6.0,0.0,9.15,Fixed start point,Loaded stone inherits this root
-LoadedSledge,GroundTurn,0.35,0.0,0.0,13.5,Smooth interpolation,Approach curve turns toward ramp
-LoadedSledge,RampEntry,0.45,0.0,0.979,12.5,Y equals rampSurfaceHeight(z),Pitch blends from 0 to 10 degrees
-LoadedSledge,RampTop,1.00,0.0,3.360,-1.0,Y equals rampSurfaceHeight(z),Final transport point
+LoadedSledge,Start,0.00,10.0,0.0,40.0,Fixed start point,Loaded stone inherits this root
+LoadedSledge,GroundTurn,0.35,0.0,0.0,47.0,Smooth interpolation,Approach curve turns toward monumental ramp
+LoadedSledge,RampEntry,0.45,0.0,0.695,45.0,Y equals main-ramp surface height,Pitch blends from 0 to 9.77 degrees
+LoadedSledge,RampTop,1.00,0.0,8.545,-0.6,Y equals main-ramp surface height,Final transport point at active face
 PullerLeft,Derived,0.00-1.00,Derived,Derived,Derived,Sledge position plus direction*3.7 minus side*0.48,Ground or ramp height follows current section
 PullerRight,Derived,0.00-1.00,Derived,Derived,Derived,Sledge position plus direction*3.7 plus side*0.48,Ground or ramp height follows current section
 RopeLeft,Derived,0.00-1.00,Derived,Derived,Derived,Cylinder between left hand joint and left tow point,Visible PullReady through Arrival
 RopeRight,Derived,0.00-1.00,Derived,Derived,Derived,Cylinder between right hand joint and right tow point,Visible PullReady through Arrival
-RampSurface,Formula,N/A,0.0,Derived,z,"y = 2.0 - (z - 5.35)*tan(10 degrees) + 0.24",Matches Phase 2 ramp deck
+RampSurface,Descriptor,N/A,0.0,Derived,z,Interpolation between ramp base and top plus half-thickness surface offset,Matches Phase 5.5 main-ramp descriptor

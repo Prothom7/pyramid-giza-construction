@@ -8,6 +8,7 @@
 
 #include "animation/ConstructionAnimation.h"
 #include "objects/Sledge.h"
+#include "scene/MonumentalSite.h"
 
 namespace
 {
@@ -95,9 +96,11 @@ bool validateConstructionAnimation(std::ostream& output)
 
     const TransportFrame start = ConstructionAnimationController::transportAt(0.0f);
     const TransportFrame destination = ConstructionAnimationController::transportAt(1.0f);
-    const glm::vec3 expectedStart{6.0f, 0.0f, 9.15f};
+    const glm::vec3 expectedStart{10.0f, 0.0f, 40.0f};
+    const RampDescriptor& mainRamp = MonumentalSite::mainRamp();
     const glm::vec3 expectedDestination{
-        0.0f, ConstructionAnimationController::rampSurfaceHeight(-1.0f), -1.0f};
+        mainRamp.top.x, ConstructionAnimationController::rampSurfaceHeight(mainRamp.top.z),
+        mainRamp.top.z};
     const bool endpointsValid = vectorNear(start.sledgePosition, expectedStart) &&
                                 vectorNear(destination.sledgePosition, expectedDestination) &&
                                 glm::distance(start.leftWorkerPosition, start.sledgePosition) > 3.0f &&
