@@ -1,17 +1,20 @@
-# Pyramid at Giza — Construction Site
+# Pyramid at Giza - Construction Site
 
 Course project status:
 
-- **Phase 1 — Complete:** reusable indexed primitive geometry foundation
-- **Phase 2 — Complete:** static Giza construction world
-- **Phase 3 — Complete:** static composite workers and construction equipment
-- **Phase 4 — Complete:** hierarchical joints and articulated rigid-part workers
+- **Phase 1 - Complete:** reusable indexed primitive geometry foundation
+- **Phase 2 - Complete:** static Giza construction world
+- **Phase 3 - Complete:** static composite workers and construction equipment
+- **Phase 4 - Complete:** hierarchical joints and articulated rigid-part workers
+- **Phase 5 - Complete:** coordinated, time-based construction animation
 
 Phase 1 is frozen at Git commit `1a743b6`; Phase 2 is frozen at `718ccb0`. The current
 application builds a recognizable inhabited construction site from canonical indexed
 triangle meshes: desert, unfinished block-built pyramid, ramp, quarry, stockpile, seven
-articulated workers, two static sledges, a transported stone, lever, mallet, and wooden
-supports. One foreground worker provides a stationary hierarchy demonstration.
+articulated workers, two sledges, a transported stone, lever, mallet, and wooden supports.
+The loaded sledge, pulling team, ramp guide, quarry mallet, and lever operator perform a
+deterministic 28.5-second construction sequence. Phase 4 pose debugging remains available
+when coordinated animation is disabled.
 
 ## Build and run
 
@@ -32,11 +35,16 @@ build\PyramidGiza.exe
 - `3`: quarry
 - `4`: ramp and staging area
 - `5`: workers and loaded sledge
+- `6`: lever and work area close-up
 - `C`: toggle back-face culling
 - `F`: toggle filled/wireframe rendering
-- `Space`: pause/resume the articulated-worker preview
-- `P`: cycle the demo worker through action and diagnostic poses
-- `R`: reset the demo worker to Standing
+- `Space`: pause/resume the coordinated animation
+- `N`: advance to the next animation state
+- `L`: toggle looping
+- `M`: toggle coordinated animation / Phase 4 pose demonstration
+- `+/-`: increase/decrease animation speed (0.25x to 4x)
+- `P`: cycle the Phase 4 demo pose
+- `R`: reset the construction sequence to Idle
 - `Esc`: exit
 
 ## Validation commands
@@ -46,11 +54,13 @@ build\PyramidGiza.exe --validate-geometry
 build\PyramidGiza.exe --validate-scene
 build\PyramidGiza.exe --validate-composites
 build\PyramidGiza.exe --validate-hierarchy
+build\PyramidGiza.exe --validate-animation
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
-`--wireframe`, `--no-cull`, and `--capture output.ppm` are available for automated
-render-state checks. Generated PPM captures are ignored by Git.
+`--wireframe`, `--no-cull`, `--animation-time SECONDS`, and `--capture output.ppm`
+are available for deterministic render-state checks. Generated PPM captures are ignored
+by Git.
 
 See [docs/PHASE1_PRIMITIVE_FOUNDATION.md](docs/PHASE1_PRIMITIVE_FOUNDATION.md) and
 [docs/PHASE2_STATIC_GIZA_WORLD.md](docs/PHASE2_STATIC_GIZA_WORLD.md).
@@ -58,3 +68,5 @@ Phase 3 composition, local transforms, and reuse are documented in
 [docs/PHASE3_COMPOSITE_OBJECTS.md](docs/PHASE3_COMPOSITE_OBJECTS.md).
 Phase 4 joint frames, pivot mathematics, limits, and pose controls are documented in
 [docs/PHASE4_HIERARCHICAL_MODELING.md](docs/PHASE4_HIERARCHICAL_MODELING.md).
+Phase 5 states, synchronized paths, rigid attachments, and controls are documented in
+[docs/PHASE5_CONSTRUCTION_ANIMATION.md](docs/PHASE5_CONSTRUCTION_ANIMATION.md).

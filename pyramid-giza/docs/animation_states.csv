@@ -1,0 +1,11 @@
+State,Order,DurationSeconds,StartSeconds,EndSeconds,SledgeAction,WorkerAction,LeverAction,Notes
+Idle,0,1.5,0.0,1.5,At stockpile start,Workers hold initial roles,None,Stable opening state
+WorkersApproach,1,3.0,1.5,4.5,Stationary,Two pullers walk to rope positions,None,Smooth local interpolation
+PullReady,2,1.5,4.5,6.0,Stationary,Pullers blend Standing to PullingReady,None,Ropes become visible
+PullGround,3,6.0,6.0,12.0,Moves start to ground turn,Pullers use synchronized pulling gait,None,Transport progress 0.00 to 0.35
+ApproachRamp,4,2.0,12.0,14.0,Turns and enters ramp,Pullers remain synchronized,None,Transport progress 0.35 to 0.45
+RampPull,5,6.0,14.0,20.0,Climbs ramp to top,Pullers and ramp guide walk,None,Transport progress 0.45 to 1.00
+Arrival,6,1.5,20.0,21.5,Holds at ramp top,Pullers blend toward Standing,None,Ropes remain visible during arrival
+LeverPreparation,7,3.0,21.5,24.5,Holds at ramp top,Lever operator blends to LeverReady,Beam rotates down 12 degrees,Rotation uses fulcrum pivot
+PlacementReady,8,2.0,24.5,26.5,Holds at ramp top,Workers hold task poses,Stone rises by 0.24 units,Small diagnostic placement lift
+Complete,9,2.0,26.5,28.5,Holds final position,Workers hold final poses,Holds final result,Loops cleanly to Idle by default

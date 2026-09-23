@@ -12,6 +12,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Camera.h"
+#include "animation/AnimationValidation.h"
 #include "graphics/GeometryValidation.h"
 #include "objects/CompositeValidation.h"
 #include "objects/WorkerHierarchyValidation.h"
@@ -50,6 +51,9 @@ void setCameraPreset(AppState& state, int preset)
         break;
     case 5:
         state.camera.SetPose({15.5f, 5.0f, 14.5f}, -132.0f, -13.0f);
+        break;
+    case 6:
+        state.camera.SetPose({22.0f, 5.5f, 8.0f}, -133.0f, -18.0f);
         break;
     case 1:
     default:
@@ -116,9 +120,9 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int)
     }
     else if (key == GLFW_KEY_SPACE && state->scene != nullptr)
     {
-        state->scene->toggleArticulationPreview();
-        std::cout << "Articulation preview: "
-                  << (state->scene->articulationPreviewEnabled() ? "RUNNING" : "PAUSED") << '\n';
+        state->scene->togglePlayback();
+        std::cout << "Animation playback toggled; state: "
+                  << state->scene->animationStateName() << '\n';
     }
     else if (key == GLFW_KEY_P && state->scene != nullptr)
     {
@@ -127,10 +131,36 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int)
     }
     else if (key == GLFW_KEY_R && state->scene != nullptr)
     {
-        state->scene->resetArticulationPreview();
-        std::cout << "Demo worker reset to Standing.\n";
+        state->scene->resetAnimation();
+        std::cout << "Animation reset to Idle.\n";
     }
-    else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_5)
+    else if (key == GLFW_KEY_N && state->scene != nullptr)
+    {
+        state->scene->advanceAnimationState();
+        std::cout << "Advanced to animation state: " << state->scene->animationStateName() << '\n';
+    }
+    else if (key == GLFW_KEY_L && state->scene != nullptr)
+    {
+        state->scene->toggleAnimationLoop();
+        std::cout << "Animation loop: " << (state->scene->animationLooping() ? "ON" : "OFF") << '\n';
+    }
+    else if (key == GLFW_KEY_M && state->scene != nullptr)
+    {
+        state->scene->toggleCoordinatedAnimation();
+        std::cout << "Coordinated construction animation: "
+                  << (state->scene->coordinatedAnimationEnabled() ? "ON" : "OFF") << '\n';
+    }
+    else if ((key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) && state->scene != nullptr)
+    {
+        state->scene->adjustAnimationSpeed(0.25f);
+        std::cout << "Animation speed: " << state->scene->animationSpeed() << "x\n";
+    }
+    else if ((key == GLFW_KEY_MINUS || key == GLFW_KEY_KP_SUBTRACT) && state->scene != nullptr)
+    {
+        state->scene->adjustAnimationSpeed(-0.25f);
+        std::cout << "Animation speed: " << state->scene->animationSpeed() << "x\n";
+    }
+    else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_6)
         setCameraPreset(*state, key - GLFW_KEY_0);
 }
 
@@ -190,10 +220,12 @@ int main(int argc, char** argv)
     bool sceneValidationOnly = false;
     bool compositeValidationOnly = false;
     bool hierarchyValidationOnly = false;
+    bool animationValidationOnly = false;
     bool smokeTest = false;
     bool startWireframe = false;
     bool startWithCulling = true;
     int cameraPreset = 1;
+    float initialAnimationTime = 0.0f;
     std::string capturePath;
     for (int argument = 1; argument < argc; ++argument)
     {
@@ -206,6 +238,8 @@ int main(int argc, char** argv)
             compositeValidationOnly = true;
         else if (option == "--validate-hierarchy")
             hierarchyValidationOnly = true;
+        else if (option == "--validate-animation")
+            animationValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
         else if (option == "--wireframe")
@@ -215,15 +249,32 @@ int main(int argc, char** argv)
         else if (option == "--preset" && argument + 1 < argc)
         {
             const std::string value = argv[++argument];
-            if (value.size() != 1 || value[0] < '1' || value[0] > '5')
+            if (value.size() != 1 || value[0] < '1' || value[0] > '6')
             {
-                std::cerr << "Camera preset must be 1, 2, 3, 4, or 5.\n";
+                std::cerr << "Camera preset must be between 1 and 6.\n";
                 return 2;
             }
             cameraPreset = value[0] - '0';
         }
         else if (option == "--capture" && argument + 1 < argc)
             capturePath = argv[++argument];
+        else if (option == "--animation-time" && argument + 1 < argc)
+        {
+            try
+            {
+                initialAnimationTime = std::stof(argv[++argument]);
+            }
+            catch (...)
+            {
+                std::cerr << "Animation time must be a non-negative number.\n";
+                return 2;
+            }
+            if (initialAnimationTime < 0.0f)
+            {
+                std::cerr << "Animation time must be a non-negative number.\n";
+                return 2;
+            }
+        }
         else
         {
             std::cerr << "Unknown or incomplete option: " << option << '\n';
@@ -239,8 +290,11 @@ int main(int argc, char** argv)
         return validateCompositeObjects(std::cout) ? 0 : 1;
     if (hierarchyValidationOnly)
         return validateWorkerHierarchy(std::cout) ? 0 : 1;
+    if (animationValidationOnly)
+        return validateConstructionAnimation(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
-        !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout))
+        !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
+        !validateConstructionAnimation(std::cout))
         return 1;
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -260,7 +314,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 4 Hierarchical Workers",
+                                          "Pyramid at Giza - Phase 5 Coordinated Construction Animation",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -291,8 +345,8 @@ int main(int argc, char** argv)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetCursorPosCallback(window, mouseCallback);
         std::cout << "Controls: W/A/S/D move, Q/E move vertically, mouse looks, "
-                     "1-5 views, C culling, F wireframe, Space pauses articulation, "
-                     "P cycles poses, R resets, ESC exits.\n";
+                     "1-6 views, C culling, F wireframe, Space pause, R reset, "
+                     "N next state, L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
 
@@ -314,6 +368,11 @@ int main(int argc, char** argv)
     {
         StaticGizaScene scene;
         state.scene = &scene;
+        if (initialAnimationTime > 0.0f)
+        {
+            scene.update(initialAnimationTime);
+            std::cout << "Animation initialized at state: " << scene.animationStateName() << '\n';
+        }
         float previousTime = static_cast<float>(glfwGetTime());
         int renderedFrames = 0;
 

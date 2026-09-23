@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include "Shader.h"
+#include "animation/ConstructionAnimation.h"
 #include "graphics/Mesh.h"
 #include "objects/Worker.h"
 #include "scene/PyramidLayout.h"
@@ -33,10 +34,21 @@ public:
     void render(const glm::mat4& view, const glm::mat4& projection,
                 const glm::vec3& cameraPosition);
     void update(float deltaTime);
-    void toggleArticulationPreview();
+    void togglePlayback();
+    void toggleCoordinatedAnimation();
+    void advanceAnimationState();
+    void toggleAnimationLoop();
+    void adjustAnimationSpeed(float amount);
     void cycleDemoPose();
-    void resetArticulationPreview();
-    bool articulationPreviewEnabled() const { return articulationPreviewEnabled_; }
+    void resetAnimation();
+    bool animationPaused() const { return animationController_.paused(); }
+    bool animationLooping() const { return animationController_.looping(); }
+    bool coordinatedAnimationEnabled() const { return coordinatedAnimationEnabled_; }
+    float animationSpeed() const { return animationController_.speed(); }
+    const char* animationStateName() const
+    {
+        return ConstructionAnimationController::stateName(animationController_.state());
+    }
     const char* demoPoseName() const { return Worker::poseName(demoPose_); }
 
     const StaticGizaSceneStats& stats() const { return stats_; }
@@ -71,9 +83,12 @@ private:
     PyramidLayoutConfig pyramidConfig_;
     std::vector<SceneObject> objects_;
     std::vector<WorkerInstance> workers_;
+    std::vector<ObjectPart> loadedSledgeParts_;
+    ConstructionAnimationController animationController_;
     WorkerPose demoPose_ = WorkerPose::Standing;
     float articulationTime_ = 0.0f;
     float articulationSpeed_ = 1.0f;
     bool articulationPreviewEnabled_ = true;
+    bool coordinatedAnimationEnabled_ = true;
     StaticGizaSceneStats stats_;
 };

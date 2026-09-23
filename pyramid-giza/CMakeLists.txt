@@ -34,6 +34,8 @@ add_executable(PyramidGiza
     src/objects/ConstructionProps.cpp
     src/objects/CompositeValidation.cpp
     src/objects/WorkerHierarchyValidation.cpp
+    src/animation/ConstructionAnimation.cpp
+    src/animation/AnimationValidation.cpp
 )
 
 target_include_directories(PyramidGiza PRIVATE
@@ -74,3 +76,4 @@ add_test(NAME Phase1GeometryValidation COMMAND PyramidGiza --validate-geometry)
 add_test(NAME Phase2SceneValidation COMMAND PyramidGiza --validate-scene)
 add_test(NAME Phase3CompositeValidation COMMAND PyramidGiza --validate-composites)
 add_test(NAME Phase4WorkerHierarchyValidation COMMAND PyramidGiza --validate-hierarchy)
+add_test(NAME Phase5ConstructionAnimationValidation COMMAND PyramidGiza --validate-animation)

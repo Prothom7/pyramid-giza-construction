@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "graphics/PrimitiveGenerator.h"
 #include "objects/ConstructionProps.h"
@@ -39,7 +40,9 @@ StaticGizaScene::StaticGizaScene()
     buildStockpile();
     buildConstructionProps();
     buildCompositeObjects();
-    stats_.totalDrawCalls = objects_.size() + stats_.workerParts;
+    // Maximum draw count includes two dynamic ropes and the attached quarry mallet.
+    stats_.totalDrawCalls = objects_.size() + stats_.workerParts +
+                            (loadedSledgeParts_.size() - 1) + 2 + 3 + 2;
 
     const PyramidLayoutStats pyramidStats = PyramidLayout::statistics(
         pyramidConfig_, PyramidLayout::generate(pyramidConfig_));
@@ -227,32 +230,54 @@ void StaticGizaScene::buildCompositeObjects()
     addWorker({11.2f, 0.0f, 7.1f}, 170.0f, WorkerPose::Standing,
               MaterialId::ClothingBlue, true);
 
-    addComposite(makeTransform({6.0f, 0.0f, 9.15f}, {}, {1.0f, 1.0f, 1.0f}),
-                 Sledge::create(true));
+    loadedSledgeParts_ = Sledge::create(true);
     addComposite(makeTransform({-12.5f, 0.0f, 6.8f}, {0.0f, -55.0f, 0.0f}, {0.9f, 0.9f, 0.9f}),
                  Sledge::create(false));
     stats_.sledgeInstances = 2;
 
-    const std::vector<ObjectPart> lever = ConstructionProps::createLever();
     const std::vector<ObjectPart> mallet = ConstructionProps::createMallet();
     const std::vector<ObjectPart> frame = ConstructionProps::createWoodenFrame();
     const std::vector<ObjectPart> roller = ConstructionProps::createRoller();
-    addComposite(makeTransform({13.3f, 0.0f, -1.6f}, {0.0f, 90.0f, 0.0f}, {1.0f, 1.0f, 1.0f}), lever);
     addComposite(makeTransform({17.0f, 0.0f, -1.1f}, {0.0f, 18.0f, 18.0f}, {1.0f, 1.0f, 1.0f}), mallet);
     addComposite(makeTransform({-10.5f, 0.0f, 8.5f}, {0.0f, 20.0f, 0.0f}, {1.0f, 1.0f, 1.0f}), frame);
     addComposite(makeTransform({-13.2f, 0.0f, 3.7f}, {0.0f, 35.0f, 0.0f}, {1.0f, 1.0f, 1.0f}), roller);
-    stats_.compositeEquipmentParts = lever.size() + mallet.size() + frame.size() + roller.size();
+    stats_.compositeEquipmentParts = 3 + mallet.size() + frame.size() + roller.size();
 }
 
 void StaticGizaScene::update(float deltaTime)
 {
-    if (articulationPreviewEnabled_ && std::isfinite(deltaTime) && deltaTime > 0.0f)
+    if (coordinatedAnimationEnabled_)
+        animationController_.update(deltaTime);
+    else if (articulationPreviewEnabled_ && std::isfinite(deltaTime) && deltaTime > 0.0f)
         articulationTime_ += deltaTime * articulationSpeed_;
 }
 
-void StaticGizaScene::toggleArticulationPreview()
+void StaticGizaScene::togglePlayback()
 {
-    articulationPreviewEnabled_ = !articulationPreviewEnabled_;
+    if (coordinatedAnimationEnabled_)
+        animationController_.togglePaused();
+    else
+        articulationPreviewEnabled_ = !articulationPreviewEnabled_;
+}
+
+void StaticGizaScene::toggleCoordinatedAnimation()
+{
+    coordinatedAnimationEnabled_ = !coordinatedAnimationEnabled_;
+}
+
+void StaticGizaScene::advanceAnimationState()
+{
+    animationController_.advanceState();
+}
+
+void StaticGizaScene::toggleAnimationLoop()
+{
+    animationController_.toggleLooping();
+}
+
+void StaticGizaScene::adjustAnimationSpeed(float amount)
+{
+    animationController_.setSpeed(animationController_.speed() + amount);
 }
 
 void StaticGizaScene::cycleDemoPose()
@@ -261,8 +286,9 @@ void StaticGizaScene::cycleDemoPose()
     articulationTime_ = 0.0f;
 }
 
-void StaticGizaScene::resetArticulationPreview()
+void StaticGizaScene::resetAnimation()
 {
+    animationController_.reset();
     demoPose_ = WorkerPose::Standing;
     articulationTime_ = 0.0f;
 }
@@ -308,13 +334,76 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
     for (const SceneObject& object : objects_)
         drawPart(object.primitive, object.model, object.material);
 
-    for (const WorkerInstance& worker : workers_)
+    const ConstructionAnimationSnapshot animation = animationController_.snapshot();
+    std::array<Worker::EvaluatedPose, 7> evaluatedWorkers{};
+    for (std::size_t index = 0; index < workers_.size(); ++index)
     {
-        const WorkerJointAngles angles = worker.isDemoWorker
-                                             ? Worker::animatedPreview(demoPose_, articulationTime_)
-                                             : worker.jointAngles;
-        const Worker::EvaluatedPose pose = Worker::evaluate(worker.root, angles, worker.style);
-        for (const WorkerPartTransform& part : pose)
+        const WorkerInstance& worker = workers_[index];
+        glm::mat4 root = worker.root;
+        WorkerJointAngles angles = worker.jointAngles;
+        if (coordinatedAnimationEnabled_)
+        {
+            root = animation.workers[index].root;
+            angles = animation.workers[index].joints;
+        }
+        else if (worker.isDemoWorker)
+            angles = Worker::animatedPreview(demoPose_, articulationTime_);
+
+        evaluatedWorkers[index] = Worker::evaluate(root, angles, worker.style);
+        for (const WorkerPartTransform& part : evaluatedWorkers[index])
             drawPart(part.primitive, part.model, part.material);
     }
+
+    const glm::mat4 loadedRoot = coordinatedAnimationEnabled_
+                                     ? animation.loadedSledgeRoot
+                                     : makeTransform({6.0f, 0.0f, 9.15f}, {}, {1.0f, 1.0f, 1.0f});
+    for (const ObjectPart& part : loadedSledgeParts_)
+    {
+        if (part.name == "PullingRope")
+            continue;
+        drawPart(part.primitive, loadedRoot * part.localTransform, part.material);
+    }
+
+    if (coordinatedAnimationEnabled_ && animation.ropeVisible)
+    {
+        const auto handPoint = [](const Worker::EvaluatedPose& pose) {
+            const glm::vec3 left{pose[static_cast<std::size_t>(BodyPart::LeftHand)].jointWorld[3]};
+            const glm::vec3 right{pose[static_cast<std::size_t>(BodyPart::RightHand)].jointWorld[3]};
+            return (left + right) * 0.5f;
+        };
+        const glm::vec3 leftStart = handPoint(evaluatedWorkers[0]);
+        const glm::vec3 rightStart = handPoint(evaluatedWorkers[1]);
+        const glm::vec3 leftEnd{loadedRoot * glm::vec4{-0.30f, 0.36f, -2.42f, 1.0f}};
+        const glm::vec3 rightEnd{loadedRoot * glm::vec4{0.30f, 0.36f, -2.42f, 1.0f}};
+        drawPart(ScenePrimitive::Cylinder,
+                 ConstructionAnimationController::cylinderBetween(leftStart, leftEnd, 0.065f),
+                 MaterialId::Rope);
+        drawPart(ScenePrimitive::Cylinder,
+                 ConstructionAnimationController::cylinderBetween(rightStart, rightEnd, 0.065f),
+                 MaterialId::Rope);
+    }
+
+    // The quarry mallet follows the right-hand joint frame, proving prop attachment.
+    const glm::mat4 toolRoot = ConstructionAnimationController::toolAttachmentRoot(
+        evaluatedWorkers[static_cast<std::size_t>(WorkerRole::QuarryMallet)]
+            [static_cast<std::size_t>(BodyPart::RightHand)].jointWorld);
+    drawPart(ScenePrimitive::Cylinder,
+             glm::scale(glm::translate(toolRoot, {0.0f, -0.32f, 0.0f}), {0.09f, 0.64f, 0.09f}),
+             MaterialId::Wood);
+    drawPart(ScenePrimitive::Cube,
+             glm::scale(glm::translate(toolRoot, {0.0f, -0.68f, 0.0f}), {0.42f, 0.20f, 0.26f}),
+             MaterialId::DarkWood);
+
+    const float leverAngle = coordinatedAnimationEnabled_ ? animation.leverAngleDegrees : 0.0f;
+    const float liftOffset = coordinatedAnimationEnabled_ ? animation.liftedStoneOffset : 0.0f;
+    const glm::mat4 leverRoot = ConstructionAnimationController::leverRoot();
+    drawPart(ScenePrimitive::Cube,
+             leverRoot * makeTransform({0.0f, 0.28f, 0.0f}, {0.0f, 0.0f, 45.0f},
+                                       {0.55f, 0.55f, 0.70f}),
+             MaterialId::QuarryStone);
+    drawPart(ScenePrimitive::Cylinder,
+             ConstructionAnimationController::leverBeamModel(leverAngle), MaterialId::Wood);
+    drawPart(ScenePrimitive::Cube,
+             ConstructionAnimationController::leverStoneModel(liftOffset),
+             MaterialId::PreparedStone);
 }

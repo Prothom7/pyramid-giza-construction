@@ -1,0 +1,8 @@
+Role,WorkerIndex,InitialX,InitialY,InitialZ,InitialHeadingDegrees,AnimationResponsibility,SharedMeshes
+PullerLeft,0,4.0,0.0,3.4,0.0,Approaches rope then pulls loaded sledge along shared path,Cylinder sphere cube
+PullerRight,1,8.0,0.0,3.4,0.0,Approaches rope then pulls loaded sledge along shared path,Cylinder sphere cube
+QuarryMallet,2,-17.0,0.0,1.2,-80.0,Loops a stationary mallet strike with hand-attached tool,Cylinder sphere cube
+QuarryCarrier,3,-19.0,0.0,6.5,155.0,Uses a small stationary carrying gait,Cylinder sphere cube
+RampGuide,4,3.55,0.0,-1.8,-35.0,Follows beside the sledge during RampPull and Arrival,Cylinder sphere cube
+LeverOperator,5,14.8,0.0,-0.8,90.0,Blends to LeverReady while beam rotates at fulcrum,Cylinder sphere cube
+StockpileWorker,6,11.2,0.0,7.1,170.0,Subtle carrying-ready activity near stockpile,Cylinder sphere cube
