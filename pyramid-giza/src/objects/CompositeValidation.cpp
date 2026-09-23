@@ -44,41 +44,66 @@ bool validateParts(const char* label, const std::vector<ObjectPart>& parts,
     return valid;
 }
 
-bool equalTransforms(const std::vector<ObjectPart>& left,
-                     const std::vector<ObjectPart>& right)
+bool equalWorkerTransforms(const Worker::EvaluatedPose& left,
+                           const Worker::EvaluatedPose& right)
 {
-    if (left.size() != right.size())
-        return false;
     for (std::size_t part = 0; part < left.size(); ++part)
         for (int column = 0; column < 4; ++column)
             for (int row = 0; row < 4; ++row)
-                if (std::abs(left[part].localTransform[column][row] -
-                             right[part].localTransform[column][row]) > 1.0e-6f)
+                if (std::abs(left[part].model[column][row] -
+                             right[part].model[column][row]) > 1.0e-6f)
                     return false;
     return true;
+}
+
+bool validateWorkerDefinition(std::ostream& output)
+{
+    const Worker::Hierarchy& hierarchy = Worker::hierarchy();
+    bool valid = hierarchy.size() == Worker::partCount();
+    std::unordered_set<int> identities;
+    for (std::size_t index = 0; index < hierarchy.size(); ++index)
+    {
+        const WorkerNode& node = hierarchy[index];
+        valid = identities.insert(static_cast<int>(node.id)).second && valid;
+        valid = node.parentIndex < static_cast<int>(index) && valid;
+        valid = validPrimitive(node.primitive) && valid;
+        valid = node.shapeScale.x > 0.0f && node.shapeScale.y > 0.0f &&
+                node.shapeScale.z > 0.0f && valid;
+    }
+    output << "  Worker hierarchy definition: " << (valid ? "PASS" : "FAIL")
+           << " (" << hierarchy.size() << " parts)\n";
+    return valid;
 }
 } // namespace
 
 bool validateCompositeObjects(std::ostream& output)
 {
     output << "Phase 3 composite-object validation:\n";
-    bool valid = true;
-    constexpr std::array<WorkerPose, 4> poses{{WorkerPose::Standing, WorkerPose::PullingReady,
-                                               WorkerPose::CarryingReady, WorkerPose::LeverReady}};
-    std::vector<ObjectPart> standing;
+    bool valid = validateWorkerDefinition(output);
+    constexpr std::array<WorkerPose, 6> poses{{
+        WorkerPose::Standing, WorkerPose::PullingReady, WorkerPose::CarryingReady,
+        WorkerPose::LeverReady, WorkerPose::ArmsOut, WorkerPose::BentKnees}};
+    Worker::EvaluatedPose standing{};
     for (WorkerPose pose : poses)
     {
-        const std::vector<ObjectPart> first = Worker::create(pose);
-        const std::vector<ObjectPart> second = Worker::create(pose);
-        valid = validateParts(Worker::poseName(pose), first, Worker::partCount(), output) && valid;
-        const bool deterministic = equalTransforms(first, second);
-        output << "    deterministic transforms: " << (deterministic ? "PASS" : "FAIL") << '\n';
+        const WorkerJointAngles angles = Worker::poseAngles(pose);
+        const Worker::EvaluatedPose first = Worker::evaluate(glm::mat4{1.0f}, angles);
+        const Worker::EvaluatedPose second = Worker::evaluate(glm::mat4{1.0f}, angles);
+        bool poseValid = Worker::jointAnglesWithinLimits(angles);
+        for (const WorkerPartTransform& part : first)
+            poseValid = isFiniteNonSingularTransform(part.jointWorld) &&
+                        isFiniteNonSingularTransform(part.model) && poseValid;
+        output << "  " << Worker::poseName(pose) << ": "
+               << (poseValid ? "PASS" : "FAIL") << " (17 evaluated parts)\n";
+        valid = poseValid && valid;
+        const bool deterministic = equalWorkerTransforms(first, second);
+        output << "    deterministic hierarchy: " << (deterministic ? "PASS" : "FAIL") << '\n';
         valid = deterministic && valid;
         if (pose == WorkerPose::Standing)
             standing = first;
         else
         {
-            const bool distinct = !equalTransforms(standing, first);
+            const bool distinct = !equalWorkerTransforms(standing, first);
             output << "    distinct from standing pose: " << (distinct ? "PASS" : "FAIL") << '\n';
             valid = distinct && valid;
         }

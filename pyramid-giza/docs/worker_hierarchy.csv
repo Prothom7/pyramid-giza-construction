@@ -1,0 +1,18 @@
+Part,Parent,JointOffsetX,JointOffsetY,JointOffsetZ,DefaultRotX,DefaultRotY,DefaultRotZ,ShapeOffsetX,ShapeOffsetY,ShapeOffsetZ,ScaleX,ScaleY,ScaleZ,Primitive,Notes
+Pelvis,WorkerRoot,0,1.17,0,0,0,0,0,0,0,0.48,0.24,0.28,Cube,Root body joint at hip height
+Torso,Pelvis,0,0.12,0,0,0,0,0,0.24,0,0.65,0.48,0.34,Cube,Waist pivot; shape extends upward
+Neck,Torso,0,0.48,0,0,0,0,0,0.06,0,0.15,0.12,0.15,Cylinder,Neck base pivot at torso top
+Head,Neck,0,0.12,0,0,0,0,0,0.15,0,0.32,0.30,0.32,Sphere,Head rotates from neck top
+Headwear,Head,0,0.29,0,0,0,0,0,0.04,0,0.38,0.08,0.38,Cylinder,Inherits head frame; no independent joint
+LeftUpperArm,Torso,-0.36,0.40,0,0,0,0,0,-0.235,0,0.17,0.47,0.17,Cylinder,Shoulder pivot; shape extends downward
+LeftForearm,LeftUpperArm,0,-0.47,0,0,0,0,0,-0.19,0,0.15,0.38,0.15,Cylinder,Elbow pivot at upper-arm end
+LeftHand,LeftForearm,0,-0.38,0,0,0,0,0,-0.055,0,0.17,0.17,0.17,Sphere,Wrist pivot at forearm end
+RightUpperArm,Torso,0.36,0.40,0,0,0,0,0,-0.235,0,0.17,0.47,0.17,Cylinder,Shoulder pivot; shape extends downward
+RightForearm,RightUpperArm,0,-0.47,0,0,0,0,0,-0.19,0,0.15,0.38,0.15,Cylinder,Elbow pivot at upper-arm end
+RightHand,RightForearm,0,-0.38,0,0,0,0,0,-0.055,0,0.17,0.17,0.17,Sphere,Wrist pivot at forearm end
+LeftThigh,Pelvis,-0.16,0,0,0,0,0,0,-0.26,0,0.20,0.52,0.20,Cylinder,Hip pivot; shape extends downward
+LeftLowerLeg,LeftThigh,0,-0.52,0,0,0,0,0,-0.225,0,0.17,0.45,0.17,Cylinder,Knee pivot at thigh end
+LeftFoot,LeftLowerLeg,0,-0.45,0,0,0,0,0,-0.10,-0.11,0.28,0.20,0.46,Cube,Ankle pivot; foot reaches local ground
+RightThigh,Pelvis,0.16,0,0,0,0,0,0,-0.26,0,0.20,0.52,0.20,Cylinder,Hip pivot; shape extends downward
+RightLowerLeg,RightThigh,0,-0.52,0,0,0,0,0,-0.225,0,0.17,0.45,0.17,Cylinder,Knee pivot at thigh end
+RightFoot,RightLowerLeg,0,-0.45,0,0,0,0,0,-0.10,-0.11,0.28,0.20,0.46,Cube,Ankle pivot; foot reaches local ground

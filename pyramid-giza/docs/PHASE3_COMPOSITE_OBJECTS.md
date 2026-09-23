@@ -1,5 +1,10 @@
 # Phase 3 - Composite Construction Objects
 
+> Historical phase note: Phase 4 replaces the worker's flat local-part evaluation with
+> the hierarchy documented in `PHASE4_HIERARCHICAL_MODELING.md`. The sledge/equipment
+> composition and shared-mesh principles below remain current; `composite_objects.csv`
+> preserves the Phase 3 worker baseline for comparison.
+
 ## Objective
 
 Phase 3 keeps the Phase 2 static Giza world and makes it inhabited with recognizable

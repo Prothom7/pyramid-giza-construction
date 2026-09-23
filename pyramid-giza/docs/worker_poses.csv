@@ -1,0 +1,34 @@
+Pose,Joint,RotationX,RotationY,RotationZ,Purpose
+Standing,All,0,0,0,Neutral bind/rest pose
+PullingReady,Torso,10,0,0,Forward body lean
+PullingReady,LeftShoulder,62,0,-8,Reach toward rope
+PullingReady,RightShoulder,62,0,8,Reach toward rope
+PullingReady,LeftElbow,32,0,0,Bent pulling arm
+PullingReady,RightElbow,32,0,0,Bent pulling arm
+PullingReady,LeftHip,-8,0,0,Staggered stance
+PullingReady,RightHip,8,0,0,Staggered stance
+PullingReady,LeftKnee,16,0,0,Staggered stance
+CarryingReady,LeftShoulder,48,0,-42,Arms spread toward carried load
+CarryingReady,RightShoulder,48,0,42,Arms spread toward carried load
+CarryingReady,LeftElbow,62,0,0,Hands drawn toward load
+CarryingReady,RightElbow,62,0,0,Hands drawn toward load
+LeverReady,Torso,12,8,0,Lean and turn toward lever
+LeverReady,LeftShoulder,68,0,-12,Reach along lever
+LeverReady,LeftElbow,34,0,0,Grip-ready bend
+LeverReady,RightShoulder,34,0,20,Secondary hand placement
+LeverReady,RightElbow,58,0,0,Secondary grip bend
+LeverReady,LeftKnee,18,0,0,Braced stance
+LeverReady,RightKnee,12,0,0,Braced stance
+ArmsOut,LeftShoulder,0,0,-90,Diagnostic T-pose arm
+ArmsOut,RightShoulder,0,0,90,Diagnostic T-pose arm
+BentKnees,Torso,-8,0,0,Counterbalance diagnostic crouch
+BentKnees,LeftHip,-24,0,0,Crouch hip bend
+BentKnees,RightHip,-24,0,0,Crouch hip bend
+BentKnees,LeftKnee,52,0,0,Crouch knee bend
+BentKnees,RightKnee,52,0,0,Crouch knee bend
+BentKnees,LeftAnkle,-24,0,0,Foot compensation
+BentKnees,RightAnkle,-24,0,0,Foot compensation
+ArticulationPreview,Head,0,18*sin(1.35*t),0,Diagnostic head sweep overlay
+ArticulationPreview,LeftShoulder,0,0,-28-24*sin(1.35*t),Diagnostic shoulder propagation overlay
+ArticulationPreview,LeftElbow,38+22*sin(1.35*t+pi/2),0,0,Diagnostic elbow propagation overlay
+ArticulationPreview,LeftKnee,10+8*sin(1.35*t+pi/2),0,0,Diagnostic knee propagation overlay

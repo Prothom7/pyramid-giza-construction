@@ -5,11 +5,13 @@ Course project status:
 - **Phase 1 — Complete:** reusable indexed primitive geometry foundation
 - **Phase 2 — Complete:** static Giza construction world
 - **Phase 3 — Complete:** static composite workers and construction equipment
+- **Phase 4 — Complete:** hierarchical joints and articulated rigid-part workers
 
 Phase 1 is frozen at Git commit `1a743b6`; Phase 2 is frozen at `718ccb0`. The current
 application builds a recognizable inhabited construction site from canonical indexed
 triangle meshes: desert, unfinished block-built pyramid, ramp, quarry, stockpile, seven
-static workers, two sledges, a transported stone, lever, mallet, and wooden supports.
+articulated workers, two static sledges, a transported stone, lever, mallet, and wooden
+supports. One foreground worker provides a stationary hierarchy demonstration.
 
 ## Build and run
 
@@ -32,6 +34,9 @@ build\PyramidGiza.exe
 - `5`: workers and loaded sledge
 - `C`: toggle back-face culling
 - `F`: toggle filled/wireframe rendering
+- `Space`: pause/resume the articulated-worker preview
+- `P`: cycle the demo worker through action and diagnostic poses
+- `R`: reset the demo worker to Standing
 - `Esc`: exit
 
 ## Validation commands
@@ -40,6 +45,7 @@ build\PyramidGiza.exe
 build\PyramidGiza.exe --validate-geometry
 build\PyramidGiza.exe --validate-scene
 build\PyramidGiza.exe --validate-composites
+build\PyramidGiza.exe --validate-hierarchy
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -50,3 +56,5 @@ See [docs/PHASE1_PRIMITIVE_FOUNDATION.md](docs/PHASE1_PRIMITIVE_FOUNDATION.md) a
 [docs/PHASE2_STATIC_GIZA_WORLD.md](docs/PHASE2_STATIC_GIZA_WORLD.md).
 Phase 3 composition, local transforms, and reuse are documented in
 [docs/PHASE3_COMPOSITE_OBJECTS.md](docs/PHASE3_COMPOSITE_OBJECTS.md).
+Phase 4 joint frames, pivot mathematics, limits, and pose controls are documented in
+[docs/PHASE4_HIERARCHICAL_MODELING.md](docs/PHASE4_HIERARCHICAL_MODELING.md).

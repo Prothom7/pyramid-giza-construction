@@ -14,6 +14,7 @@
 #include "Camera.h"
 #include "graphics/GeometryValidation.h"
 #include "objects/CompositeValidation.h"
+#include "objects/WorkerHierarchyValidation.h"
 #include "scene/PyramidLayout.h"
 #include "scene/StaticGizaScene.h"
 
@@ -31,6 +32,7 @@ struct AppState
     bool firstMouse = true;
     bool cullingEnabled = true;
     bool wireframeEnabled = false;
+    StaticGizaScene* scene = nullptr;
 };
 
 void setCameraPreset(AppState& state, int preset)
@@ -112,6 +114,22 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int)
         glPolygonMode(GL_FRONT_AND_BACK, state->wireframeEnabled ? GL_LINE : GL_FILL);
         std::cout << "Wireframe: " << (state->wireframeEnabled ? "ON" : "OFF") << '\n';
     }
+    else if (key == GLFW_KEY_SPACE && state->scene != nullptr)
+    {
+        state->scene->toggleArticulationPreview();
+        std::cout << "Articulation preview: "
+                  << (state->scene->articulationPreviewEnabled() ? "RUNNING" : "PAUSED") << '\n';
+    }
+    else if (key == GLFW_KEY_P && state->scene != nullptr)
+    {
+        state->scene->cycleDemoPose();
+        std::cout << "Demo worker pose: " << state->scene->demoPoseName() << '\n';
+    }
+    else if (key == GLFW_KEY_R && state->scene != nullptr)
+    {
+        state->scene->resetArticulationPreview();
+        std::cout << "Demo worker reset to Standing.\n";
+    }
     else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_5)
         setCameraPreset(*state, key - GLFW_KEY_0);
 }
@@ -171,6 +189,7 @@ int main(int argc, char** argv)
     bool geometryValidationOnly = false;
     bool sceneValidationOnly = false;
     bool compositeValidationOnly = false;
+    bool hierarchyValidationOnly = false;
     bool smokeTest = false;
     bool startWireframe = false;
     bool startWithCulling = true;
@@ -185,6 +204,8 @@ int main(int argc, char** argv)
             sceneValidationOnly = true;
         else if (option == "--validate-composites")
             compositeValidationOnly = true;
+        else if (option == "--validate-hierarchy")
+            hierarchyValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
         else if (option == "--wireframe")
@@ -216,8 +237,10 @@ int main(int argc, char** argv)
         return validatePyramidLayout(std::cout) ? 0 : 1;
     if (compositeValidationOnly)
         return validateCompositeObjects(std::cout) ? 0 : 1;
+    if (hierarchyValidationOnly)
+        return validateWorkerHierarchy(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
-        !validateCompositeObjects(std::cout))
+        !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout))
         return 1;
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -237,7 +260,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 3 Composite Construction Objects",
+                                          "Pyramid at Giza - Phase 4 Hierarchical Workers",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -268,7 +291,8 @@ int main(int argc, char** argv)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetCursorPosCallback(window, mouseCallback);
         std::cout << "Controls: W/A/S/D move, Q/E move vertically, mouse looks, "
-                     "1-5 select views, C toggles culling, F toggles wireframe, ESC exits.\n";
+                     "1-5 views, C culling, F wireframe, Space pauses articulation, "
+                     "P cycles poses, R resets, ESC exits.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
 
@@ -289,6 +313,7 @@ int main(int argc, char** argv)
     try
     {
         StaticGizaScene scene;
+        state.scene = &scene;
         float previousTime = static_cast<float>(glfwGetTime());
         int renderedFrames = 0;
 
@@ -299,6 +324,7 @@ int main(int argc, char** argv)
             previousTime = currentTime;
             if (!smokeTest)
                 processInput(window, state);
+            scene.update(state.deltaTime);
 
             int framebufferWidth = 0;
             int framebufferHeight = 0;
@@ -330,6 +356,7 @@ int main(int argc, char** argv)
             if (smokeTest && renderedFrames >= 3)
                 break;
         }
+        state.scene = nullptr;
     }
     catch (const std::exception& error)
     {

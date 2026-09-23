@@ -33,6 +33,7 @@ add_executable(PyramidGiza
     src/objects/Sledge.cpp
     src/objects/ConstructionProps.cpp
     src/objects/CompositeValidation.cpp
+    src/objects/WorkerHierarchyValidation.cpp
 )
 
 target_include_directories(PyramidGiza PRIVATE
@@ -72,3 +73,4 @@ enable_testing()
 add_test(NAME Phase1GeometryValidation COMMAND PyramidGiza --validate-geometry)
 add_test(NAME Phase2SceneValidation COMMAND PyramidGiza --validate-scene)
 add_test(NAME Phase3CompositeValidation COMMAND PyramidGiza --validate-composites)
+add_test(NAME Phase4WorkerHierarchyValidation COMMAND PyramidGiza --validate-hierarchy)

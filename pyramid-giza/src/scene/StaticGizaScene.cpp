@@ -31,6 +31,7 @@ StaticGizaScene::StaticGizaScene()
       sphere_(PrimitiveGenerator::createSphere())
 {
     objects_.reserve(1280);
+    workers_.reserve(7);
     buildGround();
     buildPyramid();
     buildRamp();
@@ -38,7 +39,7 @@ StaticGizaScene::StaticGizaScene()
     buildStockpile();
     buildConstructionProps();
     buildCompositeObjects();
-    stats_.totalDrawCalls = objects_.size();
+    stats_.totalDrawCalls = objects_.size() + stats_.workerParts;
 
     const PyramidLayoutStats pyramidStats = PyramidLayout::statistics(
         pyramidConfig_, PyramidLayout::generate(pyramidConfig_));
@@ -207,11 +208,13 @@ void StaticGizaScene::buildConstructionProps()
 void StaticGizaScene::buildCompositeObjects()
 {
     const auto addWorker = [&](const glm::vec3& position, float rotationY, WorkerPose pose,
-                               MaterialId clothing) {
-        const std::vector<ObjectPart> parts = Worker::create(pose, {clothing, MaterialId::Headwear});
-        addComposite(makeTransform(position, {0.0f, rotationY, 0.0f}, {1.0f, 1.0f, 1.0f}), parts);
+                               MaterialId clothing, bool isDemoWorker = false) {
+        const WorkerStyle style{clothing, MaterialId::Headwear};
+        workers_.push_back({
+            makeTransform(position, {0.0f, rotationY, 0.0f}, {1.0f, 1.0f, 1.0f}),
+            pose, Worker::poseAngles(pose), style, isDemoWorker});
         ++stats_.workerInstances;
-        stats_.workerParts += parts.size();
+        stats_.workerParts += Worker::partCount();
     };
 
     // Two pullers face the loaded sledge's rope and the pyramid approach.
@@ -221,7 +224,8 @@ void StaticGizaScene::buildCompositeObjects()
     addWorker({-19.0f, 0.0f, 6.5f}, 155.0f, WorkerPose::CarryingReady, MaterialId::ClothingLinen);
     addWorker({3.55f, 0.0f, -1.8f}, -35.0f, WorkerPose::CarryingReady, MaterialId::ClothingBlue);
     addWorker({14.8f, 0.0f, -0.8f}, 90.0f, WorkerPose::LeverReady, MaterialId::ClothingLinen);
-    addWorker({11.2f, 0.0f, 7.1f}, 170.0f, WorkerPose::Standing, MaterialId::ClothingBlue);
+    addWorker({11.2f, 0.0f, 7.1f}, 170.0f, WorkerPose::Standing,
+              MaterialId::ClothingBlue, true);
 
     addComposite(makeTransform({6.0f, 0.0f, 9.15f}, {}, {1.0f, 1.0f, 1.0f}),
                  Sledge::create(true));
@@ -238,6 +242,29 @@ void StaticGizaScene::buildCompositeObjects()
     addComposite(makeTransform({-10.5f, 0.0f, 8.5f}, {0.0f, 20.0f, 0.0f}, {1.0f, 1.0f, 1.0f}), frame);
     addComposite(makeTransform({-13.2f, 0.0f, 3.7f}, {0.0f, 35.0f, 0.0f}, {1.0f, 1.0f, 1.0f}), roller);
     stats_.compositeEquipmentParts = lever.size() + mallet.size() + frame.size() + roller.size();
+}
+
+void StaticGizaScene::update(float deltaTime)
+{
+    if (articulationPreviewEnabled_ && std::isfinite(deltaTime) && deltaTime > 0.0f)
+        articulationTime_ += deltaTime * articulationSpeed_;
+}
+
+void StaticGizaScene::toggleArticulationPreview()
+{
+    articulationPreviewEnabled_ = !articulationPreviewEnabled_;
+}
+
+void StaticGizaScene::cycleDemoPose()
+{
+    demoPose_ = Worker::nextPose(demoPose_);
+    articulationTime_ = 0.0f;
+}
+
+void StaticGizaScene::resetArticulationPreview()
+{
+    demoPose_ = WorkerPose::Standing;
+    articulationTime_ = 0.0f;
 }
 
 const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
@@ -266,15 +293,28 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
     shader_.setVec3("lightDirection", {-0.55f, -1.0f, -0.30f});
     shader_.setVec3("lightColor", {1.0f, 0.94f, 0.82f});
 
-    for (const SceneObject& object : objects_)
-    {
-        shader_.setMat4("model", object.model);
-        shader_.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(object.model))));
-        const Material& material = materialDefinition(object.material);
+    const auto drawPart = [&](ScenePrimitive primitive, const glm::mat4& model,
+                              MaterialId materialId) {
+        shader_.setMat4("model", model);
+        shader_.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+        const Material& material = materialDefinition(materialId);
         shader_.setVec3("objectColor", material.color);
         shader_.setFloat("materialAmbient", material.ambient);
         shader_.setFloat("materialDiffuse", material.diffuse);
         shader_.setFloat("materialSpecular", material.specular);
-        meshFor(object.primitive).draw();
+        meshFor(primitive).draw();
+    };
+
+    for (const SceneObject& object : objects_)
+        drawPart(object.primitive, object.model, object.material);
+
+    for (const WorkerInstance& worker : workers_)
+    {
+        const WorkerJointAngles angles = worker.isDemoWorker
+                                             ? Worker::animatedPreview(demoPose_, articulationTime_)
+                                             : worker.jointAngles;
+        const Worker::EvaluatedPose pose = Worker::evaluate(worker.root, angles, worker.style);
+        for (const WorkerPartTransform& part : pose)
+            drawPart(part.primitive, part.model, part.material);
     }
 }

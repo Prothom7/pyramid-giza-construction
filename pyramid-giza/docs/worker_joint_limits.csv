@@ -1,0 +1,49 @@
+Joint,Axis,MinDegrees,MaxDegrees,DefaultDegrees,Notes
+Pelvis,X,-20,20,0,Forward/back body-root tilt
+Pelvis,Y,-45,45,0,Body-root yaw
+Pelvis,Z,-20,20,0,Side tilt
+Torso,X,-35,35,0,Waist pitch
+Torso,Y,-45,45,0,Waist yaw
+Torso,Z,-25,25,0,Waist roll
+Neck,X,-25,25,0,Neck pitch
+Neck,Y,-45,45,0,Neck yaw
+Neck,Z,-20,20,0,Neck roll
+Head,X,-35,35,0,Head pitch
+Head,Y,-70,70,0,Head yaw
+Head,Z,-30,30,0,Head roll
+LeftShoulder,X,-120,150,0,Arm forward/back pitch
+LeftShoulder,Y,-90,90,0,Arm yaw
+LeftShoulder,Z,-170,90,0,Left arm raise/lower
+LeftElbow,X,0,145,0,Elbow bend
+LeftElbow,Y,-10,10,0,Small simplified lateral allowance
+LeftElbow,Z,-10,10,0,Small simplified lateral allowance
+LeftWrist,X,-45,45,0,Wrist pitch
+LeftWrist,Y,-45,45,0,Wrist yaw
+LeftWrist,Z,-35,35,0,Wrist roll
+RightShoulder,X,-120,150,0,Arm forward/back pitch
+RightShoulder,Y,-90,90,0,Arm yaw
+RightShoulder,Z,-90,170,0,Right arm raise/lower
+RightElbow,X,0,145,0,Elbow bend
+RightElbow,Y,-10,10,0,Small simplified lateral allowance
+RightElbow,Z,-10,10,0,Small simplified lateral allowance
+RightWrist,X,-45,45,0,Wrist pitch
+RightWrist,Y,-45,45,0,Wrist yaw
+RightWrist,Z,-35,35,0,Wrist roll
+LeftHip,X,-90,60,0,Thigh forward/back pitch
+LeftHip,Y,-45,45,0,Hip yaw
+LeftHip,Z,-35,35,0,Hip lateral rotation
+LeftKnee,X,0,130,0,Knee bend
+LeftKnee,Y,-5,5,0,Small simplified lateral allowance
+LeftKnee,Z,-5,5,0,Small simplified lateral allowance
+LeftAnkle,X,-45,45,0,Foot pitch
+LeftAnkle,Y,-25,25,0,Foot yaw
+LeftAnkle,Z,-20,20,0,Foot roll
+RightHip,X,-90,60,0,Thigh forward/back pitch
+RightHip,Y,-45,45,0,Hip yaw
+RightHip,Z,-35,35,0,Hip lateral rotation
+RightKnee,X,0,130,0,Knee bend
+RightKnee,Y,-5,5,0,Small simplified lateral allowance
+RightKnee,Z,-5,5,0,Small simplified lateral allowance
+RightAnkle,X,-45,45,0,Foot pitch
+RightAnkle,Y,-25,25,0,Foot yaw
+RightAnkle,Z,-20,20,0,Foot roll
