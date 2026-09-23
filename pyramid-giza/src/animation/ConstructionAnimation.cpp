@@ -30,8 +30,8 @@ constexpr float groundEndProgress = 0.35f;
 constexpr float rampEntryProgress = 0.45f;
 
 constexpr std::array<glm::vec3, 7> staticPositions{{
-    {7.5f, 0.0f, 35.0f}, {12.0f, 0.0f, 35.0f}, {-73.0f, 0.0f, -18.0f},
-    {-66.0f, 0.0f, -10.0f}, {5.0f, 0.0f, 2.0f}, {23.0f, 0.0f, 12.0f},
+    {7.5f, 0.0f, 35.0f}, {12.0f, 0.0f, 35.0f}, {-123.0f, -7.42f, -16.0f},
+    {-108.0f, -7.42f, -3.0f}, {5.0f, 0.0f, 2.0f}, {23.0f, 0.0f, 12.0f},
     {14.0f, 0.0f, 32.0f}
 }};
 constexpr std::array<float, 7> staticHeadings{{0.0f, 0.0f, -80.0f, 155.0f, -35.0f, 90.0f, 170.0f}};

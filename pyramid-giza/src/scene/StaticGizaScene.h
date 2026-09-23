@@ -18,8 +18,14 @@ struct StaticGizaSceneStats
     std::size_t rampComponents = 0;
     std::size_t scaffoldModules = 0;
     std::size_t quarryBlocks = 0;
+    std::size_t quarryObjects = 0;
     std::size_t stockpileBlocks = 0;
+    std::size_t repositoryBlocks = 0;
     std::size_t constructionProps = 0;
+    std::size_t treeInstances = 0;
+    std::size_t liftingRigs = 0;
+    std::size_t sphinxParts = 0;
+    std::size_t environmentalObjects = 0;
     std::size_t workerInstances = 0;
     std::size_t heroWorkers = 0;
     std::size_t secondaryWorkers = 0;
@@ -85,6 +91,8 @@ private:
     void buildStockpiles();
     void buildTransportLanes();
     void buildTimberAndCamp();
+    void buildNileAndContext();
+    void buildHeavyLiftingRig();
     void buildCompositeObjects();
     const Mesh& meshFor(ScenePrimitive primitive) const;
 

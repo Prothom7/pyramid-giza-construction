@@ -1,0 +1,5 @@
+Mechanism,Location,Components,Motion,Purpose,HistoricalCertainty,Notes
+Quarry lever station,"Bay C (-123 -6.55 -22)",Timber cylinder fulcrum cube and tilted stone,Static transformed pose,Explain block separation,Interpretive,No simulated forces
+Loading lever,"Loading station (-15.2 1.05 39.2)",Long timber cylinder,Static transformed pose,Explain loading work,Interpretive,Uses shared cylinder
+Rope-redirection rig,"(-91 0 22)",Four posts top beam two cylinder wheels two rope cylinders and suspended cube,Static transform demonstration,Graphics demonstration of rope redirection,Experimental / speculative visualization,Not presented as proven Khufu-era technology
+Main-ramp rope posts,Main ramp edges,Cylinder guide posts and retaining rails,Static while hero rope moves,Support haul-route readability,Interpretive infrastructure,Dynamic hero rope remains endpoint-driven

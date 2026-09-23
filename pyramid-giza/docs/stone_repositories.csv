@@ -1,0 +1,4 @@
+RepositoryID,Type,CenterX,CenterY,CenterZ,BlockCount,Arrangement,Material,Purpose,Notes
+RoughDepot,Rough stone,-82,0,12,48,6 rows by 8 columns with deterministic yaw,QuarryStone,Receive extracted blocks,Irregular orientation distinguishes rough work
+PartialDepot,Partially dressed,-58,0,26,18,3 rows by 6 columns,LimestoneVariation,Feed cutting and dressing yard,Adjacent low cutting beds
+FinishedDepot,Finished stone,-34,0,35,60,5 rows by 6 columns by 2 levels,PreparedStone,Supply loading station,Ordered grid visibly contrasts rough depot

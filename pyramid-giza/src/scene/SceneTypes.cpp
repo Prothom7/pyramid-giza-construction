@@ -8,7 +8,7 @@
 
 namespace
 {
-constexpr std::array<Material, 14> materials{{
+constexpr std::array<Material, 17> materials{{
     {{0.76f, 0.60f, 0.35f}, 0.24f, 0.72f, 0.05f}, // Sand
     {{0.82f, 0.72f, 0.50f}, 0.20f, 0.76f, 0.12f}, // Limestone
     {{0.72f, 0.61f, 0.40f}, 0.20f, 0.76f, 0.10f}, // Limestone variation
@@ -22,13 +22,16 @@ constexpr std::array<Material, 14> materials{{
     {{0.18f, 0.32f, 0.44f}, 0.18f, 0.75f, 0.12f}, // Blue clothing
     {{0.72f, 0.59f, 0.34f}, 0.21f, 0.73f, 0.08f}, // Headwear
     {{0.48f, 0.34f, 0.18f}, 0.20f, 0.70f, 0.05f}, // Rope
-    {{0.22f, 0.24f, 0.25f}, 0.16f, 0.55f, 0.42f}  // Tool metal
+    {{0.22f, 0.24f, 0.25f}, 0.16f, 0.55f, 0.42f}, // Tool metal
+    {{0.16f, 0.39f, 0.48f}, 0.30f, 0.62f, 0.18f}, // Water
+    {{0.36f, 0.43f, 0.22f}, 0.24f, 0.70f, 0.05f}, // Floodplain
+    {{0.22f, 0.36f, 0.14f}, 0.20f, 0.72f, 0.06f}  // Foliage
 }};
 
-constexpr std::array<const char*, 14> materialNames{{
+constexpr std::array<const char*, 17> materialNames{{
     "Sand", "Limestone", "LimestoneVariation", "QuarryStone", "PreparedStone",
     "RampEarth", "Wood", "DarkWood", "Skin", "ClothingLinen", "ClothingBlue",
-    "Headwear", "Rope", "ToolMetal"
+    "Headwear", "Rope", "ToolMetal", "Water", "Floodplain", "Foliage"
 }};
 
 std::size_t checkedMaterialIndex(MaterialId id)

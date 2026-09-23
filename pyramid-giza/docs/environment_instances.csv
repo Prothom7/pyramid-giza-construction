@@ -1,12 +1,13 @@
 Group,ObjectType,Count,Origin,GenerationRule,PrimitiveSource,Material,Notes
-Main pyramid,Stone block,7561,"(0,0,-42)",Centered shrinking square levels with active-face opening,Cube,Limestone variants,One shared cube mesh
-Ramp network,Ramp deck,3,Descriptor endpoints,Oriented cuboid between base and top,Cube,RampEarth,Main plus two auxiliary ramps
-Scaffolding,Scaffold module,22,Three descriptor groups,Bays times levels using one 13-part module,Cube and Cylinder,Wood variants,286 static part draws
-Quarry rough field,Rough stone,42,"(-84,0,-33)",7 columns by 6 rows with deterministic variation,Cube,QuarryStone variants,No random seed required
-Quarry cut face,Cut stone,24,"(-86,0,-39)",Six columns by four stepped levels,Cube,QuarryStone,Reads as an extraction wall
-Prepared stockpiles,Prepared stone,36,"(10,0,31)",Tiered stack plus transport and ramp staging,Cube,PreparedStone,Three visually distinct groups
-Workers,Articulated worker,25,Seven site groups,7 hero plus 9 secondary plus 9 background,Cube Cylinder Sphere,Worker palette,Shared 17-node hierarchy
-Sledges,Sledge,6,Transport zones,One animated loaded plus five static instances,Cube and Cylinder,Wood and Rope,Shared part definition
-Timber logs,Log,15,"(42,0,5)",Three deterministic stacked layers,Cylinder,Wood,Shared cylinder mesh
-Timber beams,Squared beam,12,"(43,0,11)",Four stacks by three layers,Cube,Wood variants,Shared cube mesh
-Shelters,Shade structure,2,"(45,0,-26)",Four poles plus roof per shelter,Cylinder and Cube,Wood variants,Simple support architecture
+Main pyramid,Stone block,7561,"(0 0 -42)",Centered shrinking levels with incomplete upper state,Cube,Limestone variants,One shared cube mesh
+Ramp network,Ramp deck,4,Descriptor endpoints,Oriented cuboid between endpoints,Cube,RampEarth,Main plus three auxiliary ramps
+Scaffolding,Scaffold module,22,Three groups,Bays times levels,Cube and Cylinder,Wood variants,Shared module definition
+Open-cut quarry,Static quarry object,74,"(-128 -3.5 -15)",Terraces bays spoil and platforms,Plane Cube Cylinder,Stone and Wood,Includes full pit base
+Stone repositories,Stone block,126,Three depots,48 rough plus 18 partial plus 60 finished,Cube,Stone variants,Shared cube mesh
+Workers,Articulated worker,35,Site-wide,7 hero plus 14 secondary plus 14 background,Cube Cylinder Sphere,Worker palette,Shared hierarchy and meshes
+Sledges,Sledge,6,Logistics stages,One hero plus five deliberate traffic roles,Cube and Cylinder,Wood Rope Stone,Two are loaded
+Trees,Tree,18,Nile and camp,One cylinder trunk plus five flattened cube leaves,Cylinder and Cube,Wood and Foliage,No trees in active quarry or ramp
+Nile,Water surface,1,"(0 0.03 -166)",Scaled shared plane,Plane,Water,No advanced water effects
+Floodplain,Transition strip,1,"(0 0.02 -143)",Scaled shared plane,Plane,Floodplain,Desert remains dominant
+Lifting rig,Experimental rig,1,"(-91 0 22)",Frame wheels ropes and suspended stone,Cube and Cylinder,Wood Rope Stone,Static transform demonstration
+Sphinx context,Stylized landmark,7,"(92 0 -105)",Body chest head paws headdress,Cube and Sphere,Limestone,Secondary contextual landmark

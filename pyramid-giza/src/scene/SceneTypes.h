@@ -27,7 +27,10 @@ enum class MaterialId
     ClothingBlue,
     Headwear,
     Rope,
-    ToolMetal
+    ToolMetal,
+    Water,
+    Floodplain,
+    Foliage
 };
 
 struct Material

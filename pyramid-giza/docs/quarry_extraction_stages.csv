@@ -1,0 +1,6 @@
+Stage,VisualRepresentation,PrimitiveReuse,Workers,Tools,Output,Notes
+Bedrock,Future block embedded in broad cutting bed,Cube,Marked-bedrock workers,Mallet markers,Marked block,Still attached
+Channel cutting,Central block isolated by gaps and surrounding strips,Cube,Channel workers,Mallets and hand tools,Channel-cut block,Composition avoids boolean geometry
+Lever separation,Tilted block beside fulcrum,Cube and Cylinder,Lever-ready workers,Long timber lever,Mostly separated block,No force physics
+Removed block,Empty center with bordered cavity,Cube,Floor handlers,Simple tools,Open extraction cavity,Shows previous stone location
+Rough staging,Twelve blocks near exit route,Cube,Carriers and sledge team,Sledge and platform,Rough repository input,Deterministic 4 by 3 group

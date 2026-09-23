@@ -21,9 +21,11 @@ struct WorldScale
     float pyramidTargetHeight = 56.0f;
     float mainRampWidth = 7.0f;
     float scaffoldLevelHeight = 2.70f;
-    float quarryDistance = 72.0f;
-    float worldWidth = 220.0f;
-    float worldDepth = 190.0f;
+    float quarryDistance = 131.0f;
+    float quarryDepth = 7.5f;
+    float haulRoadLength = 97.9f;
+    float worldWidth = 360.0f;
+    float worldDepth = 300.0f;
 };
 
 struct RampDescriptor

@@ -2,21 +2,24 @@
 
 Course project status:
 
-- **Phase 1 - Complete:** reusable indexed primitive geometry foundation
-- **Phase 2 - Complete:** static Giza construction world
-- **Phase 3 - Complete:** composite workers and construction equipment
-- **Phase 4 - Complete:** hierarchical joints and articulated rigid-part workers
-- **Phase 5 - Complete:** coordinated, time-based construction animation
-- **Phase 5.5 - Complete:** monumental scale and expanded construction site
+- **Phase 1 - Complete:** reusable indexed primitive geometry
+- **Phase 2 - Complete:** static Giza world
+- **Phase 3 - Complete:** composite workers and equipment
+- **Phase 4 - Complete:** hierarchical articulated workers
+- **Phase 5 - Complete:** coordinated 28.5-second construction animation
+- **Phase 5.5 - Complete:** monumental scale and expanded site
+- **Phase 5.6 - Complete:** quarry, stone logistics, Nile, and environmental context
 
-The application now presents a large organized construction environment built only from
-the project's indexed primitive meshes. Its 81.64-unit unfinished pyramid contains 7,561
-procedurally placed blocks and rises 20.35 worker-heights above the site. Three ramps,
-22 reusable scaffold modules, a distant quarry, cutting and stockpile stages, transport
-lanes, timber storage, shelters, 25 workers, and six sledges establish the larger world.
+The application is now a full ancient industrial landscape. A 7,561-block unfinished
+pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
+three stone repositories, loading station, long haul road, worker-access infrastructure,
+an experimental rope-redirection rig, Nile/floodplain, 18 trees, support camp, and a
+secondary stylized Sphinx-context landmark explain the wider site.
 
-The existing 28.5-second hero sequence remains active: workers approach and pull a loaded
-sledge, climb the main ramp, and prepare a lever-assisted placement.
+All objects reuse four uploaded primitive meshes (plane, cube, cylinder, sphere). Filled
+rendering remains indexed `GL_TRIANGLES`; scene instances only supply model transforms and
+materials. The original Phase 5 animation remains a focused local transport stage within
+the longer static quarry-to-pyramid logistics chain.
 
 ## Build and run
 
@@ -29,28 +32,22 @@ build\PyramidGiza.exe
 
 ## Controls
 
-- `W/A/S/D`: move forward/left/back/right
-- `Q/E`: move down/up
-- mouse: look
-- `1`: monumental overview
+- `W/A/S/D`: move; `Q/E`: move down/up; mouse: look
+- `1`: monumental pyramid overview
 - `2`: pyramid base
-- `3`: quarry and cutting zone
-- `4`: main ramp
-- `5`: hero transport animation
-- `6`: scaffold and upper work zone
-- `7`: wide site overview
-- `C`: toggle back-face culling
-- `F`: toggle filled/wireframe rendering
-- `Space`: pause/resume the coordinated animation
-- `N`: advance to the next animation state
-- `L`: toggle looping
-- `M`: toggle coordinated animation / Phase 4 pose demonstration
-- `+/-`: increase/decrease animation speed from 0.25x to 4x
-- `P`: cycle the Phase 4 demo pose
-- `R`: reset the construction sequence to Idle
-- `Esc`: exit
+- `3`: quarry overview
+- `4`: extraction bays
+- `5`: repositories and transport
+- `6`: scaffold and upper construction
+- `7`: complete site overview
+- `8`: Nile and floodplain
+- `9`: Sphinx-context landmark
+- `C`: toggle back-face culling; `F`: toggle filled/wireframe
+- `Space`: pause/resume; `N`: next state; `R`: reset; `L`: loop
+- `M`: coordinated animation/pose-preview mode; `+/-`: animation speed
+- `P`: cycle debug pose; `Esc`: exit
 
-## Validation commands
+## Validation
 
 ```powershell
 build\PyramidGiza.exe --validate-geometry
@@ -59,22 +56,22 @@ build\PyramidGiza.exe --validate-composites
 build\PyramidGiza.exe --validate-hierarchy
 build\PyramidGiza.exe --validate-animation
 build\PyramidGiza.exe --validate-site
+build\PyramidGiza.exe --validate-industrial
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
 `--wireframe`, `--no-cull`, `--animation-time SECONDS`, and `--capture output.ppm`
-are available for deterministic render-state checks. Generated build files and captures
-are ignored by Git.
+support deterministic runtime checks. Build output and captures are ignored by Git.
 
 ## Documentation
 
-- [Phase 1 primitive foundation](docs/PHASE1_PRIMITIVE_FOUNDATION.md)
-- [Phase 2 static world](docs/PHASE2_STATIC_GIZA_WORLD.md)
-- [Phase 3 composite objects](docs/PHASE3_COMPOSITE_OBJECTS.md)
-- [Phase 4 hierarchy](docs/PHASE4_HIERARCHICAL_MODELING.md)
-- [Phase 5 animation](docs/PHASE5_CONSTRUCTION_ANIMATION.md)
-- [Phase 5.5 monumental scale](docs/PHASE5_5_MONUMENTAL_SCALE.md)
+- [Phase 1](docs/PHASE1_PRIMITIVE_FOUNDATION.md)
+- [Phase 2](docs/PHASE2_STATIC_GIZA_WORLD.md)
+- [Phase 3](docs/PHASE3_COMPOSITE_OBJECTS.md)
+- [Phase 4](docs/PHASE4_HIERARCHICAL_MODELING.md)
+- [Phase 5](docs/PHASE5_CONSTRUCTION_ANIMATION.md)
+- [Phase 5.5](docs/PHASE5_5_MONUMENTAL_SCALE.md)
+- [Phase 5.6](docs/PHASE5_6_QUARRY_LOGISTICS_ENVIRONMENT.md)
 
-Excel-compatible Phase 5.5 records are in `docs/world_scale.csv`,
-`docs/site_zones.csv`, `docs/ramp_network.csv`, `docs/scaffold_layout.csv`, and
-`docs/environment_instances.csv`.
+Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
+repository, logistics, environment, lifting-mechanism, ramp, and world-scale tables.

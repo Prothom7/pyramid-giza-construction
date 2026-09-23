@@ -1,0 +1,14 @@
+Zone,Level,CenterX,CenterY,CenterZ,ExtentX,ExtentY,ExtentZ,Purpose,GenerationRule,Notes
+Quarry rim,Plateau,-128,0,-15,64,1,72,Defines excavation edge,Four ground slabs leave opening,No underground mine geometry
+Upper bench,Upper,-128,-1.5,-15,64,2.5,72,Initial cutting terrace,Stepped cuboid wall and sides,Elevation 1 of 3
+Middle bench,Middle,-128,-3.7,-15,54,2.1,58,Intermediate extraction terrace,Inset wall and side sections,Elevation 2 of 3
+Lower bench,Lower,-128,-5.7,-15,44,2.1,44,Active lower terrace,Inset wall and side sections,Elevation 3 of 3
+Pit base,Lowest,-128,-7.48,-15,60,0,64,Close excavation volume,Scaled shared plane,Prevents visual voids
+Active floor,Lowest,-128,-7.45,-15,42,0,34,Extraction working surface,Scaled shared plane,QuarryStone material
+Bay A,Lowest,-143,-6.75,-22,8.2,1.55,8,Marked bedrock,Embedded cuboid block,Future block remains attached
+Bay B,Lowest,-133,-6.75,-22,8.2,1.5,8,Channel cutting,Central block and four surrounding strips,Gaps read as cut channels
+Bay C,Lowest,-123,-6.55,-22,8.2,1.65,8,Lever separation,Tilted block fulcrum and beam,Transform-only lever display
+Bay D,Lowest,-113,-7.2,-22,8.2,1,8,Removed-block cavity,Low floor and four border strips,Empty center communicates removal
+Quarry exit ramp,Lower to plateau,-97,-2.925,0.5,7.5,0.65,21.75,Loaded exit route,Oriented shared cube,Connects floor to haul road
+Worker side stairs,Lower to plateau,-97,-2.9,0.5,12,0.22,22,Separate worker access,15 paired repeated cube steps,Ten guide posts
+Spoil area,Lowest,-138,-6.95,3,34,2,4,Waste and broken rock,Three groups of ten deterministic cubes,Away from extraction bays

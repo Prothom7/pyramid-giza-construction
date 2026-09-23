@@ -54,7 +54,9 @@ const std::vector<RampDescriptor>& MonumentalSite::ramps()
         {"WestAccessRamp", {-63.0f, 0.30f, -25.0f}, {-41.6f, 5.30f, -25.0f},
          4.5f, 0.60f, MaterialId::RampEarth, false},
         {"UpperConnector", {9.0f, 8.40f, 0.20f}, {20.0f, 13.20f, -11.0f},
-         3.6f, 0.52f, MaterialId::RampEarth, false}
+         3.6f, 0.52f, MaterialId::RampEarth, false},
+        {"QuarryExitRamp", {-103.0f, -6.2f, -8.0f}, {-91.0f, 0.35f, 9.0f},
+         7.5f, 0.65f, MaterialId::RampEarth, false}
     };
     return values;
 }
@@ -80,12 +82,16 @@ const std::vector<SiteZoneDescriptor>& MonumentalSite::zones()
         {"PyramidZone", {0.0f, 23.0f, -42.0f}, {42.0f, 23.0f, 42.0f}, "Main monument"},
         {"RampNetwork", {0.0f, 5.0f, 22.0f}, {34.0f, 8.0f, 24.0f}, "Primary access"},
         {"ScaffoldZone", {0.0f, 8.0f, 1.5f}, {31.0f, 9.0f, 4.0f}, "Active face access"},
-        {"QuarryZone", {-72.0f, 2.5f, -20.0f}, {18.0f, 5.0f, 20.0f}, "Stone extraction"},
-        {"CuttingZone", {-49.0f, 2.0f, 18.0f}, {12.0f, 4.0f, 12.0f}, "Stone preparation"},
-        {"StockpileZone", {14.0f, 2.0f, 33.0f}, {15.0f, 4.0f, 12.0f}, "Prepared transport stones"},
-        {"TransportZone", {0.0f, 1.0f, 40.0f}, {32.0f, 2.0f, 8.0f}, "Open hauling corridor"},
+        {"QuarryZone", {-128.0f, -3.5f, -15.0f}, {32.0f, 7.5f, 36.0f}, "Open-cut extraction"},
+        {"RoughRepository", {-82.0f, 2.0f, 12.0f}, {16.0f, 4.0f, 14.0f}, "Rough stone depot"},
+        {"CuttingZone", {-58.0f, 2.0f, 26.0f}, {13.0f, 4.0f, 12.0f}, "Stone dressing"},
+        {"FinishedRepository", {-34.0f, 2.0f, 35.0f}, {14.0f, 5.0f, 13.0f}, "Finished stone depot"},
+        {"LoadingStation", {-10.0f, 2.0f, 42.0f}, {13.0f, 4.0f, 10.0f}, "Sledge loading"},
+        {"TransportZone", {-45.0f, 1.0f, 31.0f}, {50.0f, 2.0f, 10.0f}, "Long haul corridor"},
         {"TimberYard", {48.0f, 2.0f, 7.0f}, {13.0f, 4.0f, 14.0f}, "Wood and scaffold storage"},
-        {"WorkCamp", {51.0f, 2.5f, -25.0f}, {14.0f, 5.0f, 12.0f}, "Shelter and tools"}
+        {"WorkCamp", {51.0f, 2.5f, -25.0f}, {14.0f, 5.0f, 12.0f}, "Shelter and tools"},
+        {"NileContext", {0.0f, 0.0f, -155.0f}, {170.0f, 1.0f, 24.0f}, "Water and floodplain"},
+        {"SphinxContext", {92.0f, 2.0f, -105.0f}, {16.0f, 5.0f, 12.0f}, "Secondary Giza landmark"}
     };
     return values;
 }

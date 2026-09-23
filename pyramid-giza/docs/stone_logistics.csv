@@ -1,0 +1,12 @@
+Stage,Zone,Input,Output,TransportMethod,PrimaryObjects,AnimationStatus,Notes
+0 Bedrock,Extraction bays,Limestone bedrock,Marked block,Manual marking,Embedded blocks and workers,Secondary pose preview,Start of material flow
+1 Separation,Quarry lower floor,Marked block,Rough free block,Levers and mallets,Channels fulcrum beam,Secondary pose preview,No physics
+2 Floor staging,Quarry exit,Rough block,Queued block,Sledge and carrying,12 rough blocks and quarry sledge,Static,Lower staging
+3 Quarry exit,Quarry ramp,Queued block,Plateau block,Sledge haul,Ramp stairs guide posts,Static demonstration,Ramp is 7.5 units wide
+4 Rough repository,RoughDepot,Plateau block,Sorted rough stone,Sledge,48 varied cubes,Static,Incoming depot
+5 Dressing,Dressing yard,Rough stone,Partially dressed stone,Short manual movement,Cutting beds tools 18 stones,Secondary workers,Clear intermediate stage
+6 Finished repository,FinishedDepot,Dressed stone,Transport-ready block,Sledge,60 ordered blocks in two levels,Static,Regular arrangement
+7 Loading,Loading station,Transport-ready block,Loaded sledge,Levers ropes beams,Platform waiting blocks sledges,Hero route nearby,Explains transport start
+8 Haul,Long road,Loaded sledge,Pyramid staging block,Sledge and pullers,Road edge posts six traffic roles,One hero animated,Hero covers focused local segment
+9 Ramp delivery,Main ramp,Staged block,Upper platform load,Loaded sledge and ropes,Ramp rollers stairs rest platform,Hero animated,Original 28.5-second route preserved
+10 Placement,Upper work platform,Delivered block,Placement-ready stone,Lever and workers,Waiting stones scaffold connection,Hero animated,Ends at pyramid active face

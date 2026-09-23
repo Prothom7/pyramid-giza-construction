@@ -1,14 +1,21 @@
 Element,ReferenceDimension,Value,UnitConvention,RelativeToWorker,Notes
 Worker,Height,2.26,world units,1.00,Phase 4 articulated worker
 Common pyramid block,Width,2.80,world units,1.24,Canonical cube scaled by model matrix
-Common pyramid block,Height,2.00,world units,0.88,Large construction stone but below worker height
+Common pyramid block,Height,2.00,world units,0.88,Preserved from Phase 5.5
 Common pyramid block,Depth,2.80,world units,1.24,Shared cube mesh
-Loaded sledge,Body length,2.75,world units,1.22,Runners excluding tow rope
-Main hauling ramp,Width,7.00,world units,3.10,Wide enough for sledge and pulling team
-Scaffold module,Level height,2.70,world units,1.19,One reusable module story
 Main pyramid,Base width,81.64,world units,36.12,28 blocks plus spacing
 Main pyramid,Completed height,46.00,world units,20.35,23 constructed levels
-Main pyramid,Target implied height,56.00,world units,24.78,Upper levels deliberately absent
-Quarry,Center distance,72.00,world units,31.86,Separated west of monument
-Desert,Footprint X,220.00,world units,97.35,Expanded ground plane
-Desert,Footprint Z,190.00,world units,84.07,Expanded ground plane
+Main pyramid,Target height,56.00,world units,24.78,Upper levels deliberately absent
+Quarry,Center distance from pyramid,130.82,world units,57.88,Increased from about 72 units
+Quarry,Excavation depth,7.50,world units,3.32,Three working elevations
+Quarry,Outer footprint,64 x 72,world units,NA,Open-cut zone
+Quarry,Active floor,42 x 34,world units,NA,Lower extraction surface
+Repository,Rough footprint,19.55 x 25.25,world units,NA,48 rough stones
+Repository,Partial footprint,9.10 x 18.10,world units,NA,18 partially dressed stones
+Repository,Finished footprint,14.68 x 17.79,world units,NA,60 finished stones in two levels
+Haul road,Quarry exit to pyramid staging,97.90,world units,43.32,Two connected road segments
+Nile,Water surface,330 x 26,world units,NA,Center at (0 0.03 -166)
+Floodplain,Transition strip,340 x 20,world units,NA,Center at (0 0.02 -143)
+Sphinx context,Center distance from pyramid,110.68,world units,48.97,Center at (92 0 -105)
+Desert plateau,Footprint X,360.00,world units,159.29,Expanded world
+Desert plateau,Footprint Z,300.00,world units,132.74,Expanded world

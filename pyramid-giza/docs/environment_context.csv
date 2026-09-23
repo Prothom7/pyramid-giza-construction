@@ -1,0 +1,8 @@
+Feature,CenterX,CenterY,CenterZ,Extent,PrimitiveComposition,Purpose,HistoricalNote,Notes
+Nile,0,0.03,-166,"330 x 26",Scaled shared plane,Distant water context,General landscape context,Restrained blue-green material
+Floodplain,0,0.02,-143,"340 x 20",Scaled shared plane,Green transition zone,General landscape context,Does not turn plateau green
+Nile tree cluster,0,0,-145,"13 trees across 287 units",Cylinder trunks and flattened cube leaves,Environmental depth,Stylized vegetation,Sparse deterministic positions
+Camp tree cluster,54,0,-27,"5 trees",Cylinder trunks and flattened cube leaves,Shade and support identity,Stylized vegetation,Away from ramp and quarry
+Worker camp,51,2.5,-25,"28 x 10 x 24",Poles roofs jars crates,Workforce support,Scene organization rather than reconstruction,Secondary to pyramid
+Inspection shelter,-30,2.3,51,"8 x 4.6 x 5.8",Four cylinder poles and cube roof,Finished-stone oversight,Interpretive support zone,Near organized queue
+Sphinx context,92,0,-105,"13 x 10.6 x 14",Seven cube/sphere parts,Broader Giza landmark,A broader Giza contextual landmark / site-reference zone; not a same-moment claim,Secondary and distant
