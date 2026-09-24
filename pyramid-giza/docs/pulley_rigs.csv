@@ -1,0 +1,5 @@
+RigID,Location,RigType,WheelCount,RopeType,PrimaryPurpose,SpeculativeFlag,Notes
+Phase5_6Existing,-91 0 22,Four-post lifting frame,2,Static cylinder segments,Existing loading/lifting visualization,TRUE,Preserved unchanged from Phase 5.6
+QuarryExitRedirect,-98 0 17,Horizontal rope-redirection frame,2,Static cylinder segment,Turn quarry-exit hauling line,TRUE,Primitive frame axle wheels braces and rope
+LoadingAFrame,-10 0 54,A-frame lift,1,Static vertical cylinder segment,Demonstrate short loading assist,TRUE,Suspended prepared block remains static
+RampSideAssist,8.5 3.15 27,Ramp-side assist,1,Static cylinder segment,Demonstrate ramp rope assistance,TRUE,Root remains at least 8 world units from ramp centerline

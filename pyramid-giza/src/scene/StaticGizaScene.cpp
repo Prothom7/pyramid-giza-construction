@@ -1,6 +1,7 @@
 #include "scene/StaticGizaScene.h"
 
 #include <cmath>
+#include <initializer_list>
 #include <iostream>
 #include <stdexcept>
 
@@ -13,6 +14,7 @@
 #include "objects/Sledge.h"
 #include "scene/IndustrialLandscape.h"
 #include "scene/MonumentalSite.h"
+#include "scene/ObjectEnrichment.h"
 
 namespace
 {
@@ -32,8 +34,8 @@ StaticGizaScene::StaticGizaScene()
       cylinder_(PrimitiveGenerator::createCylinder()),
       sphere_(PrimitiveGenerator::createSphere())
 {
-    objects_.reserve(9500);
-    workers_.reserve(36);
+    objects_.reserve(9800);
+    workers_.reserve(44);
     buildGround();
     buildPyramid();
     buildTransportLanes();
@@ -44,6 +46,7 @@ StaticGizaScene::StaticGizaScene()
     buildTimberAndCamp();
     buildNileAndContext();
     buildHeavyLiftingRig();
+    buildObjectEnrichment();
     buildCompositeObjects();
 
     // Maximum draw count includes the dynamic loaded sledge, two ropes,
@@ -68,7 +71,10 @@ StaticGizaScene::StaticGizaScene()
               << "Industrial context: " << stats_.quarryObjects << " quarry objects, "
               << stats_.repositoryBlocks << " repository stones, "
               << stats_.treeInstances << " trees, " << stats_.liftingRigs
-              << " lifting rig, " << stats_.sphinxParts << " Sphinx-context parts\n";
+              << " rope/lifting rigs, " << stats_.sphinxParts << " Sphinx-context parts\n"
+              << "Object enrichment: " << stats_.enrichmentObjects << " primitive instances, "
+              << stats_.anchorPosts << " anchors, " << stats_.ladders << " ladders, "
+              << stats_.boats << " boats, 1 workshop and 1 sledge-repair station\n";
 }
 
 void StaticGizaScene::addObject(ScenePrimitive primitive, const glm::mat4& model,
@@ -690,6 +696,473 @@ void StaticGizaScene::buildHeavyLiftingRig()
     stats_.liftingRigs = 1;
 }
 
+void StaticGizaScene::buildObjectEnrichment()
+{
+    const std::size_t start = objects_.size();
+    buildRopeInfrastructure();
+    buildScaffoldAccess();
+    buildWorkshopRepairAndInspection();
+    buildRiverLanding();
+    buildUpperPlatformDetails();
+    stats_.enrichmentObjects = objects_.size() - start;
+    if (stats_.enrichmentObjects != ObjectEnrichment::expectedStaticInstances)
+        throw std::runtime_error("Object-enrichment instance count changed unexpectedly");
+}
+
+void StaticGizaScene::buildRopeInfrastructure()
+{
+    // These rigs are deliberately labelled speculative: they visualize useful
+    // graphics/composition ideas without asserting known Khufu-era pulley machinery.
+    for (const RopeRigDescriptor& rig : ObjectEnrichment::ropeRigs())
+    {
+        const glm::mat4 root = makeTransform(
+            rig.center, {0.0f, rig.yawDegrees, 0.0f}, {1.0f, 1.0f, 1.0f});
+        const auto worldPoint = [&root](const glm::vec3& local) {
+            return glm::vec3{root * glm::vec4{local, 1.0f}};
+        };
+        const auto addSegment = [this](const glm::vec3& from, const glm::vec3& to,
+                                       float diameter, MaterialId material) {
+            addObject(ScenePrimitive::Cylinder,
+                      ConstructionAnimationController::cylinderBetween(
+                          from, to, diameter), material);
+        };
+
+        glm::vec3 wheelCenter{0.0f, rig.height - 0.48f, 0.0f};
+        if (rig.type == RopeRigType::AFrameLift)
+        {
+            for (float x : {-0.5f * rig.width, 0.5f * rig.width})
+                for (float z : {-0.5f * rig.depth, 0.5f * rig.depth})
+                    addSegment(worldPoint({x, 0.0f, z}),
+                               worldPoint({x * 0.28f, rig.height, 0.0f}),
+                               0.30f, MaterialId::Wood);
+            addObject(ScenePrimitive::Cube,
+                      root * makeTransform({0.0f, rig.height, 0.0f}, {},
+                                           {rig.width * 0.48f, 0.34f, 0.42f}),
+                      MaterialId::DarkWood);
+        }
+        else
+        {
+            const float postDepth = rig.type == RopeRigType::HorizontalRedirection
+                                        ? 0.5f * rig.depth : 0.0f;
+            for (float x : {-0.5f * rig.width, 0.5f * rig.width})
+                for (float z : (postDepth > 0.0f
+                                    ? std::initializer_list<float>{-postDepth, postDepth}
+                                    : std::initializer_list<float>{0.0f}))
+                    addObject(ScenePrimitive::Cylinder,
+                              root * makeTransform({x, 0.5f * rig.height, z}, {},
+                                                   {0.30f, rig.height, 0.30f}),
+                              MaterialId::Wood);
+            addObject(ScenePrimitive::Cube,
+                      root * makeTransform({0.0f, rig.height, 0.0f}, {},
+                                           {rig.width + 0.6f, 0.34f, 0.42f}),
+                      MaterialId::DarkWood);
+            for (float x : {-0.5f * rig.width, 0.5f * rig.width})
+                addSegment(worldPoint({x, 0.3f, 0.0f}),
+                           worldPoint({x * 0.62f, rig.height - 0.15f, 0.0f}),
+                           0.18f, MaterialId::DarkWood);
+        }
+
+        const float wheelSpacing = rig.wheelCount == 2 ? 1.35f : 0.0f;
+        for (unsigned int wheel = 0; wheel < rig.wheelCount; ++wheel)
+        {
+            const float x = (static_cast<float>(wheel) -
+                             0.5f * static_cast<float>(rig.wheelCount - 1)) * wheelSpacing;
+            wheelCenter.x = x;
+            addObject(ScenePrimitive::Cylinder,
+                      root * makeTransform(wheelCenter, {90.0f, 0.0f, 0.0f},
+                                           {0.92f, 0.32f, 0.92f}),
+                      MaterialId::Wood);
+            addObject(ScenePrimitive::Cylinder,
+                      root * makeTransform(wheelCenter, {90.0f, 0.0f, 0.0f},
+                                           {0.18f, rig.depth + 0.50f, 0.18f}),
+                      MaterialId::DarkWood);
+        }
+
+        const glm::vec3 guide = worldPoint(wheelCenter);
+        if (rig.type == RopeRigType::AFrameLift)
+        {
+            const glm::vec3 load = worldPoint({0.0f, 0.75f, 0.0f});
+            addSegment(guide, load + glm::vec3{0.0f, 0.75f, 0.0f},
+                       0.075f, MaterialId::Rope);
+            addObject(ScenePrimitive::Cube,
+                      root * makeTransform({0.0f, 0.75f, 0.0f}, {},
+                                           {2.5f, 1.5f, 2.3f}),
+                      MaterialId::PreparedStone);
+        }
+        else if (rig.type == RopeRigType::RampAssist)
+        {
+            addSegment(guide, worldPoint({-7.0f, 0.35f, -5.5f}),
+                       0.075f, MaterialId::Rope);
+        }
+        else
+        {
+            addSegment(guide, worldPoint({6.2f, 0.45f, -3.0f}),
+                       0.075f, MaterialId::Rope);
+        }
+    }
+
+    for (const AnchorPostDescriptor& post : ObjectEnrichment::anchorPosts())
+    {
+        addObject(ScenePrimitive::Cylinder,
+                  makeTransform(post.base + glm::vec3{0.0f, 0.5f * post.height, 0.0f},
+                                {}, {post.diameter, post.height, post.diameter}),
+                  MaterialId::DarkWood);
+        addObject(ScenePrimitive::Cylinder,
+                  makeTransform(post.base + glm::vec3{0.0f, post.height - 0.35f, 0.0f},
+                                {0.0f, 0.0f, 90.0f},
+                                {0.18f, 1.15f, 0.18f}),
+                  MaterialId::Wood);
+    }
+    stats_.enrichmentRopeRigs = ObjectEnrichment::ropeRigs().size();
+    stats_.liftingRigs += stats_.enrichmentRopeRigs;
+    stats_.anchorPosts = ObjectEnrichment::anchorPosts().size();
+}
+
+void StaticGizaScene::buildScaffoldAccess()
+{
+    for (const LadderDescriptor& ladder : ObjectEnrichment::ladders())
+    {
+        const glm::mat4 root = makeTransform(
+            ladder.base, {0.0f, ladder.yawDegrees, ladder.leanDegrees},
+            {1.0f, 1.0f, 1.0f});
+        for (float sign : {-1.0f, 1.0f})
+            addObject(ScenePrimitive::Cube,
+                      root * makeTransform({sign * 0.5f * ladder.width,
+                                            0.5f * ladder.height, 0.0f}, {},
+                                           {0.16f, ladder.height, 0.18f}),
+                      MaterialId::DarkWood);
+        const float spacing = ladder.height / static_cast<float>(ladder.rungCount + 1);
+        for (unsigned int rung = 1; rung <= ladder.rungCount; ++rung)
+            addObject(ScenePrimitive::Cube,
+                      root * makeTransform({0.0f, spacing * static_cast<float>(rung), 0.0f}, {},
+                                           {ladder.width + 0.18f, 0.12f, 0.16f}),
+                      MaterialId::Wood);
+    }
+
+    struct Walkway
+    {
+        glm::vec3 center;
+        glm::vec3 scale;
+        float yaw;
+    };
+    const Walkway walkways[]{
+        {{-17.0f, 5.55f, 2.1f}, {8.0f, 0.22f, 1.35f}, 0.0f},
+        {{18.0f, 5.55f, 2.1f}, {8.0f, 0.22f, 1.35f}, 0.0f},
+        {{-1.0f, 11.35f, -1.0f}, {7.0f, 0.22f, 1.30f}, 0.0f},
+        {{-40.0f, 5.35f, -25.0f}, {6.0f, 0.22f, 1.25f}, 0.0f}
+    };
+    for (const Walkway& walkway : walkways)
+    {
+        const glm::mat4 root = makeTransform(
+            walkway.center, {0.0f, walkway.yaw, 0.0f}, {1.0f, 1.0f, 1.0f});
+        addObject(ScenePrimitive::Cube,
+                  root * makeTransform({}, {}, walkway.scale), MaterialId::Wood);
+        for (float z : {-0.72f, 0.72f})
+            addObject(ScenePrimitive::Cube,
+                      root * makeTransform({0.0f, 0.80f, z}, {},
+                                           {walkway.scale.x, 0.14f, 0.14f}),
+                      MaterialId::DarkWood);
+    }
+    stats_.ladders = ObjectEnrichment::ladders().size();
+    stats_.scaffoldAccessObjects = stats_.ladders + ObjectEnrichment::accessWalkways;
+}
+
+void StaticGizaScene::buildWorkshopRepairAndInspection()
+{
+    const glm::vec3 workshop{32.0f, 0.0f, -15.0f};
+    addObject(ScenePrimitive::Cube,
+              makeTransform(workshop + glm::vec3{0.0f, 0.12f, 0.0f}, {},
+                            {12.0f, 0.20f, 8.0f}),
+              MaterialId::RampEarth);
+    addObject(ScenePrimitive::Cube,
+              makeTransform(workshop + glm::vec3{-2.2f, 1.15f, 0.0f}, {},
+                            {5.0f, 0.30f, 2.0f}),
+              MaterialId::DarkWood);
+    for (float x : {-4.2f, -0.2f})
+        for (float z : {-0.75f, 0.75f})
+            addObject(ScenePrimitive::Cube,
+                      makeTransform(workshop + glm::vec3{x, 0.58f, z}, {},
+                                    {0.24f, 1.15f, 0.24f}),
+                      MaterialId::Wood);
+
+    // A readable tool rack: frame plus six coarse mallet/chisel silhouettes.
+    for (float x : {1.2f, 5.2f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform(workshop + glm::vec3{x, 1.7f, 2.2f}, {},
+                                {0.25f, 3.4f, 0.25f}),
+                  MaterialId::DarkWood);
+    for (float y : {0.55f, 2.85f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform(workshop + glm::vec3{3.2f, y, 2.2f}, {},
+                                {4.3f, 0.20f, 0.25f}),
+                  MaterialId::Wood);
+    for (int tool = 0; tool < 6; ++tool)
+    {
+        const float x = 1.55f + static_cast<float>(tool) * 0.66f;
+        addObject(ScenePrimitive::Cylinder,
+                  makeTransform(workshop + glm::vec3{x, 1.65f, 2.05f},
+                                {0.0f, 0.0f, tool % 2 == 0 ? 8.0f : -8.0f},
+                                {0.09f, 1.85f, 0.09f}),
+                  MaterialId::Wood);
+        addObject(ScenePrimitive::Cube,
+                  makeTransform(workshop + glm::vec3{x, 0.76f, 2.05f}, {},
+                                {0.40f, 0.20f, 0.28f}),
+                  MaterialId::ToolMetal);
+    }
+    addObject(ScenePrimitive::Cylinder,
+              makeTransform(workshop + glm::vec3{4.2f, 1.25f, -1.4f},
+                            {90.0f, 0.0f, 0.0f}, {1.05f, 0.42f, 1.05f}),
+              MaterialId::QuarryStone);
+    addObject(ScenePrimitive::Cylinder,
+              makeTransform(workshop + glm::vec3{4.2f, 1.25f, -1.4f},
+                            {90.0f, 0.0f, 0.0f}, {0.16f, 2.0f, 0.16f}),
+              MaterialId::DarkWood);
+    for (float x : {3.2f, 5.2f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform(workshop + glm::vec3{x, 0.68f, -1.4f}, {},
+                                {0.28f, 1.36f, 1.20f}),
+                  MaterialId::Wood);
+    for (int crate = 0; crate < 4; ++crate)
+        addObject(ScenePrimitive::Cube,
+                  makeTransform(workshop + glm::vec3{-4.5f + (crate % 2) * 1.5f,
+                                                     0.45f, -2.5f + (crate / 2) * 1.4f}, {},
+                                {1.25f, 0.90f, 1.10f}),
+                  MaterialId::Wood);
+
+    // A partial sledge and spare components make the repair purpose visible.
+    const glm::vec3 repair{64.0f, 0.0f, 8.0f};
+    addObject(ScenePrimitive::Cube,
+              makeTransform(repair + glm::vec3{0.0f, 0.08f, 0.0f}, {},
+                            {13.0f, 0.14f, 10.0f}),
+              MaterialId::RampEarth);
+    for (float x : {-1.25f, 1.25f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform(repair + glm::vec3{x, 0.38f, 0.0f}, {},
+                                {0.42f, 0.45f, 5.8f}),
+                  MaterialId::DarkWood);
+    for (float z : {-2.1f, 0.0f, 2.1f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform(repair + glm::vec3{0.0f, 0.70f, z}, {},
+                                {3.4f, 0.24f, 0.34f}),
+                  MaterialId::Wood);
+    for (int runner = 0; runner < 3; ++runner)
+        addObject(ScenePrimitive::Cube,
+                  makeTransform(repair + glm::vec3{4.4f, 0.32f + runner * 0.34f,
+                                                   -1.5f + runner * 0.35f},
+                                {0.0f, -8.0f, 0.0f}, {0.38f, 0.28f, 5.5f}),
+                  MaterialId::Wood);
+    addObject(ScenePrimitive::Cube,
+              makeTransform(repair + glm::vec3{-4.1f, 1.05f, -1.4f}, {},
+                            {3.6f, 0.28f, 1.7f}), MaterialId::DarkWood);
+    for (float x : {-5.4f, -2.8f})
+        for (float z : {-2.0f, -0.8f})
+            addObject(ScenePrimitive::Cube,
+                      makeTransform(repair + glm::vec3{x, 0.52f, z}, {},
+                                    {0.22f, 1.05f, 0.22f}), MaterialId::Wood);
+    const std::vector<ObjectPart> mallet = ConstructionProps::createMallet();
+    for (int tool = 0; tool < 3; ++tool)
+        addComposite(makeTransform(repair + glm::vec3{-4.8f + tool * 0.8f, 1.25f, -1.1f},
+                                   {0.0f, 20.0f * tool, 72.0f}, {0.85f, 0.85f, 0.85f}),
+                     mallet);
+
+    // Inspection bed, reference rods and a plumb marker link dressing to loading.
+    const glm::vec3 inspection{-50.0f, 0.0f, 8.0f};
+    addObject(ScenePrimitive::Cube,
+              makeTransform(inspection + glm::vec3{0.0f, 0.42f, 0.0f}, {},
+                            {7.0f, 0.50f, 5.0f}), MaterialId::DarkWood);
+    addObject(ScenePrimitive::Cube,
+              makeTransform(inspection + glm::vec3{0.0f, 1.32f, 0.0f}, {},
+                            {3.4f, 1.35f, 3.0f}), MaterialId::PreparedStone);
+    for (float x : {-2.7f, 2.7f})
+        for (float z : {-1.8f, 1.8f})
+            addObject(ScenePrimitive::Cylinder,
+                      makeTransform(inspection + glm::vec3{x, 1.75f, z}, {},
+                                    {0.12f, 3.5f, 0.12f}), MaterialId::Wood);
+    addObject(ScenePrimitive::Cylinder,
+              ConstructionAnimationController::cylinderBetween(
+                  inspection + glm::vec3{-2.7f, 2.8f, -1.8f},
+                  inspection + glm::vec3{2.7f, 2.8f, -1.8f}, 0.055f),
+              MaterialId::Rope);
+    addObject(ScenePrimitive::Cylinder,
+              ConstructionAnimationController::cylinderBetween(
+                  inspection + glm::vec3{0.0f, 2.8f, -1.8f},
+                  inspection + glm::vec3{0.0f, 0.65f, -1.8f}, 0.045f),
+              MaterialId::Rope);
+    addObject(ScenePrimitive::Sphere,
+              makeTransform(inspection + glm::vec3{0.0f, 0.55f, -1.8f}, {},
+                            {0.18f, 0.26f, 0.18f}), MaterialId::ToolMetal);
+    for (float x : {-2.35f, 2.35f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({-21.0f + x, 0.25f, 45.5f}, {-8.0f, 0.0f, 0.0f},
+                                {1.2f, 0.24f, 6.5f}), MaterialId::DarkWood);
+
+    // Organized lever/timber racks at extraction, loading, and repair zones.
+    const glm::vec3 rackCenters[]{
+        {-108.0f, 0.0f, 13.0f}, {-23.0f, 0.0f, 51.0f}, {55.0f, 0.0f, 16.0f}
+    };
+    for (const glm::vec3& center : rackCenters)
+    {
+        for (float x : {-2.6f, 2.6f})
+            addObject(ScenePrimitive::Cube,
+                      makeTransform(center + glm::vec3{x, 1.0f, 0.0f}, {},
+                                    {0.28f, 2.0f, 2.4f}), MaterialId::DarkWood);
+        for (int beam = 0; beam < 5; ++beam)
+            addObject(ScenePrimitive::Cylinder,
+                      makeTransform(center + glm::vec3{0.0f, 0.55f + beam * 0.28f,
+                                                       -0.65f + (beam % 2) * 1.30f},
+                                    {0.0f, 0.0f, 90.0f}, {0.18f, 5.6f, 0.18f}),
+                      MaterialId::Wood);
+    }
+
+    // Small camp/admin arrangement remains secondary to the construction zones.
+    addObject(ScenePrimitive::Cube,
+              makeTransform({65.0f, 0.95f, -26.0f}, {}, {4.0f, 0.25f, 2.2f}),
+              MaterialId::DarkWood);
+    for (float x : {63.4f, 66.6f})
+        for (float z : {-26.8f, -25.2f})
+            addObject(ScenePrimitive::Cube,
+                      makeTransform({x, 0.46f, z}, {}, {0.22f, 0.92f, 0.22f}),
+                      MaterialId::Wood);
+    for (float z : {-29.0f, -23.0f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({65.0f, 0.35f, z}, {}, {5.0f, 0.38f, 0.85f}),
+                  MaterialId::Wood);
+
+    stats_.workshopClusters = ObjectEnrichment::workshopClusters;
+    stats_.repairStations = ObjectEnrichment::repairStations;
+}
+
+void StaticGizaScene::buildRiverLanding()
+{
+    const std::size_t start = objects_.size();
+
+    // Segmented primitive quay sits at the floodplain/water boundary.
+    for (int section = 0; section < 8; ++section)
+    {
+        const float x = -42.0f + static_cast<float>(section) * 5.0f;
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({x, 0.24f, -153.2f}, {}, {4.7f, 0.36f, 5.5f}),
+                  MaterialId::QuarryStone);
+        addObject(ScenePrimitive::Cylinder,
+                  makeTransform({x - 1.8f, 0.80f, -155.4f}, {},
+                                {0.24f, 2.0f, 0.24f}), MaterialId::DarkWood);
+    }
+    addObject(ScenePrimitive::Cube,
+              makeTransform({-24.0f, 0.10f, -143.0f}, {}, {8.0f, 0.14f, 17.0f}),
+              MaterialId::RampEarth);
+
+    for (const BoatDescriptor& boat : ObjectEnrichment::boats())
+    {
+        const glm::mat4 root = makeTransform(
+            boat.center, {0.0f, boat.yawDegrees, 0.0f}, {1.0f, 1.0f, 1.0f});
+        addObject(ScenePrimitive::Cube,
+                  root * makeTransform({0.0f, 0.26f, 0.0f}, {},
+                                       {boat.width * 0.68f, 0.42f, boat.length * 0.82f}),
+                  MaterialId::DarkWood);
+        for (float sign : {-1.0f, 1.0f})
+            addObject(ScenePrimitive::Cube,
+                      root * makeTransform({sign * boat.width * 0.43f, 0.72f, 0.0f},
+                                           {0.0f, 0.0f, -sign * 12.0f},
+                                           {0.34f, 0.80f, boat.length}),
+                      MaterialId::Wood);
+        for (float sign : {-1.0f, 1.0f})
+            addObject(ScenePrimitive::Cube,
+                      root * makeTransform({0.0f, 0.82f, sign * boat.length * 0.45f},
+                                           {sign * 22.0f, 0.0f, 0.0f},
+                                           {boat.width * 0.82f, 0.62f, 1.45f}),
+                      MaterialId::Wood);
+        for (float z : {-0.25f * boat.length, 0.0f, 0.25f * boat.length})
+            addObject(ScenePrimitive::Cube,
+                      root * makeTransform({0.0f, 0.88f, z}, {},
+                                           {boat.width * 0.72f, 0.18f, 0.34f}),
+                      MaterialId::DarkWood);
+        addObject(ScenePrimitive::Cylinder,
+                  root * makeTransform({0.0f, 2.1f, 0.8f}, {},
+                                       {0.16f, 3.5f, 0.16f}), MaterialId::Wood);
+        addObject(ScenePrimitive::Cube,
+                  root * makeTransform({0.0f, 3.0f, 0.8f}, {0.0f, 0.0f, 8.0f},
+                                       {2.4f, 0.10f, 1.6f}), MaterialId::ClothingLinen);
+
+        if (boat.mooredAtLanding)
+        {
+            const glm::vec3 bow{root * glm::vec4{0.0f, 0.8f, 0.45f * boat.length, 1.0f}};
+            const glm::vec3 stern{root * glm::vec4{0.0f, 0.8f, -0.45f * boat.length, 1.0f}};
+            addObject(ScenePrimitive::Cylinder,
+                      ConstructionAnimationController::cylinderBetween(
+                          bow, {-30.0f, 1.9f, -153.0f}, 0.055f), MaterialId::Rope);
+            addObject(ScenePrimitive::Cylinder,
+                      ConstructionAnimationController::cylinderBetween(
+                          stern, {-42.0f, 1.9f, -153.0f}, 0.055f), MaterialId::Rope);
+        }
+    }
+
+    // Cargo, timber and a small landing shelter establish river logistics.
+    for (int crate = 0; crate < 10; ++crate)
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({-40.0f + (crate % 5) * 1.55f,
+                                 0.72f + (crate / 5) * 0.82f,
+                                 -149.0f}, {}, {1.25f, 0.78f, 1.15f}), MaterialId::Wood);
+    for (int timber = 0; timber < 7; ++timber)
+        addObject(ScenePrimitive::Cylinder,
+                  makeTransform({-17.0f, 0.30f + timber * 0.24f,
+                                 -149.0f + (timber % 2) * 0.60f},
+                                {0.0f, 0.0f, 90.0f}, {0.22f, 5.6f, 0.22f}),
+                  MaterialId::Wood);
+    for (float x : {-3.0f, 3.0f})
+        for (float z : {-2.0f, 2.0f})
+            addObject(ScenePrimitive::Cylinder,
+                      makeTransform({-7.0f + x, 1.8f, -145.0f + z}, {},
+                                    {0.20f, 3.6f, 0.20f}), MaterialId::Wood);
+    addObject(ScenePrimitive::Cube,
+              makeTransform({-7.0f, 3.55f, -145.0f}, {}, {7.0f, 0.22f, 5.0f}),
+              MaterialId::DarkWood);
+
+    stats_.boats = ObjectEnrichment::boats().size();
+    stats_.riverLandingObjects = objects_.size() - start;
+}
+
+void StaticGizaScene::buildUpperPlatformDetails()
+{
+    const std::size_t start = objects_.size();
+
+    for (float x : {-10.5f, -8.5f, 8.5f, 10.5f})
+        addObject(ScenePrimitive::Cylinder,
+                  makeTransform({x, 9.95f, -2.0f}, {}, {0.12f, 2.8f, 0.12f}),
+                  MaterialId::Wood);
+    addObject(ScenePrimitive::Cylinder,
+              ConstructionAnimationController::cylinderBetween(
+                  {-10.5f, 10.8f, -2.0f}, {-8.5f, 10.8f, -2.0f}, 0.045f),
+              MaterialId::Rope);
+    addObject(ScenePrimitive::Cylinder,
+              ConstructionAnimationController::cylinderBetween(
+                  {8.5f, 10.8f, -2.0f}, {10.5f, 10.8f, -2.0f}, 0.045f),
+              MaterialId::Rope);
+
+    for (int block = 0; block < 4; ++block)
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({-14.0f + block * 2.75f, 9.25f, -4.5f}, {},
+                                {2.45f, 1.35f, 2.30f}), MaterialId::PreparedStone);
+    for (float x : {-6.0f, 6.0f})
+        for (float z : {-3.8f, -1.0f})
+            addObject(ScenePrimitive::Cube,
+                      makeTransform({x, 8.82f, z}, {}, {0.30f, 0.35f, 3.2f}),
+                      MaterialId::DarkWood);
+
+    // Upper lever rack remains outside the x=0 animated arrival lane.
+    for (float x : {-13.0f, -8.0f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({x, 9.45f, 3.8f}, {}, {0.28f, 1.8f, 2.0f}),
+                  MaterialId::DarkWood);
+    for (int lever = 0; lever < 5; ++lever)
+        addObject(ScenePrimitive::Cylinder,
+                  makeTransform({-10.5f, 9.15f + lever * 0.25f,
+                                 3.25f + (lever % 2) * 1.1f},
+                                {0.0f, 0.0f, 90.0f}, {0.16f, 5.4f, 0.16f}),
+                  MaterialId::Wood);
+
+    stats_.upperPlatformObjects = objects_.size() - start;
+}
+
 void StaticGizaScene::buildCompositeObjects()
 {
     // The first seven entries retain the exact Phase 5 role order.
@@ -752,7 +1225,11 @@ void StaticGizaScene::buildCompositeObjects()
         {{13.0f, 0.0f, 3.2f}, 180.0f, WorkerPose::ArmsOut},
         {{6.0f, 8.70f, 0.2f}, 180.0f, WorkerPose::Standing},
         {{50.0f, 0.0f, 11.0f}, -120.0f, WorkerPose::CarryingReady},
-        {{49.0f, 0.0f, -22.0f}, 45.0f, WorkerPose::Standing}
+        {{49.0f, 0.0f, -22.0f}, 45.0f, WorkerPose::Standing},
+        {{34.0f, 0.0f, -13.0f}, -110.0f, WorkerPose::Standing},
+        {{62.0f, 0.0f, 7.0f}, 80.0f, WorkerPose::BentKnees},
+        {{-33.0f, 0.20f, -149.0f}, 160.0f, WorkerPose::CarryingReady},
+        {{-14.0f, 0.20f, -148.0f}, -30.0f, WorkerPose::Standing}
     };
     for (std::size_t index = 0; index < std::size(backgroundSeeds); ++index)
     {

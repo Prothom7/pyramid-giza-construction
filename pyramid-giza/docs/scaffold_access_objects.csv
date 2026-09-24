@@ -1,0 +1,13 @@
+ObjectID,Type,Location,Count,ConnectedTo,Purpose,Notes
+QuarryLower,Ladder,-151 -7.35 -9,1,Lower-to-middle terrace,Quarry access,10 rungs
+QuarryUpper,Ladder,-104.5 -5.55 -35,1,Middle-to-upper terrace,Quarry access,8 rungs
+FrontWest,Ladder,-22.2 0 2.2,1,Front-west scaffold,Three-level access,13 rungs
+FrontEast,Ladder,13.8 0 2.2,1,Front-east scaffold,Three-level access,13 rungs
+RampTop,Ladder,-3.2 8.55 0.5,1,Ramp-top scaffold,Upper access,9 rungs
+WestAccess,Ladder,-43.2 4.95 -22.6,1,West access platform,Platform access,8 rungs
+InspectionAccess,Ladder,-49 0 8.4,1,Raised inspection bed,Inspection access,5 rungs
+LandingAccess,Ladder,-24 0.08 -151,1,River quay,Boat/quay access,5 rungs
+FrontWestWalkway,Walkway,-17 5.55 2.1,1,Front-west scaffold,Connect bays,Deck plus two rails
+FrontEastWalkway,Walkway,18 5.55 2.1,1,Front-east scaffold,Connect bays,Deck plus two rails
+RampTopWalkway,Walkway,-1 11.35 -1,1,Ramp-top scaffold,Upper inspection path,Deck plus two rails
+WestWalkway,Walkway,-40 5.35 -25,1,West access,Bridge ramp/scaffold access,Deck plus two rails

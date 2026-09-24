@@ -24,6 +24,16 @@ struct StaticGizaSceneStats
     std::size_t constructionProps = 0;
     std::size_t treeInstances = 0;
     std::size_t liftingRigs = 0;
+    std::size_t enrichmentRopeRigs = 0;
+    std::size_t anchorPosts = 0;
+    std::size_t ladders = 0;
+    std::size_t boats = 0;
+    std::size_t workshopClusters = 0;
+    std::size_t repairStations = 0;
+    std::size_t scaffoldAccessObjects = 0;
+    std::size_t upperPlatformObjects = 0;
+    std::size_t riverLandingObjects = 0;
+    std::size_t enrichmentObjects = 0;
     std::size_t sphinxParts = 0;
     std::size_t environmentalObjects = 0;
     std::size_t workerInstances = 0;
@@ -94,6 +104,12 @@ private:
     void buildTimberAndCamp();
     void buildNileAndContext();
     void buildHeavyLiftingRig();
+    void buildObjectEnrichment();
+    void buildRopeInfrastructure();
+    void buildScaffoldAccess();
+    void buildWorkshopRepairAndInspection();
+    void buildRiverLanding();
+    void buildUpperPlatformDetails();
     void buildCompositeObjects();
     const Mesh& meshFor(ScenePrimitive primitive) const;
 

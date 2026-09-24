@@ -1,0 +1,10 @@
+ObjectID,Type,Location,Count,PrimitiveComposition,Purpose,Notes
+Quay01,Segmented quay,-42..-7 0.24 -153.2,8,Cube sections+Cylinder piles,Landing edge,Located on floodplain/water boundary
+Approach01,Landing approach,-24 0.10 -143,1,Cube,Connect floodplain to quay,Low earth-toned path
+CargoBoatMoored,Boat,-31 0.22 -159,1,Cube hull/sides/ends/benches+sphere-free cylinder mast,Moored cargo transport,Two static mooring ropes
+SupplyBoatOffshore,Boat,-9 0.20 -169,1,Cube hull/sides/ends/benches+Cylinder mast,Offshore supply context,No motion system
+CargoStack01,Crates,-40..-33.8 0.72..1.54 -149,10,Cube,Waiting cargo,Organized two-level stack
+TimberStack01,Timber,-17 0.30..1.74 -149,7,Cylinder,Landing supplies,Repeated shared cylinder
+LandingShelter01,Open shelter,-7 0 -145,1,Cylinder posts+Cube roof,Worker/logistics support,Five primitive instances
+LandingAnchors,Mooring/rope posts,-42..-6 0.10 -153,4,Cylinder,Secure boats and materials,Part of shared anchor descriptor list
+LandingLadder,Access ladder,-24 0.08 -151,1,Cube rails+rungs,Quay-to-boat access,Five rungs

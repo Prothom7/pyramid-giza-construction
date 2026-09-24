@@ -1,0 +1,13 @@
+ObjectGroup,ObjectType,Zone,Count,PrimitiveReuse,HistoricalCertainty,Notes
+Rope infrastructure,New rope-redirection rigs,Quarry/loading/ramp,3,Cube+Cylinder,Speculative/experimental,Four total when the existing Phase 5.6 frame is included
+Rope infrastructure,Heavy anchor posts,Quarry/loading/ramp/upper/Nile,14,Cylinder,Higher-confidence concept / reconstructed grouping,Post and transverse securing peg
+Scaffold access,Ladders,Quarry/scaffolds/inspection/Nile,8,Cube,Higher-confidence,Two rails plus repeated rungs
+Scaffold access,Connecting walkways,Scaffolds and west access,4,Cube,Reasonable reconstruction,Deck plus two rails
+Workshop,Tool-maintenance cluster,Camp edge,1,Cube+Cylinder,Reasonable reconstruction,30 primitive instances including bench rack tools wheel and crates
+Inspection,Stone inspection station,Dressing-to-loading link,1,Cube+Cylinder+Sphere,Reasonable reconstruction,Prepared block measuring rods string and plumb marker
+Repair,Sledge repair station,Timber yard,1,Cube+Cylinder,Reasonable reconstruction,Incomplete sledge spare runners bench and mallets
+Storage,Lever/timber racks,Quarry/loading/repair,3,Cube+Cylinder,Higher-confidence,Organized long-member storage
+River logistics,Landing/quay,Nile edge,1,Cube+Cylinder,Reasonable reconstruction,Segmented quay approach cargo timber and shelter
+River logistics,Stylized boats,Nile,2,Cube+Cylinder,Higher-confidence broad context,One moored and one offshore
+Upper placement,Alignment and handling cluster,Upper platform,1,Cube+Cylinder,Higher-confidence / reasonable reconstruction,21 primitive instances kept outside arrival lane
+Support,Additional background workers,Workshop/repair/Nile,4,Shared worker Cube+Cylinder+Sphere,Higher-confidence,Existing rigid-part hierarchy and meshes

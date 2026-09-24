@@ -21,6 +21,7 @@
 #include "scene/PyramidLayout.h"
 #include "scene/IndustrialLandscape.h"
 #include "scene/MonumentalSite.h"
+#include "scene/ObjectEnrichment.h"
 #include "scene/StaticGizaScene.h"
 
 namespace
@@ -263,6 +264,7 @@ int main(int argc, char** argv)
     bool siteValidationOnly = false;
     bool industrialValidationOnly = false;
     bool cameraValidationOnly = false;
+    bool enrichmentValidationOnly = false;
     bool smokeTest = false;
     bool startWireframe = false;
     bool startWithCulling = true;
@@ -289,6 +291,8 @@ int main(int argc, char** argv)
             industrialValidationOnly = true;
         else if (option == "--validate-camera")
             cameraValidationOnly = true;
+        else if (option == "--validate-enrichment")
+            enrichmentValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
         else if (option == "--wireframe")
@@ -357,10 +361,13 @@ int main(int argc, char** argv)
         return validateIndustrialLandscape(std::cout) ? 0 : 1;
     if (cameraValidationOnly)
         return validateCameraNavigation(std::cout) ? 0 : 1;
+    if (enrichmentValidationOnly)
+        return validateObjectEnrichment(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
-        !validateIndustrialLandscape(std::cout) || !validateCameraNavigation(std::cout))
+        !validateIndustrialLandscape(std::cout) || !validateCameraNavigation(std::cout) ||
+        !validateObjectEnrichment(std::cout))
         return 1;
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -380,7 +387,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 6 Camera Presentation",
+                                          "Pyramid at Giza - Phase 6.5 Object Enrichment",
                                           nullptr, nullptr);
     if (window == nullptr)
     {

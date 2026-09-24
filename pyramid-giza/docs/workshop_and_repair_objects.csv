@@ -1,0 +1,10 @@
+ObjectID,Zone,Type,Count,Purpose,PrimitiveComposition,Notes
+Workshop01,Camp edge,Workshop cluster,1,Tool sharpening and maintenance,Cube platform bench rack crates+Cylinder handles/wheel,30 primitive instances
+ToolRack01,Workshop,Framed tool rack,1,Organized tool storage,Cube frame+six Cylinder/Cube tools,Readable silhouette not handheld detail
+Sharpening01,Workshop,Sharpening station,1,Tool maintenance,Cylinder wheel/axle+Cube supports,Static only
+Repair01,Timber yard,Sledge repair station,1,Repair inactive sledge,Cube runners/cross-members/bench+shared mallets,Incomplete sledge deliberately lacks a cross-member
+SpareRunners01,Repair yard,Runner stack,3,Replacement parts,Cube,Positive non-uniform scales
+Inspection01,Dressing/loading,Stone inspection station,1,Check prepared block,Cube bed/block+Cylinder rods/lines+Sphere plumb bob,Eleven primitive instances
+LoadingRails01,Loading edge,Short loading rails,2,Guide block/sledge loading,Cube,Placed west of hero route
+LeverRacks,Quarry/loading/repair,Long-member racks,3,Store levers and timber,Cube supports+Cylinder beams,Seven primitive instances per rack
+CampAdmin01,Support camp,Table and seating,1,Administration/rest support,Cube,Seven primitive instances

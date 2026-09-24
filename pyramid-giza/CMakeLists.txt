@@ -31,6 +31,7 @@ add_executable(PyramidGiza
     src/scene/PyramidLayout.cpp
     src/scene/MonumentalSite.cpp
     src/scene/IndustrialLandscape.cpp
+    src/scene/ObjectEnrichment.cpp
     src/scene/SceneTypes.cpp
     src/scene/StaticGizaScene.cpp
     src/objects/Worker.cpp
@@ -85,3 +86,4 @@ add_test(NAME Phase5ConstructionAnimationValidation COMMAND PyramidGiza --valida
 add_test(NAME Phase5_5MonumentalSiteValidation COMMAND PyramidGiza --validate-site)
 add_test(NAME Phase5_6IndustrialLandscapeValidation COMMAND PyramidGiza --validate-industrial)
 add_test(NAME Phase6CameraNavigationValidation COMMAND PyramidGiza --validate-camera)
+add_test(NAME Phase6_5ObjectEnrichmentValidation COMMAND PyramidGiza --validate-enrichment)
