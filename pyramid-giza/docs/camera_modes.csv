@@ -1,0 +1,6 @@
+Mode,ActivationKey,Target,MovementBehavior,ManualInputBehavior,Purpose,Notes
+Free,Default or 0,None,WASDQE with normal fast and slow speeds,Normal mouse and movement remain active,Explore entire world,FOV wheel range 30 to 75
+PresetTransition,1 through 9,Selected preset,One-second smoothstep position yaw pitch and FOV interpolation,Mouse or movement cancels to Free,Move quickly between presentation zones,Shortest-path yaw handles wraparound
+PyramidOrbit,O,Pyramid center at (0 20 -42),Mouse changes azimuth/elevation and wheel changes radius,WASDQE cancels to Free,Inspect monumental form,Radius 55 to 180 and elevation 8 to 70 degrees
+TransportFollow,T,Animated loaded sledge,Exponentially smoothed fixed-offset chase and look-at,Mouse or movement cancels to Free,Observe workers rope stone and ramp,Read-only animation target
+GuidedDemo,G,Seven curated camera poses,Data-driven one-second transitions and three/four-second holds,Mouse or movement cancels to Free,Viva presentation tour,Loops after about 29 seconds

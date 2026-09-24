@@ -1,0 +1,30 @@
+Key,Modifier,Action,Mode,Notes
+W,None,Move forward,Free,24 units per second
+S,None,Move backward,Free,24 units per second
+A,None,Move left,Free,24 units per second
+D,None,Move right,Free,24 units per second
+Q,None,Move down,Free,Quarry-safe minimum Y is -6.8
+E,None,Move up,Free,Vertical movement is delta-time based
+WASDQE,Shift,Fast movement,Free,56 units per second
+WASDQE,Ctrl,Precision movement,Free,7 units per second and overrides Shift
+Mouse,None,Look or orbit,Free/Orbit,Pitch is clamped; cancels transition follow or demo
+Mouse wheel,None,FOV zoom,Free,FOV clamps to 30 through 75 degrees
+Mouse wheel,None,Orbit radius,OrbitPyramid,Radius clamps to 55 through 180
+1-9,None,Smooth camera preset,PresetTransition,One-second transition
+1-9,Shift,Instant camera preset,Free,Useful for direct screenshot capture
+0,None,Reset camera,Free,Restores preset 1 normal speed and default FOV
+O,None,Toggle pyramid orbit,OrbitPyramid,Mouse orbits and wheel changes radius
+T,None,Toggle transport follow,FollowTransport,Tracks loaded sledge without changing animation
+G,None,Start or stop guided demo,GuidedDemo,Seven data-driven shots
+K,None,Print camera pose,Any,Prints position yaw pitch FOV and mode once
+C,None,Toggle back-face culling,Any,Preserved Phase 1 debug control
+F,None,Toggle wireframe,Any,Preserved Phase 1 debug control
+Space,None,Pause or resume animation,Any,Preserved Phase 5 control
+R,None,Reset animation,Any,Camera mode remains finite and follows reset target
+N,None,Advance animation state,Any,Preserved Phase 5 control
+L,None,Toggle animation loop,Any,Preserved Phase 5 control
+M,None,Toggle coordinated/pose-preview mode,Any,Preserved Phase 4/5 control
+Plus,None,Increase animation speed,Any,Range 0.25x through 4x
+Minus,None,Decrease animation speed,Any,Range 0.25x through 4x
+P,None,Cycle diagnostic worker pose,Any,Preserved Phase 4 control
+Esc,None,Exit,Any,Closes window

@@ -1,0 +1,10 @@
+PresetID,Name,PositionX,PositionY,PositionZ,Yaw,Pitch,FOV,Purpose,Notes
+1,Monumental Overview,110,65,100,-131,-17,48,Show pyramid scale with workers and ramp,Default and reset pose
+2,Pyramid Base,0,10,34,-90,-7,50,Show worker scale at main ramp,Close presentation view
+3,Quarry Overview,-72,38,55,-129,-24,50,Show terraces exit ramp and repositories,Industrial secondary focus
+4,Extraction Close-up,-98,12,22,-126,-21,48,Show four extraction stages and workers,Quarry process detail
+5,Stone Logistics,-5,22,75,-135,-18,50,Show repositories loading and haul road,Material-flow view
+6,Ramp and Scaffolding,25,18,18,-140,-16,48,Show main ramp scaffolding and upper platforms,Animation infrastructure
+7,Industrial Site,-170,105,110,-43,-27,52,Show complete quarry-to-pyramid landscape,High wide overview
+8,Nile and Floodplain,120,42,-190,131,-10,52,Relate water vegetation and construction plateau,Environmental context
+9,Sphinx Context,132,24,-132,145,-9,52,Show secondary landmark with pyramid beyond,Context not primary subject

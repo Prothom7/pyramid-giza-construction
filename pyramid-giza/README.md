@@ -9,6 +9,7 @@ Course project status:
 - **Phase 5 - Complete:** coordinated 28.5-second construction animation
 - **Phase 5.5 - Complete:** monumental scale and expanded site
 - **Phase 5.6 - Complete:** quarry, stone logistics, Nile, and environmental context
+- **Phase 6 - Complete:** camera navigation, inspection modes, and guided presentation
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -20,6 +21,10 @@ All objects reuse four uploaded primitive meshes (plane, cube, cylinder, sphere)
 rendering remains indexed `GL_TRIANGLES`; scene instances only supply model transforms and
 materials. The original Phase 5 animation remains a focused local transport stage within
 the longer static quarry-to-pyramid logistics chain.
+
+Phase 6 adds three movement speeds, smooth/instant curated presets, pyramid orbit,
+transport follow, a seven-shot guided demo, safe FOV zoom, and debug pose output without
+changing world geometry or the rendering pipeline.
 
 ## Build and run
 
@@ -33,6 +38,8 @@ build\PyramidGiza.exe
 ## Controls
 
 - `W/A/S/D`: move; `Q/E`: move down/up; mouse: look
+- `Shift + movement`: fast (56 units/s); `Ctrl + movement`: precision (7 units/s)
+- mouse wheel: FOV zoom; in orbit mode: radius
 - `1`: monumental pyramid overview
 - `2`: pyramid base
 - `3`: quarry overview
@@ -42,6 +49,12 @@ build\PyramidGiza.exe
 - `7`: complete site overview
 - `8`: Nile and floodplain
 - `9`: Sphinx-context landmark
+- `Shift + 1-9`: instant preset instead of the normal one-second transition
+- `0`: reset camera to overview and normal speed
+- `O`: toggle pyramid orbit
+- `T`: toggle animated transport follow
+- `G`: start/stop the guided seven-shot demo
+- `K`: print camera position, yaw, pitch, FOV, and mode
 - `C`: toggle back-face culling; `F`: toggle filled/wireframe
 - `Space`: pause/resume; `N`: next state; `R`: reset; `L`: loop
 - `M`: coordinated animation/pose-preview mode; `+/-`: animation speed
@@ -57,11 +70,13 @@ build\PyramidGiza.exe --validate-hierarchy
 build\PyramidGiza.exe --validate-animation
 build\PyramidGiza.exe --validate-site
 build\PyramidGiza.exe --validate-industrial
+build\PyramidGiza.exe --validate-camera
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
-`--wireframe`, `--no-cull`, `--animation-time SECONDS`, and `--capture output.ppm`
-support deterministic runtime checks. Build output and captures are ignored by Git.
+`--wireframe`, `--no-cull`, `--animation-time SECONDS`, `--camera-mode
+free|orbit|follow|demo`, and `--capture output.ppm` support deterministic runtime checks.
+Build output and captures are ignored by Git.
 
 ## Documentation
 
@@ -72,6 +87,7 @@ support deterministic runtime checks. Build output and captures are ignored by G
 - [Phase 5](docs/PHASE5_CONSTRUCTION_ANIMATION.md)
 - [Phase 5.5](docs/PHASE5_5_MONUMENTAL_SCALE.md)
 - [Phase 5.6](docs/PHASE5_6_QUARRY_LOGISTICS_ENVIRONMENT.md)
+- [Phase 6](docs/PHASE6_CAMERA_NAVIGATION.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, and world-scale tables.

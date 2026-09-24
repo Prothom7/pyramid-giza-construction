@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -11,8 +12,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "Camera.h"
 #include "animation/AnimationValidation.h"
+#include "camera/CameraController.h"
+#include "camera/CameraValidation.h"
 #include "graphics/GeometryValidation.h"
 #include "objects/CompositeValidation.h"
 #include "objects/WorkerHierarchyValidation.h"
@@ -28,7 +30,7 @@ constexpr int initialHeight = 720;
 
 struct AppState
 {
-    Camera camera{{110.0f, 65.0f, 100.0f}, {0.0f, 1.0f, 0.0f}, -131.0f, -17.0f};
+    CameraController cameraController;
     float lastMouseX = initialWidth * 0.5f;
     float lastMouseY = initialHeight * 0.5f;
     float deltaTime = 0.0f;
@@ -38,41 +40,14 @@ struct AppState
     StaticGizaScene* scene = nullptr;
 };
 
-void setCameraPreset(AppState& state, int preset)
+void setCameraPreset(AppState& state, int preset, bool instant)
 {
-    switch (preset)
-    {
-    case 2:
-        state.camera.SetPose({0.0f, 12.0f, 32.0f}, -90.0f, -8.0f);
-        break;
-    case 3:
-        state.camera.SetPose({-72.0f, 38.0f, 55.0f}, -129.0f, -24.0f);
-        break;
-    case 4:
-        state.camera.SetPose({-98.0f, 12.0f, 22.0f}, -126.0f, -21.0f);
-        break;
-    case 5:
-        state.camera.SetPose({-5.0f, 22.0f, 75.0f}, -135.0f, -18.0f);
-        break;
-    case 6:
-        state.camera.SetPose({25.0f, 18.0f, 18.0f}, -140.0f, -16.0f);
-        break;
-    case 7:
-        state.camera.SetPose({-195.0f, 125.0f, 155.0f}, -50.0f, -25.0f);
-        break;
-    case 8:
-        state.camera.SetPose({105.0f, 35.0f, -110.0f}, -152.0f, -17.0f);
-        break;
-    case 9:
-        state.camera.SetPose({122.0f, 16.0f, -78.0f}, -138.0f, -20.0f);
-        break;
-    case 1:
-    default:
-        state.camera.SetPose({110.0f, 65.0f, 100.0f}, -131.0f, -17.0f);
-        break;
-    }
+    const std::size_t index = static_cast<std::size_t>(std::clamp(preset, 1, 9) - 1);
+    state.cameraController.selectPreset(index, instant);
     state.firstMouse = true;
-    std::cout << "Camera preset " << preset << " selected.\n";
+    const CameraPose& pose = CameraController::presets()[index];
+    std::cout << "Camera preset " << preset << " - " << pose.name
+              << (instant ? " (instant)" : " (smooth)") << ".\n";
 }
 
 void glfwErrorCallback(int code, const char* description)
@@ -100,12 +75,20 @@ void mouseCallback(GLFWwindow* window, double xPosition, double yPosition)
         state->firstMouse = false;
     }
 
-    state->camera.ProcessMouseMovement(x - state->lastMouseX, state->lastMouseY - y);
+    state->cameraController.handleMouseDelta(x - state->lastMouseX,
+                                             state->lastMouseY - y);
     state->lastMouseX = x;
     state->lastMouseY = y;
 }
 
-void keyCallback(GLFWwindow* window, int key, int, int action, int)
+void scrollCallback(GLFWwindow* window, double, double yOffset)
+{
+    auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if (state != nullptr)
+        state->cameraController.handleScroll(static_cast<float>(yOffset));
+}
+
+void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
 {
     if (action != GLFW_PRESS)
         return;
@@ -171,26 +154,71 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int)
         state->scene->adjustAnimationSpeed(-0.25f);
         std::cout << "Animation speed: " << state->scene->animationSpeed() << "x\n";
     }
+    else if (key == GLFW_KEY_0)
+    {
+        state->cameraController.reset();
+        state->firstMouse = true;
+        std::cout << "Camera reset to monumental overview.\n";
+    }
+    else if (key == GLFW_KEY_O)
+    {
+        state->cameraController.togglePyramidOrbit();
+        state->firstMouse = true;
+        std::cout << "Camera mode: "
+                  << CameraController::modeName(state->cameraController.mode()) << '\n';
+    }
+    else if (key == GLFW_KEY_T && state->scene != nullptr)
+    {
+        state->cameraController.toggleTransportFollow(state->scene->transportTarget());
+        state->firstMouse = true;
+        std::cout << "Camera mode: "
+                  << CameraController::modeName(state->cameraController.mode()) << '\n';
+    }
+    else if (key == GLFW_KEY_G)
+    {
+        state->cameraController.toggleGuidedDemo();
+        state->firstMouse = true;
+        std::cout << "Camera mode: "
+                  << CameraController::modeName(state->cameraController.mode()) << '\n';
+    }
+    else if (key == GLFW_KEY_K)
+    {
+        const CameraPose pose = state->cameraController.currentPose();
+        std::cout << "Camera position = (" << pose.position.x << ", "
+                  << pose.position.y << ", " << pose.position.z << ") yaw = "
+                  << pose.yaw << " pitch = " << pose.pitch << " FOV = "
+                  << pose.fovDegrees << " mode = "
+                  << CameraController::modeName(state->cameraController.mode()) << '\n';
+    }
     else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9)
-        setCameraPreset(*state, key - GLFW_KEY_0);
+        setCameraPreset(*state, key - GLFW_KEY_0, (mods & GLFW_MOD_SHIFT) != 0);
 }
 
 void processInput(GLFWwindow* window, AppState& state)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+
+    CameraSpeedMode speedMode = CameraSpeedMode::Normal;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS)
+        speedMode = CameraSpeedMode::Slow;
+    else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+             glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+        speedMode = CameraSpeedMode::Fast;
+
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        state.camera.ProcessKeyboard(CameraMovement::FORWARD, state.deltaTime);
+        state.cameraController.move(CameraMovement::FORWARD, state.deltaTime, speedMode);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        state.camera.ProcessKeyboard(CameraMovement::BACKWARD, state.deltaTime);
+        state.cameraController.move(CameraMovement::BACKWARD, state.deltaTime, speedMode);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        state.camera.ProcessKeyboard(CameraMovement::LEFT, state.deltaTime);
+        state.cameraController.move(CameraMovement::LEFT, state.deltaTime, speedMode);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        state.camera.ProcessKeyboard(CameraMovement::RIGHT, state.deltaTime);
+        state.cameraController.move(CameraMovement::RIGHT, state.deltaTime, speedMode);
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-        state.camera.ProcessKeyboard(CameraMovement::DOWN, state.deltaTime);
+        state.cameraController.move(CameraMovement::DOWN, state.deltaTime, speedMode);
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-        state.camera.ProcessKeyboard(CameraMovement::UP, state.deltaTime);
+        state.cameraController.move(CameraMovement::UP, state.deltaTime, speedMode);
 }
 
 bool checkOpenGLErrors()
@@ -234,12 +262,14 @@ int main(int argc, char** argv)
     bool animationValidationOnly = false;
     bool siteValidationOnly = false;
     bool industrialValidationOnly = false;
+    bool cameraValidationOnly = false;
     bool smokeTest = false;
     bool startWireframe = false;
     bool startWithCulling = true;
     int cameraPreset = 1;
     float initialAnimationTime = 0.0f;
     std::string capturePath;
+    std::string initialCameraMode = "free";
     for (int argument = 1; argument < argc; ++argument)
     {
         const std::string option = argv[argument];
@@ -257,6 +287,8 @@ int main(int argc, char** argv)
             siteValidationOnly = true;
         else if (option == "--validate-industrial")
             industrialValidationOnly = true;
+        else if (option == "--validate-camera")
+            cameraValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
         else if (option == "--wireframe")
@@ -275,6 +307,16 @@ int main(int argc, char** argv)
         }
         else if (option == "--capture" && argument + 1 < argc)
             capturePath = argv[++argument];
+        else if (option == "--camera-mode" && argument + 1 < argc)
+        {
+            initialCameraMode = argv[++argument];
+            if (initialCameraMode != "free" && initialCameraMode != "orbit" &&
+                initialCameraMode != "follow" && initialCameraMode != "demo")
+            {
+                std::cerr << "Camera mode must be free, orbit, follow, or demo.\n";
+                return 2;
+            }
+        }
         else if (option == "--animation-time" && argument + 1 < argc)
         {
             try
@@ -313,10 +355,12 @@ int main(int argc, char** argv)
         return validateMonumentalSite(std::cout) ? 0 : 1;
     if (industrialValidationOnly)
         return validateIndustrialLandscape(std::cout) ? 0 : 1;
+    if (cameraValidationOnly)
+        return validateCameraNavigation(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
-        !validateIndustrialLandscape(std::cout))
+        !validateIndustrialLandscape(std::cout) || !validateCameraNavigation(std::cout))
         return 1;
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -336,7 +380,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 5.6 Industrial Landscape",
+                                          "Pyramid at Giza - Phase 6 Camera Presentation",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -358,17 +402,20 @@ int main(int argc, char** argv)
               << "Renderer: " << glGetString(GL_RENDERER) << '\n';
 
     AppState state;
-    setCameraPreset(state, cameraPreset);
+    setCameraPreset(state, cameraPreset, true);
     glfwSetWindowUserPointer(window, &state);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     glfwSetKeyCallback(window, keyCallback);
+    glfwSetScrollCallback(window, scrollCallback);
     if (!smokeTest)
     {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetCursorPosCallback(window, mouseCallback);
-        std::cout << "Controls: W/A/S/D move, Q/E move vertically, mouse looks, "
-                     "1-9 views, C culling, F wireframe, Space pause, R reset, "
-                     "N next state, L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
+        std::cout << "Controls: W/A/S/D/Q/E move, Shift fast, Ctrl precision, mouse looks, "
+                     "wheel zoom/orbit radius, 1-9 smooth views, Shift+1-9 instant, "
+                     "0 camera reset, O orbit, T transport follow, G guided demo, K camera info, "
+                     "C culling, F wireframe, Space pause, R animation reset, N next state, "
+                     "L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
 
@@ -395,6 +442,18 @@ int main(int argc, char** argv)
             scene.update(initialAnimationTime);
             std::cout << "Animation initialized at state: " << scene.animationStateName() << '\n';
         }
+        if (initialCameraMode == "orbit")
+            state.cameraController.togglePyramidOrbit();
+        else if (initialCameraMode == "follow")
+            state.cameraController.toggleTransportFollow(scene.transportTarget());
+        else if (initialCameraMode == "demo")
+            state.cameraController.toggleGuidedDemo();
+        if (initialCameraMode != "free")
+        {
+            state.cameraController.update(1.0f, scene.transportTarget());
+            std::cout << "Camera initialized in mode: "
+                      << CameraController::modeName(state.cameraController.mode()) << '\n';
+        }
         float previousTime = static_cast<float>(glfwGetTime());
         int renderedFrames = 0;
 
@@ -406,6 +465,7 @@ int main(int argc, char** argv)
             if (!smokeTest)
                 processInput(window, state);
             scene.update(state.deltaTime);
+            state.cameraController.update(state.deltaTime, scene.transportTarget());
 
             int framebufferWidth = 0;
             int framebufferHeight = 0;
@@ -421,10 +481,11 @@ int main(int argc, char** argv)
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             const glm::mat4 projection = glm::perspective(
-                glm::radians(45.0f),
+                glm::radians(state.cameraController.fovDegrees()),
                 static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight),
-                0.7f, 550.0f);
-            scene.render(state.camera.GetViewMatrix(), projection, state.camera.Position);
+                CameraController::nearPlane, CameraController::farPlane);
+            const Camera& activeCamera = state.cameraController.camera();
+            scene.render(activeCamera.GetViewMatrix(), projection, activeCamera.Position);
 
             ++renderedFrames;
             if (smokeTest && renderedFrames == 3 && !capturePath.empty())

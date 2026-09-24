@@ -23,6 +23,8 @@ add_executable(PyramidGiza
     src/main.cpp
     src/Shader.cpp
     src/Camera.cpp
+    src/camera/CameraController.cpp
+    src/camera/CameraValidation.cpp
     src/graphics/Mesh.cpp
     src/graphics/PrimitiveGenerator.cpp
     src/graphics/GeometryValidation.cpp
@@ -82,3 +84,4 @@ add_test(NAME Phase4WorkerHierarchyValidation COMMAND PyramidGiza --validate-hie
 add_test(NAME Phase5ConstructionAnimationValidation COMMAND PyramidGiza --validate-animation)
 add_test(NAME Phase5_5MonumentalSiteValidation COMMAND PyramidGiza --validate-site)
 add_test(NAME Phase5_6IndustrialLandscapeValidation COMMAND PyramidGiza --validate-industrial)
+add_test(NAME Phase6CameraNavigationValidation COMMAND PyramidGiza --validate-camera)

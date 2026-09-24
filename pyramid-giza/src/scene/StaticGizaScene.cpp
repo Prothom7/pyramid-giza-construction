@@ -785,6 +785,14 @@ void StaticGizaScene::update(float deltaTime)
         articulationTime_ += deltaTime * articulationSpeed_;
 }
 
+glm::vec3 StaticGizaScene::transportTarget() const
+{
+    if (!coordinatedAnimationEnabled_)
+        return {10.0f, 0.0f, 40.0f};
+    const glm::mat4 root = animationController_.snapshot().loadedSledgeRoot;
+    return glm::vec3{root[3]};
+}
+
 void StaticGizaScene::togglePlayback()
 {
     if (coordinatedAnimationEnabled_)

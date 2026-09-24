@@ -60,6 +60,7 @@ public:
         return ConstructionAnimationController::stateName(animationController_.state());
     }
     const char* demoPoseName() const { return Worker::poseName(demoPose_); }
+    glm::vec3 transportTarget() const;
 
     const StaticGizaSceneStats& stats() const { return stats_; }
     const PyramidLayoutConfig& pyramidConfig() const { return pyramidConfig_; }
