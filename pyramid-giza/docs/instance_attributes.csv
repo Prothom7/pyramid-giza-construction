@@ -1,0 +1,12 @@
+Location,Attribute,Components,Divisor,Purpose,Notes
+0,Position,3,0,Canonical mesh position,Shared geometry VBO
+1,Normal,3,0,Canonical mesh normal,Shared geometry VBO
+2,TextureCoordinate,2,0,Canonical UV,Shared geometry VBO
+3,InstanceModelColumn0,4,1,Model transform,Instance VBO
+4,InstanceModelColumn1,4,1,Model transform,Instance VBO
+5,InstanceModelColumn2,4,1,Model transform,Instance VBO
+6,InstanceModelColumn3,4,1,Model transform,Instance VBO
+7,InstanceNormalColumn0,3,1,Inverse-transpose normal transform,CPU precomputed
+8,InstanceNormalColumn1,3,1,Inverse-transpose normal transform,CPU precomputed
+9,InstanceNormalColumn2,3,1,Inverse-transpose normal transform,CPU precomputed
+10,InstanceUvTransform,4,1,UV scale XY and offset ZW,Preserves Phase 9 material mapping

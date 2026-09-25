@@ -55,6 +55,9 @@ public:
 
     static float blockThreshold(const PyramidBlockPlacement& block,
                                 const PyramidLayoutConfig& config);
+    static bool isFrontierCandidate(const PyramidBlockPlacement& block);
+    static float stableThreshold(const PyramidBlockPlacement& block,
+                                 const PyramidLayoutConfig& config);
     static const char* stageName(ConstructionStage stage);
 
 private:

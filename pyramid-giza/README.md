@@ -14,6 +14,7 @@ Course project status:
 - **Phase 7 - Complete:** directional sun lighting, material response, and daylight control
 - **Phase 8 - Complete:** moving directional-sun shadow mapping with bias and 3x3 PCF
 - **Phase 9 - Complete:** scene integrity, independent construction timelapse, dynamic infrastructure, animation refinement, and procedural UV textures
+- **Phase 10 - Complete:** indexed GPU instancing, construction-aware batching, conservative frustum culling, and render statistics
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -65,6 +66,15 @@ bound separately from the shadow map. The sphere now has an intentional U=0/U=1 
 duplicate. Maximum estimates are approximately 9,690 visible indexed draws and 19,380
 combined shadow plus visible draws.
 
+Phase 10 uploads the complete pyramid once as eight static material/spatial instance
+batches and updates at most two small animated-frontier batches. Both lit and shadow
+passes call indexed `glDrawElementsInstanced(GL_TRIANGLES)`, while all other objects keep
+the indexed normal path. The default overview measured 1,942 visible and 1,954 shadow
+draws at 75-percent construction; the complete pyramid measured 1,760 and 1,772, an
+81.8-percent combined reduction from the Phase 9 maximum estimate. Camera and light
+frusta use conservative bounding spheres, and compatible normal draws are sorted to
+reduce material uploads and texture binds.
+
 ## Build and run
 
 ```powershell
@@ -109,6 +119,8 @@ build\PyramidGiza.exe
 - `B`: play/pause the independent construction timelapse
 - `,` / `.`: decrease/increase timelapse speed (0.25x to 8x)
 - `Home` / `End`: set construction progress to 0 / 100 percent
+- `Y`: toggle conservative camera/light frustum culling
+- `I`: print current-frame render statistics
 
 ## Validation
 
@@ -127,6 +139,9 @@ build\PyramidGiza.exe --validate-shadows
 build\PyramidGiza.exe --validate-construction
 build\PyramidGiza.exe --validate-textures
 build\PyramidGiza.exe --validate-layout
+build\PyramidGiza.exe --validate-instancing
+build\PyramidGiza.exe --validate-frustum
+build\PyramidGiza.exe --validate-renderer-structure
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -140,6 +155,8 @@ normal|diffuse|specular|normals|unlit` support deterministic lighting checks.
 animation regression (up to 60 seconds).
 Construction startup options are --construction-progress 0..1, --timelapse, and
 --timelapse-speed 0.25..8. Use --textures or --no-textures for A/B runtime checks.
+Use `--render-stats` to print the latest frame, `--benchmark-render` for a two-second
+hidden benchmark, and `--no-frustum-culling` for a visibility-control comparison.
 Build output and captures are ignored by Git.
 
 ## Documentation
@@ -156,6 +173,7 @@ Build output and captures are ignored by Git.
 - [Phase 7 lighting and sun](docs/PHASE7_LIGHTING_AND_SUN.md)
 - [Phase 8 directional shadow mapping](docs/PHASE8_SHADOW_MAPPING.md)
 - [Phase 9 integration, timelapse, and textures](docs/PHASE9_INTEGRATION_TIMELAPSE_TEXTURES.md)
+- [Phase 10 renderer optimization](docs/PHASE10_RENDERER_OPTIMIZATION.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
@@ -163,3 +181,5 @@ pulley-rig, river-landing, workshop/repair, scaffold-access, material, sun-state
 lighting-control, shadow-setting, shadow-validation, and shadow-control tables.
 Phase 9 adds world-bounds, layout-validation, construction-timeline, construction-stage,
 infrastructure-stage, texture, UV-mapping, material-texture, and texture-control tables.
+Phase 10 adds instance-batch, instance-attribute, frustum-culling, and measured
+render-performance tables.

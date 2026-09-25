@@ -17,6 +17,8 @@
 #include "camera/CameraController.h"
 #include "camera/CameraValidation.h"
 #include "graphics/GeometryValidation.h"
+#include "graphics/Frustum.h"
+#include "graphics/InstanceBatch.h"
 #include "graphics/Texture.h"
 #include "lighting/ShadowMap.h"
 #include "lighting/SunController.h"
@@ -306,6 +308,14 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
         std::cout << "Material textures: "
                   << (state->scene->texturesEnabled() ? "ON" : "OFF") << '\n';
     }
+    else if (key == GLFW_KEY_Y && state->scene != nullptr)
+    {
+        state->scene->toggleFrustumCulling();
+        std::cout << "Frustum culling: "
+                  << (state->scene->frustumCullingEnabled() ? "ON" : "OFF") << '\n';
+    }
+    else if (key == GLFW_KEY_I && state->scene != nullptr)
+        state->scene->printRenderStats(std::cout);
     else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9)
         setCameraPreset(*state, key - GLFW_KEY_0, (mods & GLFW_MOD_SHIFT) != 0);
 }
@@ -385,7 +395,12 @@ int main(int argc, char** argv)
     bool constructionValidationOnly = false;
     bool textureValidationOnly = false;
     bool layoutValidationOnly = false;
+    bool instancingValidationOnly = false;
+    bool frustumValidationOnly = false;
+    bool rendererStructureValidationOnly = false;
     bool smokeTest = false;
+    bool benchmarkRender = false;
+    bool renderStatsRequested = false;
     float smokeDurationSeconds = 0.0f;
     bool startWireframe = false;
     bool startWithCulling = true;
@@ -396,6 +411,7 @@ int main(int argc, char** argv)
     bool startAutomaticSun = true;
     bool startWithShadows = true;
     bool startWithTextures = true;
+    bool startWithFrustumCulling = true;
     bool startTimelapse = false;
     float initialConstructionProgress = ConstructionTimelineController::defaultProgress;
     float initialConstructionSpeed = 1.0f;
@@ -435,6 +451,21 @@ int main(int argc, char** argv)
             textureValidationOnly = true;
         else if (option == "--validate-layout")
             layoutValidationOnly = true;
+        else if (option == "--validate-instancing")
+            instancingValidationOnly = true;
+        else if (option == "--validate-frustum")
+            frustumValidationOnly = true;
+        else if (option == "--validate-renderer-structure")
+            rendererStructureValidationOnly = true;
+        else if (option == "--benchmark-render")
+        {
+            benchmarkRender = true;
+            smokeTest = true;
+        }
+        else if (option == "--render-stats")
+            renderStatsRequested = true;
+        else if (option == "--no-frustum-culling")
+            startWithFrustumCulling = false;
         else if (option == "--smoke-test")
             smokeTest = true;
         else if (option == "--smoke-duration" && argument + 1 < argc)
@@ -629,6 +660,12 @@ int main(int argc, char** argv)
         return validatePhase9Textures(std::cout) ? 0 : 1;
     if (layoutValidationOnly)
         return validateSceneIntegrity(std::cout) ? 0 : 1;
+    if (instancingValidationOnly)
+        return validatePhase10Instancing(std::cout) ? 0 : 1;
+    if (frustumValidationOnly)
+        return validatePhase10Frustum(std::cout) ? 0 : 1;
+    if (rendererStructureValidationOnly)
+        return validatePhase10PerformanceStructure(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
@@ -637,8 +674,14 @@ int main(int argc, char** argv)
         !validatePhase8Shadows(std::cout) ||
         !validateConstructionTimeline(std::cout) ||
         !validatePhase9Textures(std::cout) ||
-        !validateSceneIntegrity(std::cout))
+        !validateSceneIntegrity(std::cout) ||
+        !validatePhase10Instancing(std::cout) ||
+        !validatePhase10Frustum(std::cout) ||
+        !validatePhase10PerformanceStructure(std::cout))
         return 1;
+
+    if (benchmarkRender && smokeDurationSeconds <= 0.0f)
+        smokeDurationSeconds = 2.0f;
 
     glfwSetErrorCallback(glfwErrorCallback);
     if (glfwInit() == GLFW_FALSE)
@@ -657,7 +700,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 9 Integrated Construction",
+                                          "Pyramid at Giza - Phase 10 Optimized Rendering",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -694,6 +737,7 @@ int main(int argc, char** argv)
                      "U automatic sun, [/] sun time, F1/F2/F3 morning/noon/evening, "
                      "V lighting debug, H shadows, J shadow-factor debug, "
                      "X textures, B timelapse, ,/. timelapse speed, Home/End 0/100%, "
+                     "Y frustum culling, I render stats, "
                      "C culling, F wireframe, Space pause, R animation reset, N next state, "
                      "L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
     }
@@ -730,6 +774,7 @@ int main(int argc, char** argv)
         scene.setShadowsEnabled(startWithShadows);
         scene.setShadowDebugMode(initialShadowDebugMode);
         scene.setTexturesEnabled(startWithTextures);
+        scene.setFrustumCullingEnabled(startWithFrustumCulling);
         scene.setConstructionProgress(initialConstructionProgress);
         scene.setConstructionSpeed(initialConstructionSpeed);
         scene.setConstructionPlaying(startTimelapse);
@@ -740,6 +785,8 @@ int main(int argc, char** argv)
                   << ", resolution: " << scene.shadowSettings().resolution << " x "
                   << scene.shadowSettings().resolution << '\n';
         std::cout << "Material textures: " << (scene.texturesEnabled() ? "ON" : "OFF")
+                  << "; frustum culling: "
+                  << (scene.frustumCullingEnabled() ? "ON" : "OFF")
                   << "; construction: " << scene.constructionProgress() * 100.0f
                   << "% (" << scene.constructionStageName() << "), speed "
                   << scene.constructionSpeed() << "x, timelapse "
@@ -811,6 +858,8 @@ int main(int argc, char** argv)
         if (smokeDurationSeconds > 0.0f)
             std::cout << "Timed OpenGL smoke duration completed: "
                       << smokeDurationSeconds << " seconds.\n";
+        if (renderStatsRequested || benchmarkRender)
+            scene.printRenderStats(std::cout);
         state.scene = nullptr;
     }
     catch (const std::exception& error)

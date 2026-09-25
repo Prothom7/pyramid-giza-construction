@@ -1,0 +1,8 @@
+ConstructionProgress,Culling,VisibleDraws,ShadowDraws,CombinedDraws,VisibleInstances,CulledObjects,CulledInstances,TextureBinds,CpuSubmissionMs,FPS,Notes
+Phase9Maximum,N/A,9690,9690,19380,,,,,,,Historical Phase 9 maximum estimate
+0%,On,1346,1358,2704,1414,12,0,13,4.692,,Preset 1 static morning single latest-frame sample
+25%,On,1825,1837,3662,6555,12,0,13,8.539,,Preset 1 static morning single latest-frame sample
+50%,On,1946,1958,3904,8902,12,0,13,9.623,,Preset 1 static morning single latest-frame sample
+75%,On,1942,1954,3896,9496,12,0,13,9.889,,Default Phase 9-equivalent construction checkpoint
+100%,On,1760,1772,3532,9466,12,0,13,9.125,,Complete 7714-block pyramid; late temporary infrastructure removed
+100%,Off,1772,1772,3544,9478,0,0,13,7.200,,Culling-disabled control; CPU time is not a GPU benchmark

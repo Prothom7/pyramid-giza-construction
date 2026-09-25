@@ -1,6 +1,9 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
+#include <cstdint>
+#include <iosfwd>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -8,6 +11,8 @@
 #include "Shader.h"
 #include "animation/ConstructionAnimation.h"
 #include "animation/ConstructionTimeline.h"
+#include "graphics/Frustum.h"
+#include "graphics/InstanceBatch.h"
 #include "graphics/Mesh.h"
 #include "graphics/Texture.h"
 #include "lighting/ShadowMap.h"
@@ -50,6 +55,21 @@ struct StaticGizaSceneStats
     std::size_t totalDrawCalls = 0;
     std::size_t shadowDepthDrawCalls = 0;
     std::size_t combinedDrawCalls = 0;
+};
+
+struct RenderStats
+{
+    std::uint64_t visibleDrawCalls = 0;
+    std::uint64_t shadowDrawCalls = 0;
+    std::uint64_t visibleInstances = 0;
+    std::uint64_t shadowInstances = 0;
+    std::uint64_t visibleTriangles = 0;
+    std::uint64_t shadowTriangles = 0;
+    std::uint64_t culledObjects = 0;
+    std::uint64_t culledInstances = 0;
+    std::uint64_t materialChanges = 0;
+    std::uint64_t textureBinds = 0;
+    double cpuSubmissionMilliseconds = 0.0;
 };
 
 class StaticGizaScene
@@ -120,6 +140,12 @@ public:
     glm::vec3 skyColor() const { return sunController_.state().skyColor; }
     glm::vec3 transportTarget() const;
 
+    void toggleFrustumCulling() { frustumCullingEnabled_ = !frustumCullingEnabled_; }
+    void setFrustumCullingEnabled(bool enabled) { frustumCullingEnabled_ = enabled; }
+    bool frustumCullingEnabled() const { return frustumCullingEnabled_; }
+    const RenderStats& renderStats() const { return renderStats_; }
+    void printRenderStats(std::ostream& output) const;
+
     const StaticGizaSceneStats& stats() const { return stats_; }
     const PyramidLayoutConfig& pyramidConfig() const { return pyramidConfig_; }
 
@@ -155,6 +181,15 @@ private:
         float maximumProgress = 1.01f;
     };
 
+    struct PyramidInstanceGroup
+    {
+        MaterialId material = MaterialId::Limestone;
+        unsigned int levelChunk = 0;
+        InstanceBatch batch;
+        std::vector<float> stableThresholds;
+        BoundingSphere bounds;
+    };
+
     void addObject(ScenePrimitive primitive, const glm::mat4& model, MaterialId material);
     void addComposite(const glm::mat4& root, const std::vector<ObjectPart>& parts);
     void addWorker(const glm::vec3& position, float rotationY, WorkerPose pose,
@@ -163,6 +198,7 @@ private:
     void addStaticSledge(const glm::vec3& position, float rotationY, float scale = 1.0f);
     void buildGround();
     void buildPyramid();
+    void buildPyramidInstanceBatches();
     void buildRampNetwork();
     void buildScaffolding();
     void buildQuarryAndCutting();
@@ -180,10 +216,17 @@ private:
     void buildCompositeObjects();
     void buildConstructionStages();
     void collectFrameObjects();
+    void updateFrontierBatches();
+    std::size_t activeStableCount(const PyramidInstanceGroup& group) const;
+    float primitiveLocalRadius(ScenePrimitive primitive) const;
+    bool objectVisible(const SceneObject& object, const Frustum& frustum,
+                       float margin = 0.0f) const;
     const Mesh& meshFor(ScenePrimitive primitive) const;
 
     Shader shader_;
+    Shader instancedShader_;
     Shader depthShader_;
+    Shader instancedDepthShader_;
     ShadowMap shadowMap_;
     ShadowSettings shadowSettings_;
     Mesh plane_;
@@ -193,6 +236,10 @@ private:
     TextureLibrary textures_;
     PyramidLayoutConfig pyramidConfig_;
     std::vector<PyramidBlockPlacement> pyramidBlocks_;
+    std::vector<PyramidInstanceGroup> pyramidInstanceGroups_;
+    std::array<InstanceBatch, 2> frontierBatches_;
+    std::array<std::vector<InstanceData>, 2> frontierInstances_;
+    std::array<BoundingSphere, 2> frontierBounds_{};
     std::vector<SceneObject> objects_;
     std::vector<SceneObject> frameObjects_;
     std::vector<StagedSceneObject> stagedObjects_;
@@ -209,6 +256,8 @@ private:
     bool coordinatedAnimationEnabled_ = true;
     bool shadowsEnabled_ = true;
     bool texturesEnabled_ = true;
+    bool frustumCullingEnabled_ = true;
     ShadowDebugMode shadowDebugMode_ = ShadowDebugMode::Normal;
     StaticGizaSceneStats stats_;
+    RenderStats renderStats_;
 };

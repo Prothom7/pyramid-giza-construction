@@ -39,6 +39,7 @@ public:
 
     void upload(const MeshData& data);
     void draw() const;
+    void bind() const;
     void cleanup();
 
     bool isUploaded() const { return vao_ != 0; }

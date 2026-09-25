@@ -1,0 +1,6 @@
+Group,BoundingType,Chunking,VisiblePass,ShadowPass,ConservativeMargin,Notes
+OrdinarySceneObjects,Transformed bounding sphere,Per object,Camera frustum,Light frustum,0.35 visible / 2.0 shadow,Primitive radius times conservative Frobenius bound; safe with inherited shear
+StablePyramid,Group bounding sphere,2 materials x 4 seven-level chunks,Camera frustum,Light frustum,0.75 visible / 3.0 shadow,Avoids per-block CPU tests; active count remains threshold prefix
+FrontierPyramid,Group bounding sphere,2 material groups,Camera frustum,Light frustum,0.75 visible / 3.0 shadow,Bounds recomputed from the small moving population
+CameraFrustum,6 normalized planes,Projection multiplied by view,Yes,No,N/A,Camera culling never controls shadow casters
+DirectionalLightFrustum,6 normalized planes,Orthographic light-space matrix,No,Yes,N/A,Independent conservative caster test

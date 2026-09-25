@@ -137,14 +137,29 @@ ConstructionBlockState ConstructionTimelineController::blockState(
         return state;
 
     state.visible = true;
-    const unsigned int signature =
-        block.gridX * 17u + block.gridZ * 31u + block.level * 13u;
-    state.frontier = signature % 23u == 0u &&
+    state.frontier = progress_ < 1.0f && isFrontierCandidate(block) &&
                      progress_ < state.threshold + frontierWindow;
     state.placementAmount = state.frontier
         ? smoothStep((progress_ - state.threshold) / frontierWindow)
         : 1.0f;
     return state;
+}
+
+bool ConstructionTimelineController::isFrontierCandidate(
+    const PyramidBlockPlacement& block)
+{
+    const unsigned int signature =
+        block.gridX * 17u + block.gridZ * 31u + block.level * 13u;
+    return signature % 23u == 0u;
+}
+
+float ConstructionTimelineController::stableThreshold(
+    const PyramidBlockPlacement& block, const PyramidLayoutConfig& config)
+{
+    const float threshold = blockThreshold(block, config);
+    return isFrontierCandidate(block)
+        ? std::min(1.0f, threshold + frontierWindow)
+        : threshold;
 }
 
 std::size_t ConstructionTimelineController::visibleBlockCount(

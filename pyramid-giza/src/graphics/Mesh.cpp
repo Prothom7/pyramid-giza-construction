@@ -85,6 +85,11 @@ void Mesh::draw() const
     glBindVertexArray(0);
 }
 
+void Mesh::bind() const
+{
+    glBindVertexArray(vao_);
+}
+
 void Mesh::cleanup()
 {
     if (ebo_ != 0)

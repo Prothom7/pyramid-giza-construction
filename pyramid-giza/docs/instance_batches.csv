@@ -1,0 +1,11 @@
+Batch,Mesh,Material,Texture,MaxInstances,Dynamic,VisiblePass,ShadowPass,Notes
+PyramidLimestoneChunk0,Cube,Limestone,Limestone,1985,No,Yes,Yes,Levels 0-6; threshold-sorted prefix
+PyramidLimestoneChunk1,Cube,Limestone,Limestone,1386,No,Yes,Yes,Levels 7-13; threshold-sorted prefix
+PyramidLimestoneChunk2,Cube,Limestone,Limestone,458,No,Yes,Yes,Levels 14-20; threshold-sorted prefix
+PyramidLimestoneChunk3,Cube,Limestone,Limestone,42,No,Yes,Yes,Levels 21-27; threshold-sorted prefix
+PyramidVariationChunk0,Cube,LimestoneVariation,Limestone,2418,No,Yes,Yes,Levels 0-6; threshold-sorted prefix
+PyramidVariationChunk1,Cube,LimestoneVariation,Limestone,910,No,Yes,Yes,Levels 7-13; threshold-sorted prefix
+PyramidVariationChunk2,Cube,LimestoneVariation,Limestone,417,No,Yes,Yes,Levels 14-20; threshold-sorted prefix
+PyramidVariationChunk3,Cube,LimestoneVariation,Limestone,98,No,Yes,Yes,Levels 21-27; threshold-sorted prefix
+PyramidLimestoneFrontier,Cube,Limestone,Limestone,Up to 336 candidates across frontier batches,Yes,Yes,Yes,Only currently moving placements; capacity grows on demand
+PyramidVariationFrontier,Cube,LimestoneVariation,Limestone,Up to 336 candidates across frontier batches,Yes,Yes,Yes,Only currently moving placements; no stable duplicate

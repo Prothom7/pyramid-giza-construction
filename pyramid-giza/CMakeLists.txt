@@ -31,6 +31,8 @@ add_executable(PyramidGiza
     src/graphics/PrimitiveGenerator.cpp
     src/graphics/GeometryValidation.cpp
     src/graphics/Texture.cpp
+    src/graphics/Frustum.cpp
+    src/graphics/InstanceBatch.cpp
     src/scene/PyramidLayout.cpp
     src/scene/MonumentalSite.cpp
     src/scene/IndustrialLandscape.cpp
@@ -97,3 +99,6 @@ add_test(NAME Phase8ShadowMappingValidation COMMAND PyramidGiza --validate-shado
 add_test(NAME Phase9ConstructionTimelineValidation COMMAND PyramidGiza --validate-construction)
 add_test(NAME Phase9TextureUvValidation COMMAND PyramidGiza --validate-textures)
 add_test(NAME Phase9SceneIntegrityValidation COMMAND PyramidGiza --validate-layout)
+add_test(NAME Phase10InstancingValidation COMMAND PyramidGiza --validate-instancing)
+add_test(NAME Phase10FrustumValidation COMMAND PyramidGiza --validate-frustum)
+add_test(NAME Phase10PerformanceStructureValidation COMMAND PyramidGiza --validate-renderer-structure)

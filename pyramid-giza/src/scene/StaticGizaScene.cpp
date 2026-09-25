@@ -1,9 +1,14 @@
 #include "scene/StaticGizaScene.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <iomanip>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
+#include <tuple>
 
 #include <glad/glad.h>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -30,12 +35,20 @@ glm::vec3 rampSide(const RampDescriptor& ramp)
 
 StaticGizaScene::StaticGizaScene(int shadowResolution)
     : shader_("shaders/basic.vert", "shaders/basic.frag"),
+      instancedShader_("shaders/basic_instanced.vert", "shaders/basic.frag"),
       depthShader_("shaders/shadow_depth.vert", "shaders/shadow_depth.frag"),
+      instancedDepthShader_("shaders/shadow_depth_instanced.vert",
+                            "shaders/shadow_depth.frag"),
       plane_(PrimitiveGenerator::createPlane()),
       cube_(PrimitiveGenerator::createCube()),
       cylinder_(PrimitiveGenerator::createCylinder()),
       sphere_(PrimitiveGenerator::createSphere())
 {
+    GLint maximumVertexAttributes = 0;
+    glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maximumVertexAttributes);
+    if (maximumVertexAttributes < 11)
+        throw std::runtime_error("Phase 10 instancing requires 11 vertex attributes");
+
     shadowSettings_.resolution = shadowResolution;
     shadowMap_.initialize(shadowSettings_.resolution, shadowSettings_.resolution);
     textures_.initialize();
@@ -67,7 +80,8 @@ StaticGizaScene::StaticGizaScene(int shadowResolution)
     // Maximum draw count includes the dynamic loaded sledge, two ropes,
     // the hand-attached mallet, and the three-part animated lever.
     stats_.totalDrawCalls = objects_.size() + stagedObjects_.size() +
-                            dynamicPulleyWheels_.size() + pyramidBlocks_.size() +
+                            dynamicPulleyWheels_.size() +
+                            pyramidInstanceGroups_.size() + frontierBatches_.size() +
                             stats_.workerParts +
                             (loadedSledgeParts_.size() - 1) + 2 + 2 + 3;
     stats_.shadowDepthDrawCalls = stats_.totalDrawCalls;
@@ -104,7 +118,10 @@ StaticGizaScene::StaticGizaScene(int shadowResolution)
     std::cout << "Directional shadow framebuffer complete: " << shadowMap_.width() << " x "
               << shadowMap_.height() << " D24, " << stats_.shadowDepthDrawCalls
               << " depth draws, " << stats_.combinedDrawCalls
-              << " maximum combined draws\n";
+              << " maximum combined draws\n"
+              << "Phase 10 renderer: " << pyramidInstanceGroups_.size()
+              << " static pyramid batches + " << frontierBatches_.size()
+              << " dynamic frontier batches; conservative frustum culling ON\n";
 }
 
 void StaticGizaScene::addObject(ScenePrimitive primitive, const glm::mat4& model,
@@ -185,6 +202,77 @@ void StaticGizaScene::buildPyramid()
     pyramidBlocks_ = PyramidLayout::generateComplete(pyramidConfig_);
     stats_.pyramidBlocks =
         constructionTimeline_.visibleBlockCount(pyramidBlocks_, pyramidConfig_);
+    buildPyramidInstanceBatches();
+}
+
+void StaticGizaScene::buildPyramidInstanceBatches()
+{
+    struct ScheduledInstance
+    {
+        float stableThreshold = 0.0f;
+        InstanceData data;
+        glm::vec3 minimum{0.0f};
+        glm::vec3 maximum{0.0f};
+    };
+
+    constexpr unsigned int chunksPerMaterial = 4;
+    constexpr unsigned int levelsPerChunk = 7;
+    std::array<std::vector<ScheduledInstance>, 8> scheduled;
+    for (const PyramidBlockPlacement& block : pyramidBlocks_)
+    {
+        const bool variation = block.level % 4 == 1 || block.level % 4 == 2;
+        const MaterialId materialId = variation
+                                          ? MaterialId::LimestoneVariation
+                                          : MaterialId::Limestone;
+        const unsigned int materialIndex = variation ? 1u : 0u;
+        const unsigned int chunk = std::min(
+            chunksPerMaterial - 1, block.level / levelsPerChunk);
+        const Material& material = materialDefinition(materialId);
+        const glm::mat4 model = makeTransform(block.position, {}, block.scale);
+        scheduled[materialIndex * chunksPerMaterial + chunk].push_back({
+            ConstructionTimelineController::stableThreshold(block, pyramidConfig_),
+            makeInstanceData(model, material.textureScale, material.textureOffset),
+            block.position - 0.5f * block.scale,
+            block.position + 0.5f * block.scale});
+    }
+
+    pyramidInstanceGroups_.clear();
+    pyramidInstanceGroups_.reserve(scheduled.size());
+    for (unsigned int index = 0; index < scheduled.size(); ++index)
+    {
+        std::vector<ScheduledInstance>& source = scheduled[index];
+        std::sort(source.begin(), source.end(),
+                  [](const ScheduledInstance& left, const ScheduledInstance& right)
+                  { return left.stableThreshold < right.stableThreshold; });
+
+        PyramidInstanceGroup group;
+        group.material = index < chunksPerMaterial
+                             ? MaterialId::Limestone
+                             : MaterialId::LimestoneVariation;
+        group.levelChunk = index % chunksPerMaterial;
+        std::vector<InstanceData> instances;
+        instances.reserve(source.size());
+        group.stableThresholds.reserve(source.size());
+        glm::vec3 minimum{std::numeric_limits<float>::max()};
+        glm::vec3 maximum{std::numeric_limits<float>::lowest()};
+        for (const ScheduledInstance& item : source)
+        {
+            instances.push_back(item.data);
+            group.stableThresholds.push_back(item.stableThreshold);
+            minimum = glm::min(minimum, item.minimum);
+            maximum = glm::max(maximum, item.maximum);
+        }
+        if (!instances.empty())
+        {
+            group.bounds.center = 0.5f * (minimum + maximum);
+            group.bounds.radius = glm::length(0.5f * (maximum - minimum));
+        }
+        group.batch.uploadStatic(instances);
+        pyramidInstanceGroups_.push_back(std::move(group));
+    }
+
+    for (std::vector<InstanceData>& instances : frontierInstances_)
+        instances.reserve(384);
 }
 
 void StaticGizaScene::buildTransportLanes()
@@ -1505,6 +1593,86 @@ const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
     }
 }
 
+std::size_t StaticGizaScene::activeStableCount(
+    const PyramidInstanceGroup& group) const
+{
+    return static_cast<std::size_t>(std::upper_bound(
+        group.stableThresholds.begin(), group.stableThresholds.end(),
+        constructionTimeline_.progress() + 1.0e-6f) -
+        group.stableThresholds.begin());
+}
+
+float StaticGizaScene::primitiveLocalRadius(ScenePrimitive primitive) const
+{
+    switch (primitive)
+    {
+    case ScenePrimitive::Sphere: return 0.5f;
+    case ScenePrimitive::Plane:
+    case ScenePrimitive::Cylinder: return 0.7071068f;
+    case ScenePrimitive::Cube:
+    default: return 0.8660254f;
+    }
+}
+
+bool StaticGizaScene::objectVisible(const SceneObject& object,
+                                    const Frustum& frustum, float margin) const
+{
+    return frustum.intersects(
+        transformedPrimitiveBounds(object.model,
+                                   primitiveLocalRadius(object.primitive)),
+        margin);
+}
+
+void StaticGizaScene::updateFrontierBatches()
+{
+    for (std::vector<InstanceData>& instances : frontierInstances_)
+        instances.clear();
+    std::array<glm::vec3, 2> minimum{
+        glm::vec3{std::numeric_limits<float>::max()},
+        glm::vec3{std::numeric_limits<float>::max()}};
+    std::array<glm::vec3, 2> maximum{
+        glm::vec3{std::numeric_limits<float>::lowest()},
+        glm::vec3{std::numeric_limits<float>::lowest()}};
+
+    for (const PyramidBlockPlacement& block : pyramidBlocks_)
+    {
+        const ConstructionBlockState state =
+            constructionTimeline_.blockState(block, pyramidConfig_);
+        if (!state.frontier)
+            continue;
+        glm::vec3 position = block.position;
+        const float remaining = 1.0f - state.placementAmount;
+        position += glm::vec3{remaining * 2.0f, remaining * 4.0f,
+                              remaining * 1.2f};
+        const bool variation = block.level % 4 == 1 || block.level % 4 == 2;
+        const std::size_t materialIndex = variation ? 1u : 0u;
+        const MaterialId materialId = variation
+                                          ? MaterialId::LimestoneVariation
+                                          : MaterialId::Limestone;
+        const Material& material = materialDefinition(materialId);
+        const glm::mat4 model = makeTransform(position, {}, block.scale);
+        frontierInstances_[materialIndex].push_back(
+            makeInstanceData(model, material.textureScale, material.textureOffset));
+        minimum[materialIndex] = glm::min(
+            minimum[materialIndex], position - 0.5f * block.scale);
+        maximum[materialIndex] = glm::max(
+            maximum[materialIndex], position + 0.5f * block.scale);
+    }
+
+    for (std::size_t index = 0; index < frontierBatches_.size(); ++index)
+    {
+        frontierBatches_[index].updateDynamic(frontierInstances_[index]);
+        if (frontierInstances_[index].empty())
+            frontierBounds_[index] = {};
+        else
+        {
+            frontierBounds_[index].center = 0.5f * (minimum[index] + maximum[index]);
+            frontierBounds_[index].radius =
+                glm::length(0.5f * (maximum[index] - minimum[index]));
+        }
+    }
+}
+
 void StaticGizaScene::collectFrameObjects()
 {
     frameObjects_.clear();
@@ -1529,25 +1697,7 @@ void StaticGizaScene::collectFrameObjects()
         frameObjects_.push_back({ScenePrimitive::Cylinder, model, MaterialId::Wood});
     }
 
-    for (const PyramidBlockPlacement& block : pyramidBlocks_)
-    {
-        const ConstructionBlockState state =
-            constructionTimeline_.blockState(block, pyramidConfig_);
-        if (!state.visible)
-            continue;
-        glm::vec3 position = block.position;
-        if (state.frontier)
-        {
-            const float remaining = 1.0f - state.placementAmount;
-            position += glm::vec3{remaining * 2.0f, remaining * 4.0f,
-                                  remaining * 1.2f};
-        }
-        const MaterialId material = (block.level % 4 == 1 || block.level % 4 == 2)
-                                        ? MaterialId::LimestoneVariation
-                                        : MaterialId::Limestone;
-        frameObjects_.push_back({ScenePrimitive::Cube,
-                                 makeTransform(position, {}, block.scale), material});
-    }
+    updateFrontierBatches();
 
     const auto drawPart = [&](ScenePrimitive primitive, const glm::mat4& model,
                               MaterialId materialId) {
@@ -1655,10 +1805,40 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
                              const glm::vec3& cameraPosition,
                              int viewportWidth, int viewportHeight)
 {
+    const auto submissionStart = std::chrono::steady_clock::now();
+    renderStats_ = {};
     collectFrameObjects();
     const SunState& sun = sunController_.state();
     const LightSpaceState lightSpace =
         calculateLightSpace(sun.light.direction, shadowSettings_);
+    const Frustum cameraFrustum = Frustum::fromMatrix(projection * view);
+    const Frustum lightFrustum = Frustum::fromMatrix(lightSpace.matrix);
+
+    std::vector<const SceneObject*> visibleObjects;
+    std::vector<const SceneObject*> shadowObjects;
+    visibleObjects.reserve(frameObjects_.size());
+    shadowObjects.reserve(frameObjects_.size());
+    for (const SceneObject& object : frameObjects_)
+    {
+        if (!frustumCullingEnabled_ || objectVisible(object, cameraFrustum, 0.35f))
+            visibleObjects.push_back(&object);
+        else
+            ++renderStats_.culledObjects;
+
+        if (!frustumCullingEnabled_ || objectVisible(object, lightFrustum, 2.0f))
+            shadowObjects.push_back(&object);
+        else if (shadowsEnabled_)
+            ++renderStats_.culledObjects;
+    }
+    const auto sortByState = [](const SceneObject* left, const SceneObject* right)
+    {
+        return std::tie(left->material, left->primitive) <
+               std::tie(right->material, right->primitive);
+    };
+    std::sort(visibleObjects.begin(), visibleObjects.end(), sortByState);
+    std::sort(shadowObjects.begin(), shadowObjects.end(),
+              [](const SceneObject* left, const SceneObject* right)
+              { return left->primitive < right->primitive; });
 
     if (shadowsEnabled_)
     {
@@ -1669,53 +1849,197 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         // thin ropes, ladders, limbs, and scaffold pieces remain reliable casters.
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         shadowMap_.beginDepthPass();
+        instancedDepthShader_.use();
+        instancedDepthShader_.setMat4("lightSpaceMatrix", lightSpace.matrix);
+        for (const PyramidInstanceGroup& group : pyramidInstanceGroups_)
+        {
+            const std::size_t count = activeStableCount(group);
+            if (count == 0)
+                continue;
+            if (frustumCullingEnabled_ &&
+                !lightFrustum.intersects(group.bounds, 3.0f))
+            {
+                renderStats_.culledInstances += count;
+                continue;
+            }
+            group.batch.draw(cube_, count);
+            ++renderStats_.shadowDrawCalls;
+            renderStats_.shadowInstances += count;
+            renderStats_.shadowTriangles += count * (cube_.indexCount() / 3u);
+        }
+        for (std::size_t index = 0; index < frontierBatches_.size(); ++index)
+        {
+            const std::size_t count = frontierInstances_[index].size();
+            if (count == 0)
+                continue;
+            if (frustumCullingEnabled_ &&
+                !lightFrustum.intersects(frontierBounds_[index], 3.0f))
+            {
+                renderStats_.culledInstances += count;
+                continue;
+            }
+            frontierBatches_[index].draw(cube_, count);
+            ++renderStats_.shadowDrawCalls;
+            renderStats_.shadowInstances += count;
+            renderStats_.shadowTriangles += count * (cube_.indexCount() / 3u);
+        }
+
         depthShader_.use();
         depthShader_.setMat4("lightSpaceMatrix", lightSpace.matrix);
-        for (const SceneObject& object : frameObjects_)
+        for (const SceneObject* object : shadowObjects)
         {
-            depthShader_.setMat4("model", object.model);
-            meshFor(object.primitive).draw();
+            depthShader_.setMat4("model", object->model);
+            const Mesh& mesh = meshFor(object->primitive);
+            mesh.draw();
+            ++renderStats_.shadowDrawCalls;
+            ++renderStats_.shadowInstances;
+            renderStats_.shadowTriangles += mesh.indexCount() / 3u;
         }
         shadowMap_.endDepthPass(viewportWidth, viewportHeight);
         glPolygonMode(GL_FRONT_AND_BACK, polygonMode[0]);
     }
 
-    shader_.use();
-    shader_.setMat4("view", view);
-    shader_.setMat4("projection", projection);
-    shader_.setMat4("lightSpaceMatrix", lightSpace.matrix);
-    shader_.setVec3("viewPosition", cameraPosition);
-    shader_.setVec3("sunDirection", sun.light.direction);
-    shader_.setVec3("sunColor", sun.light.color);
-    shader_.setFloat("sunIntensity", sun.light.intensity);
-    shader_.setVec3("ambientColor", sun.ambientColor);
-    shader_.setFloat("ambientIntensity", sun.ambientIntensity);
-    shader_.setInt("lightingDebugMode", static_cast<int>(sunController_.debugMode()));
-    shader_.setInt("shadowsEnabled", shadowsEnabled_ ? 1 : 0);
-    shader_.setInt("shadowDebugMode", static_cast<int>(shadowDebugMode_));
-    shader_.setFloat("shadowMinimumBias", shadowSettings_.minimumBias);
-    shader_.setFloat("shadowSlopeBias", shadowSettings_.slopeBias);
-    shader_.setFloat("shadowStrength", shadowSettings_.shadowStrength);
-    shadowMap_.bindDepthTexture(0);
-    shader_.setInt("shadowMap", 0);
-    shader_.setInt("materialTexture", 1);
-    shader_.setInt("texturesEnabled", texturesEnabled_ ? 1 : 0);
-
-    for (const SceneObject& object : frameObjects_)
+    const auto configureLighting = [&](Shader& program)
     {
-        shader_.setMat4("model", object.model);
-        shader_.setMat3("normalMatrix",
-                        glm::transpose(glm::inverse(glm::mat3(object.model))));
-        const Material& material = materialDefinition(object.material);
-        shader_.setVec3("materialBaseColor", material.baseColor);
-        shader_.setFloat("materialAmbient", material.ambientStrength);
-        shader_.setFloat("materialDiffuse", material.diffuseStrength);
-        shader_.setFloat("materialSpecular", material.specularStrength);
-        shader_.setFloat("materialShininess", material.shininess);
-        shader_.setVec2("materialTextureScale", material.textureScale);
-        shader_.setVec2("materialTextureOffset", material.textureOffset);
-        shader_.setFloat("materialTextureBlend", material.textureBlend);
-        textures_.bind(material.texture, 1);
-        meshFor(object.primitive).draw();
+        program.use();
+        program.setMat4("view", view);
+        program.setMat4("projection", projection);
+        program.setMat4("lightSpaceMatrix", lightSpace.matrix);
+        program.setVec3("viewPosition", cameraPosition);
+        program.setVec3("sunDirection", sun.light.direction);
+        program.setVec3("sunColor", sun.light.color);
+        program.setFloat("sunIntensity", sun.light.intensity);
+        program.setVec3("ambientColor", sun.ambientColor);
+        program.setFloat("ambientIntensity", sun.ambientIntensity);
+        program.setInt("lightingDebugMode", static_cast<int>(sunController_.debugMode()));
+        program.setInt("shadowsEnabled", shadowsEnabled_ ? 1 : 0);
+        program.setInt("shadowDebugMode", static_cast<int>(shadowDebugMode_));
+        program.setFloat("shadowMinimumBias", shadowSettings_.minimumBias);
+        program.setFloat("shadowSlopeBias", shadowSettings_.slopeBias);
+        program.setFloat("shadowStrength", shadowSettings_.shadowStrength);
+        program.setInt("shadowMap", 0);
+        program.setInt("materialTexture", 1);
+        program.setInt("texturesEnabled", texturesEnabled_ ? 1 : 0);
+    };
+    shadowMap_.bindDepthTexture(0);
+    TextureId currentTexture = TextureId::Count;
+    const auto applyMaterial = [&](Shader& program, MaterialId materialId,
+                                   bool uvIsInstanced)
+    {
+        const Material& material = materialDefinition(materialId);
+        program.setVec3("materialBaseColor", material.baseColor);
+        program.setFloat("materialAmbient", material.ambientStrength);
+        program.setFloat("materialDiffuse", material.diffuseStrength);
+        program.setFloat("materialSpecular", material.specularStrength);
+        program.setFloat("materialShininess", material.shininess);
+        program.setVec2("materialTextureScale",
+                        uvIsInstanced ? glm::vec2{1.0f} : material.textureScale);
+        program.setVec2("materialTextureOffset",
+                        uvIsInstanced ? glm::vec2{0.0f} : material.textureOffset);
+        program.setFloat("materialTextureBlend", material.textureBlend);
+        if (currentTexture != material.texture)
+        {
+            textures_.bind(material.texture, 1);
+            currentTexture = material.texture;
+            ++renderStats_.textureBinds;
+        }
+        ++renderStats_.materialChanges;
+    };
+
+    configureLighting(instancedShader_);
+    MaterialId activeInstancedMaterial = MaterialId::Count;
+    for (const PyramidInstanceGroup& group : pyramidInstanceGroups_)
+    {
+        const std::size_t count = activeStableCount(group);
+        if (count == 0)
+            continue;
+        if (frustumCullingEnabled_ &&
+            !cameraFrustum.intersects(group.bounds, 0.75f))
+        {
+            renderStats_.culledInstances += count;
+            continue;
+        }
+        if (activeInstancedMaterial != group.material)
+        {
+            applyMaterial(instancedShader_, group.material, true);
+            activeInstancedMaterial = group.material;
+        }
+        group.batch.draw(cube_, count);
+        ++renderStats_.visibleDrawCalls;
+        renderStats_.visibleInstances += count;
+        renderStats_.visibleTriangles += count * (cube_.indexCount() / 3u);
     }
+    for (std::size_t index = 0; index < frontierBatches_.size(); ++index)
+    {
+        const std::size_t count = frontierInstances_[index].size();
+        if (count == 0)
+            continue;
+        if (frustumCullingEnabled_ &&
+            !cameraFrustum.intersects(frontierBounds_[index], 0.75f))
+        {
+            renderStats_.culledInstances += count;
+            continue;
+        }
+        const MaterialId material = index == 0
+                                        ? MaterialId::Limestone
+                                        : MaterialId::LimestoneVariation;
+        if (activeInstancedMaterial != material)
+        {
+            applyMaterial(instancedShader_, material, true);
+            activeInstancedMaterial = material;
+        }
+        frontierBatches_[index].draw(cube_, count);
+        ++renderStats_.visibleDrawCalls;
+        renderStats_.visibleInstances += count;
+        renderStats_.visibleTriangles += count * (cube_.indexCount() / 3u);
+    }
+
+    configureLighting(shader_);
+    MaterialId activeMaterial = MaterialId::Count;
+    for (const SceneObject* object : visibleObjects)
+    {
+        shader_.setMat4("model", object->model);
+        shader_.setMat3("normalMatrix",
+                        glm::transpose(glm::inverse(glm::mat3(object->model))));
+        if (activeMaterial != object->material)
+        {
+            applyMaterial(shader_, object->material, false);
+            activeMaterial = object->material;
+        }
+        const Mesh& mesh = meshFor(object->primitive);
+        mesh.draw();
+        ++renderStats_.visibleDrawCalls;
+        ++renderStats_.visibleInstances;
+        renderStats_.visibleTriangles += mesh.indexCount() / 3u;
+    }
+
+    renderStats_.cpuSubmissionMilliseconds =
+        std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - submissionStart).count();
+}
+
+void StaticGizaScene::printRenderStats(std::ostream& output) const
+{
+    output << std::fixed << std::setprecision(3)
+           << "Phase 10 render statistics (latest frame)\n"
+           << "  construction: " << constructionTimeline_.progress() * 100.0f
+           << "% (" << constructionStageName() << ")\n"
+           << "  visible draws / instances / triangles: "
+           << renderStats_.visibleDrawCalls << " / "
+           << renderStats_.visibleInstances << " / "
+           << renderStats_.visibleTriangles << '\n'
+           << "  shadow draws / instances / triangles: "
+           << renderStats_.shadowDrawCalls << " / "
+           << renderStats_.shadowInstances << " / "
+           << renderStats_.shadowTriangles << '\n'
+           << "  conservative culling: "
+           << (frustumCullingEnabled_ ? "ON" : "OFF")
+           << ", rejected objects / instances: "
+           << renderStats_.culledObjects << " / "
+           << renderStats_.culledInstances << '\n'
+           << "  material changes / texture binds: "
+           << renderStats_.materialChanges << " / "
+           << renderStats_.textureBinds << '\n'
+           << "  CPU collection + submission: "
+           << renderStats_.cpuSubmissionMilliseconds << " ms\n";
 }
