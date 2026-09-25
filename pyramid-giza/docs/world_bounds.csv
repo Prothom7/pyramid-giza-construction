@@ -1,0 +1,10 @@
+Group,MinX,MinY,MinZ,MaxX,MaxY,MaxZ,MarginOrPurpose,Status
+ContentAggregate,-170,-11,-179,170,46,52,Calculated from 13 authoritative site zones,Contained
+FinalGround,-213,-0.62,-213,213,0,123,Expanded slabs plus low perimeter skirt,Valid
+LeftMargin,-213,0,0,-170,0,0,43 world units,Pass
+RightMargin,170,0,0,213,0,0,43 world units,Pass
+BackMargin,0,0,-213,0,0,-179,34 world units,Pass
+FrontMargin,0,0,52,0,0,123,71 world units,Pass
+QuarryOpening,-158,-7.5,-55,-98,0,15,Ground intentionally omitted above recessed pit,Intentional
+ShadowCoverage,-255,-217,-243,215,253,227,Phase 8 orthographic horizontal coverage,Pass
+CameraProjection,,,,,,,Near 0.7 far 700 ground diagonal 542.561,Pass

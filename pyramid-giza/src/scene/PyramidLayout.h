@@ -25,6 +25,8 @@ struct PyramidBlockPlacement
     glm::vec3 position;
     glm::vec3 scale;
     unsigned int level = 0;
+    unsigned int gridX = 0;
+    unsigned int gridZ = 0;
 };
 
 struct PyramidLayoutStats
@@ -40,6 +42,9 @@ class PyramidLayout
 {
 public:
     static std::vector<PyramidBlockPlacement> generate(const PyramidLayoutConfig& config);
+    static std::vector<PyramidBlockPlacement> generateComplete(const PyramidLayoutConfig& config);
+    static bool isLegacyConstructionOpening(const PyramidLayoutConfig& config,
+                                            const PyramidBlockPlacement& block);
     static PyramidLayoutStats statistics(const PyramidLayoutConfig& config,
                                           const std::vector<PyramidBlockPlacement>& blocks);
 };

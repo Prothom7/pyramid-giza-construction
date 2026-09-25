@@ -1,0 +1,6 @@
+Progress,Percent,Stage,ActiveLevel,VisibleBlocks,Meaning
+0.00,0,Foundation,0,70,First deterministic foundation batch
+0.25,25,Lower courses,7,4734,Large lower square courses dominate block count
+0.50,50,Lower-middle courses,15,6964,Mid-height construction and migrating access
+0.75,75,Phase 5.6 checkpoint,22,7561,Exact previous unfinished pyramid
+1.00,100,Complete,27,7714,All 28 square courses including summit

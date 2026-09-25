@@ -30,10 +30,12 @@ add_executable(PyramidGiza
     src/graphics/Mesh.cpp
     src/graphics/PrimitiveGenerator.cpp
     src/graphics/GeometryValidation.cpp
+    src/graphics/Texture.cpp
     src/scene/PyramidLayout.cpp
     src/scene/MonumentalSite.cpp
     src/scene/IndustrialLandscape.cpp
     src/scene/ObjectEnrichment.cpp
+    src/scene/SceneIntegrity.cpp
     src/scene/SceneTypes.cpp
     src/scene/StaticGizaScene.cpp
     src/objects/Worker.cpp
@@ -44,6 +46,7 @@ add_executable(PyramidGiza
     src/objects/WorkerHierarchyValidation.cpp
     src/animation/ConstructionAnimation.cpp
     src/animation/AnimationValidation.cpp
+    src/animation/ConstructionTimeline.cpp
 )
 
 target_include_directories(PyramidGiza PRIVATE
@@ -91,3 +94,6 @@ add_test(NAME Phase6CameraNavigationValidation COMMAND PyramidGiza --validate-ca
 add_test(NAME Phase6_5ObjectEnrichmentValidation COMMAND PyramidGiza --validate-enrichment)
 add_test(NAME Phase7LightingValidation COMMAND PyramidGiza --validate-lighting)
 add_test(NAME Phase8ShadowMappingValidation COMMAND PyramidGiza --validate-shadows)
+add_test(NAME Phase9ConstructionTimelineValidation COMMAND PyramidGiza --validate-construction)
+add_test(NAME Phase9TextureUvValidation COMMAND PyramidGiza --validate-textures)
+add_test(NAME Phase9SceneIntegrityValidation COMMAND PyramidGiza --validate-layout)

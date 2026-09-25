@@ -7,7 +7,9 @@
 
 #include "Shader.h"
 #include "animation/ConstructionAnimation.h"
+#include "animation/ConstructionTimeline.h"
 #include "graphics/Mesh.h"
+#include "graphics/Texture.h"
 #include "lighting/ShadowMap.h"
 #include "lighting/SunController.h"
 #include "objects/Worker.h"
@@ -82,6 +84,22 @@ public:
     void setShadowDebugMode(ShadowDebugMode mode);
     ShadowDebugMode shadowDebugMode() const { return shadowDebugMode_; }
     const char* shadowDebugModeName() const;
+    void toggleTextures() { texturesEnabled_ = !texturesEnabled_; }
+    void setTexturesEnabled(bool enabled) { texturesEnabled_ = enabled; }
+    bool texturesEnabled() const { return texturesEnabled_; }
+    void toggleConstructionTimelapse() { constructionTimeline_.togglePlayback(); }
+    void adjustConstructionSpeed(int direction) { constructionTimeline_.adjustSpeed(direction); }
+    void resetConstruction() { constructionTimeline_.reset(); }
+    void completeConstruction() { constructionTimeline_.complete(); }
+    void setConstructionProgress(float progress) { constructionTimeline_.setProgress(progress); }
+    void setConstructionSpeed(float speed) { constructionTimeline_.setSpeed(speed); }
+    void setConstructionPlaying(bool playing) { constructionTimeline_.setPlaying(playing); }
+    float constructionProgress() const { return constructionTimeline_.progress(); }
+    float constructionSpeed() const { return constructionTimeline_.speed(); }
+    const char* constructionStageName() const
+    {
+        return ConstructionTimelineController::stageName(constructionTimeline_.stage());
+    }
     const ShadowSettings& shadowSettings() const { return shadowSettings_; }
     bool animationPaused() const { return animationController_.paused(); }
     bool animationLooping() const { return animationController_.looping(); }
@@ -116,6 +134,25 @@ private:
         bool isSecondary = false;
         bool isDemoWorker = false;
         float animationPhase = 0.0f;
+        float minimumConstructionProgress = 0.0f;
+        float maximumConstructionProgress = 1.01f;
+    };
+
+    struct StagedSceneObject
+    {
+        SceneObject object;
+        float minimumProgress = 0.0f;
+        float maximumProgress = 1.01f;
+    };
+
+    struct DynamicPulleyWheel
+    {
+        glm::mat4 root{1.0f};
+        glm::vec3 center{0.0f};
+        glm::vec3 scale{1.0f};
+        float phase = 0.0f;
+        float minimumProgress = 0.0f;
+        float maximumProgress = 1.01f;
     };
 
     void addObject(ScenePrimitive primitive, const glm::mat4& model, MaterialId material);
@@ -141,6 +178,7 @@ private:
     void buildRiverLanding();
     void buildUpperPlatformDetails();
     void buildCompositeObjects();
+    void buildConstructionStages();
     void collectFrameObjects();
     const Mesh& meshFor(ScenePrimitive primitive) const;
 
@@ -152,12 +190,17 @@ private:
     Mesh cube_;
     Mesh cylinder_;
     Mesh sphere_;
+    TextureLibrary textures_;
     PyramidLayoutConfig pyramidConfig_;
+    std::vector<PyramidBlockPlacement> pyramidBlocks_;
     std::vector<SceneObject> objects_;
     std::vector<SceneObject> frameObjects_;
+    std::vector<StagedSceneObject> stagedObjects_;
+    std::vector<DynamicPulleyWheel> dynamicPulleyWheels_;
     std::vector<WorkerInstance> workers_;
     std::vector<ObjectPart> loadedSledgeParts_;
     ConstructionAnimationController animationController_;
+    ConstructionTimelineController constructionTimeline_;
     SunController sunController_;
     WorkerPose demoPose_ = WorkerPose::Standing;
     float articulationTime_ = 0.0f;
@@ -165,6 +208,7 @@ private:
     bool articulationPreviewEnabled_ = true;
     bool coordinatedAnimationEnabled_ = true;
     bool shadowsEnabled_ = true;
+    bool texturesEnabled_ = true;
     ShadowDebugMode shadowDebugMode_ = ShadowDebugMode::Normal;
     StaticGizaSceneStats stats_;
 };

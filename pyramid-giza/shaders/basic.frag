@@ -12,6 +12,11 @@ uniform float materialAmbient;
 uniform float materialDiffuse;
 uniform float materialSpecular;
 uniform float materialShininess;
+uniform sampler2D materialTexture;
+uniform vec2 materialTextureScale;
+uniform vec2 materialTextureOffset;
+uniform float materialTextureBlend;
+uniform int texturesEnabled;
 
 uniform vec3 sunDirection;
 uniform vec3 sunColor;
@@ -57,6 +62,13 @@ float calculateShadow(vec3 normal, vec3 toLight)
 
 void main()
 {
+    vec3 textureSample = texture(materialTexture,
+                                 TexCoord * materialTextureScale +
+                                 materialTextureOffset).rgb;
+    vec3 texturedColor = materialBaseColor * textureSample * 1.12;
+    vec3 surfaceColor = texturesEnabled != 0
+        ? mix(materialBaseColor, texturedColor, materialTextureBlend)
+        : materialBaseColor;
     vec3 normal = normalize(WorldNormal);
     // All lighting vectors are world-space. sunDirection is the direction in
     // which sunlight rays travel, so L points in the opposite direction.
@@ -69,8 +81,8 @@ void main()
         ? pow(max(dot(normal, halfwayDirection), 0.0), materialShininess)
         : 0.0;
 
-    vec3 ambient = ambientIntensity * materialAmbient * materialBaseColor * ambientColor;
-    vec3 diffuse = sunIntensity * materialDiffuse * nDotL * materialBaseColor * sunColor;
+    vec3 ambient = ambientIntensity * materialAmbient * surfaceColor * ambientColor;
+    vec3 diffuse = sunIntensity * materialDiffuse * nDotL * surfaceColor * sunColor;
     vec3 specular = sunIntensity * materialSpecular * blinnFactor * sunColor;
     float shadow = calculateShadow(normal, toLight);
     float visibility = 1.0 - shadow * shadowStrength;
@@ -85,7 +97,7 @@ void main()
     else if (lightingDebugMode == 3)
         result = normal * 0.5 + 0.5;
     else if (lightingDebugMode == 4)
-        result = materialBaseColor;
+        result = surfaceColor;
     else
         result = ambient + visibility * (diffuse + specular);
     FragColor = vec4(result, 1.0);

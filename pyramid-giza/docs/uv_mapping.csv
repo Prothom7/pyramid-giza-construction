@@ -1,0 +1,8 @@
+Primitive,Mapping,VertexDuplication,SeamHandling,Validation
+Triangle,Planar 0..1,None,Not applicable,Finite and bounded
+Plane,Planar XZ 0..1,Four render vertices,Repeat wrapping through material scale,Finite and bounded
+Cube,Planar per face,24 render vertices for distinct normals and UVs,Each face independent,Finite and bounded
+Pyramid,Per-triangle sides plus planar base,Side vertices duplicated for flat normals,Triangle-local UVs,Finite and bounded
+Disk,Radial mapping centered at 0.5/0.5,Center plus perimeter,Indexed wraparound,Finite and bounded
+Cylinder,Side cylindrical plus planar caps,Side seam and cap vertices intentionally separate,Side U=0 and U=1 duplicate position,Finite and bounded
+Sphere,Latitude/longitude,31 rings times 33 plus two poles,Each ring duplicates longitude 0 at U=1,Finite seam position and U endpoints verified

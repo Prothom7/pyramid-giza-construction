@@ -83,11 +83,31 @@ std::vector<PyramidBlockPlacement> PyramidLayout::generate(const PyramidLayoutCo
                      y,
                      config.origin.z + (static_cast<float>(z) - centerOffset) * zStep},
                     {config.blockWidth, config.blockHeight, config.blockDepth},
-                    level});
+                    level,
+                    x,
+                    z});
             }
         }
     }
     return blocks;
+}
+
+std::vector<PyramidBlockPlacement> PyramidLayout::generateComplete(
+    const PyramidLayoutConfig& config)
+{
+    PyramidLayoutConfig complete = config;
+    complete.completedLevels = complete.baseBlocksPerSide;
+    complete.partialFromLevel = complete.baseBlocksPerSide;
+    return generate(complete);
+}
+
+bool PyramidLayout::isLegacyConstructionOpening(const PyramidLayoutConfig& config,
+                                                 const PyramidBlockPlacement& block)
+{
+    if (block.level >= config.completedLevels)
+        return false;
+    const unsigned int side = config.baseBlocksPerSide - block.level;
+    return isConstructionOpening(config, block.level, side, block.gridX, block.gridZ);
 }
 
 PyramidLayoutStats PyramidLayout::statistics(

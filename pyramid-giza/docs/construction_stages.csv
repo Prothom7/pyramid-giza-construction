@@ -1,0 +1,8 @@
+StageID,Name,ProgressStart,ProgressEnd,PrimaryBlockRange,InfrastructureBehavior
+1,Foundation,0.00,0.10,Level 0 begins,Early access and repository activity starts
+2,LowerCourses,0.10,0.30,Levels 0-8,Low scaffold and haul equipment active
+3,LowerMiddle,0.30,0.55,Levels 8-16,Mid ramp and scaffold migrate upward
+4,HistoricalCheckpoint,0.55,0.75,Levels 16-22,Matches the Phase 5.6 scene at 75 percent
+5,UpperCourses,0.75,0.92,Opening closes and levels 23-25 appear,Upper access and pulley support active
+6,Summit,0.92,1.00,Levels 26-27,Temporary summit equipment is removed
+7,Complete,1.00,1.00,All 7714 blocks,Permanent context remains and temporary equipment is absent

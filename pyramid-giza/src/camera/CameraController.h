@@ -56,7 +56,7 @@ public:
     static constexpr float normalSpeed = 24.0f;
     static constexpr float fastSpeed = 56.0f;
     static constexpr float nearPlane = 0.7f;
-    static constexpr float farPlane = 550.0f;
+    static constexpr float farPlane = 700.0f;
     static constexpr float minimumFov = 30.0f;
     static constexpr float maximumFov = 75.0f;
     static constexpr float transitionDuration = 1.0f;

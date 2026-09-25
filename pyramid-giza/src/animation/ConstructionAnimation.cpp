@@ -303,17 +303,31 @@ WorkerJointAngles ConstructionAnimationController::walkingPose(
     const WorkerJointAngles& base, float time, float strength, bool pulling)
 {
     WorkerJointAngles angles = base;
-    const float wave = std::sin(time * 5.0f);
+    const float cadence = pulling ? 3.65f : 4.8f;
+    const float wave = std::sin(time * cadence);
     const float opposite = -wave;
     const float gait = saturate(strength);
-    angles.leftHip.x += 18.0f * wave * gait;
-    angles.rightHip.x += 18.0f * opposite * gait;
-    angles.leftKnee.x += 24.0f * std::max(0.0f, opposite) * gait;
-    angles.rightKnee.x += 24.0f * std::max(0.0f, wave) * gait;
+    const float hipAmplitude = pulling ? 12.0f : 18.0f;
+    angles.leftHip.x += hipAmplitude * wave * gait;
+    angles.rightHip.x += hipAmplitude * opposite * gait;
+    angles.leftKnee.x += (pulling ? 18.0f : 24.0f) *
+                         std::max(0.0f, opposite) * gait;
+    angles.rightKnee.x += (pulling ? 18.0f : 24.0f) *
+                          std::max(0.0f, wave) * gait;
     const float armAmplitude = pulling ? 6.0f : 16.0f;
     angles.leftShoulder.x += armAmplitude * opposite * gait;
     angles.rightShoulder.x += armAmplitude * wave * gait;
     angles.torso.y += 2.5f * wave * gait;
+    if (pulling)
+    {
+        // A slower, braced gait communicates a heavy load without changing
+        // the original root path or 28.5-second sequence timing.
+        angles.torso.x += 5.0f + 1.5f * wave;
+        angles.leftKnee.x += 4.0f;
+        angles.rightKnee.x += 4.0f;
+        angles.leftAnkle.x -= 2.0f * wave;
+        angles.rightAnkle.x += 2.0f * wave;
+    }
     return Worker::clampJointAngles(angles);
 }
 
@@ -429,6 +443,17 @@ ConstructionAnimationSnapshot ConstructionAnimationController::snapshot() const
                             state_ == ConstructionState::RampPull;
         WorkerJointAngles leftJoints = moving ? walkingPose(pulling, elapsedTime_, 1.0f, true) : pulling;
         WorkerJointAngles rightJoints = moving ? walkingPose(pulling, elapsedTime_ + 0.63f, 1.0f, true) : pulling;
+        if (state_ == ConstructionState::RampPull)
+        {
+            leftJoints.torso.x += 7.0f;
+            rightJoints.torso.x += 7.0f;
+            leftJoints.leftKnee.x += 5.0f;
+            leftJoints.rightKnee.x += 5.0f;
+            rightJoints.leftKnee.x += 5.0f;
+            rightJoints.rightKnee.x += 5.0f;
+            leftJoints = Worker::clampJointAngles(leftJoints);
+            rightJoints = Worker::clampJointAngles(rightJoints);
+        }
         if (state_ == ConstructionState::Arrival)
         {
             leftJoints = blendPoses(pulling, standing, result.stateProgress);
@@ -446,7 +471,14 @@ ConstructionAnimationSnapshot ConstructionAnimationController::snapshot() const
 
     const auto quarryIndex = static_cast<std::size_t>(WorkerRole::QuarryMallet);
     WorkerJointAngles quarry = Worker::poseAngles(WorkerPose::Standing);
-    const float strike = 0.5f + 0.5f * std::sin(elapsedTime_ * 3.2f);
+    const float strikeCycle = std::fmod(elapsedTime_ * 0.72f, 1.0f);
+    float strike = 0.0f;
+    if (strikeCycle < 0.46f)
+        strike = smooth(strikeCycle / 0.46f); // deliberate anticipation
+    else if (strikeCycle < 0.62f)
+        strike = 1.0f - smooth((strikeCycle - 0.46f) / 0.16f); // fast impact
+    else
+        strike = 0.08f * (1.0f - smooth((strikeCycle - 0.62f) / 0.38f));
     quarry.rightShoulder = {glm::mix(25.0f, 105.0f, strike), 0.0f, 24.0f};
     quarry.rightElbow.x = glm::mix(35.0f, 90.0f, strike);
     quarry.torso.x = glm::mix(-4.0f, 12.0f, strike);
@@ -473,8 +505,11 @@ ConstructionAnimationSnapshot ConstructionAnimationController::snapshot() const
     const WorkerJointAngles leverPose = Worker::poseAngles(WorkerPose::LeverReady);
     if (state_ == ConstructionState::LeverPreparation)
     {
-        result.workers[leverIndex].joints = blendPoses(standing, leverPose, result.stateProgress);
-        result.leverAngleDegrees = -12.0f * result.stateProgress;
+        const float preparation = result.stateProgress < 0.25f
+            ? 0.18f * smooth(result.stateProgress / 0.25f)
+            : 0.18f + 0.82f * smooth((result.stateProgress - 0.25f) / 0.75f);
+        result.workers[leverIndex].joints = blendPoses(standing, leverPose, preparation);
+        result.leverAngleDegrees = -12.0f * preparation;
     }
     else if (state_ >= ConstructionState::PlacementReady)
     {

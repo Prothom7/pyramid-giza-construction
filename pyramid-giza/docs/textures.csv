@@ -1,0 +1,9 @@
+TextureId,Resolution,Channels,Generation,MinFilter,MagFilter,Wrap,SharedUse
+None,2x2,RGB,White fallback,Linear mipmap linear,Linear,Repeat,Skin and metal zero-blend fallback
+Sand,256x256,RGB,Seeded fine noise plus directional ripples,Linear mipmap linear,Linear,Repeat,Ground and earth
+Limestone,256x256,RGB,Seeded grain plus broad course variation,Linear mipmap linear,Linear,Repeat,Pyramid and prepared blocks
+QuarryStone,256x256,RGB,Seeded coarse cell noise,Linear mipmap linear,Linear,Repeat,Quarry faces
+Wood,256x256,RGB,Seeded longitudinal sine grain,Linear mipmap linear,Linear,Repeat,Timber rope and equipment
+Cloth,256x256,RGB,Seeded small woven checker,Linear mipmap linear,Linear,Repeat,Worker clothes and headwear
+Water,256x256,RGB,Seeded horizontal wave bands,Linear mipmap linear,Linear,Repeat,Nile
+Foliage,256x256,RGB,Seeded clustered mottling,Linear mipmap linear,Linear,Repeat,Floodplain and trees

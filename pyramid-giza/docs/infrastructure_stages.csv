@@ -1,0 +1,12 @@
+Infrastructure,PrimitiveReuse,MinProgress,MaxProgress,StageBehavior
+LowTemporaryRamp,Cube,0.05,0.48,Early access removed after lower-middle courses
+MiddleTemporaryRamp,Cube,0.38,0.82,Access migrates from middle to upper work
+SummitTemporaryRamp,Cube,0.70,0.985,Removed before completed presentation
+LowStageScaffold,Cube/Cylinder,0.12,0.58,Rigid shared-module access
+MiddleStageScaffold,Cube/Cylinder,0.42,0.86,Rigid shared-module access
+SummitStageScaffold,Cube/Cylinder,0.70,0.995,Removed at final completion
+PreparedRepository,Cube,0.08,0.965,Twelve stones deplete deterministically
+EarlyParkedSledge,Cube/Cylinder,0.10,0.68,Shared sledge composition
+LateParkedSledge,Cube/Cylinder,0.55,0.97,Shared sledge composition
+BackgroundWorkers,Cube/Cylinder/Sphere,0.04-0.28,0.90-1.01,Selected workers arrive and depart by role signature
+PulleyWheels,Cylinder,0.12-0.70,0.92-0.995,Speculative wheels rotate by transform and are stage-limited

@@ -13,9 +13,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "animation/AnimationValidation.h"
+#include "animation/ConstructionTimeline.h"
 #include "camera/CameraController.h"
 #include "camera/CameraValidation.h"
 #include "graphics/GeometryValidation.h"
+#include "graphics/Texture.h"
 #include "lighting/ShadowMap.h"
 #include "lighting/SunController.h"
 #include "objects/CompositeValidation.h"
@@ -24,6 +26,7 @@
 #include "scene/IndustrialLandscape.h"
 #include "scene/MonumentalSite.h"
 #include "scene/ObjectEnrichment.h"
+#include "scene/SceneIntegrity.h"
 #include "scene/StaticGizaScene.h"
 
 namespace
@@ -268,6 +271,41 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
         std::cout << "Shadow debug mode: "
                   << state->scene->shadowDebugModeName() << '\n';
     }
+    else if (key == GLFW_KEY_B && state->scene != nullptr)
+    {
+        state->scene->toggleConstructionTimelapse();
+        std::cout << "Construction timelapse toggled at "
+                  << state->scene->constructionProgress() * 100.0f << "% ("
+                  << state->scene->constructionStageName() << ").\n";
+    }
+    else if (key == GLFW_KEY_COMMA && state->scene != nullptr)
+    {
+        state->scene->adjustConstructionSpeed(-1);
+        std::cout << "Construction timelapse speed: "
+                  << state->scene->constructionSpeed() << "x\n";
+    }
+    else if (key == GLFW_KEY_PERIOD && state->scene != nullptr)
+    {
+        state->scene->adjustConstructionSpeed(1);
+        std::cout << "Construction timelapse speed: "
+                  << state->scene->constructionSpeed() << "x\n";
+    }
+    else if (key == GLFW_KEY_HOME && state->scene != nullptr)
+    {
+        state->scene->resetConstruction();
+        std::cout << "Construction timelapse reset to 0%.\n";
+    }
+    else if (key == GLFW_KEY_END && state->scene != nullptr)
+    {
+        state->scene->completeConstruction();
+        std::cout << "Construction timelapse set to 100%.\n";
+    }
+    else if (key == GLFW_KEY_X && state->scene != nullptr)
+    {
+        state->scene->toggleTextures();
+        std::cout << "Material textures: "
+                  << (state->scene->texturesEnabled() ? "ON" : "OFF") << '\n';
+    }
     else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9)
         setCameraPreset(*state, key - GLFW_KEY_0, (mods & GLFW_MOD_SHIFT) != 0);
 }
@@ -344,6 +382,9 @@ int main(int argc, char** argv)
     bool enrichmentValidationOnly = false;
     bool lightingValidationOnly = false;
     bool shadowValidationOnly = false;
+    bool constructionValidationOnly = false;
+    bool textureValidationOnly = false;
+    bool layoutValidationOnly = false;
     bool smokeTest = false;
     float smokeDurationSeconds = 0.0f;
     bool startWireframe = false;
@@ -354,6 +395,10 @@ int main(int argc, char** argv)
     bool sunTimeSpecified = false;
     bool startAutomaticSun = true;
     bool startWithShadows = true;
+    bool startWithTextures = true;
+    bool startTimelapse = false;
+    float initialConstructionProgress = ConstructionTimelineController::defaultProgress;
+    float initialConstructionSpeed = 1.0f;
     int shadowResolution = ShadowSettings::defaultResolution;
     LightingDebugMode initialLightingMode = LightingDebugMode::Normal;
     ShadowDebugMode initialShadowDebugMode = ShadowDebugMode::Normal;
@@ -384,6 +429,12 @@ int main(int argc, char** argv)
             lightingValidationOnly = true;
         else if (option == "--validate-shadows")
             shadowValidationOnly = true;
+        else if (option == "--validate-construction")
+            constructionValidationOnly = true;
+        else if (option == "--validate-textures")
+            textureValidationOnly = true;
+        else if (option == "--validate-layout")
+            layoutValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
         else if (option == "--smoke-duration" && argument + 1 < argc)
@@ -475,6 +526,46 @@ int main(int argc, char** argv)
             startWithShadows = true;
         else if (option == "--no-shadows")
             startWithShadows = false;
+        else if (option == "--textures")
+            startWithTextures = true;
+        else if (option == "--no-textures")
+            startWithTextures = false;
+        else if (option == "--timelapse")
+            startTimelapse = true;
+        else if (option == "--construction-progress" && argument + 1 < argc)
+        {
+            try
+            {
+                initialConstructionProgress = std::stof(argv[++argument]);
+            }
+            catch (...)
+            {
+                std::cerr << "Construction progress must be between 0 and 1.\n";
+                return 2;
+            }
+            if (initialConstructionProgress < 0.0f || initialConstructionProgress > 1.0f)
+            {
+                std::cerr << "Construction progress must be between 0 and 1.\n";
+                return 2;
+            }
+        }
+        else if (option == "--timelapse-speed" && argument + 1 < argc)
+        {
+            try
+            {
+                initialConstructionSpeed = std::stof(argv[++argument]);
+            }
+            catch (...)
+            {
+                std::cerr << "Timelapse speed must be between 0.25 and 8.\n";
+                return 2;
+            }
+            if (initialConstructionSpeed < 0.25f || initialConstructionSpeed > 8.0f)
+            {
+                std::cerr << "Timelapse speed must be between 0.25 and 8.\n";
+                return 2;
+            }
+        }
         else if (option == "--shadow-debug-factor")
             initialShadowDebugMode = ShadowDebugMode::Factor;
         else if (option == "--shadow-resolution" && argument + 1 < argc)
@@ -532,12 +623,21 @@ int main(int argc, char** argv)
         return validatePhase7Lighting(std::cout) ? 0 : 1;
     if (shadowValidationOnly)
         return validatePhase8Shadows(std::cout) ? 0 : 1;
+    if (constructionValidationOnly)
+        return validateConstructionTimeline(std::cout) ? 0 : 1;
+    if (textureValidationOnly)
+        return validatePhase9Textures(std::cout) ? 0 : 1;
+    if (layoutValidationOnly)
+        return validateSceneIntegrity(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
         !validateIndustrialLandscape(std::cout) || !validateCameraNavigation(std::cout) ||
         !validateObjectEnrichment(std::cout) || !validatePhase7Lighting(std::cout) ||
-        !validatePhase8Shadows(std::cout))
+        !validatePhase8Shadows(std::cout) ||
+        !validateConstructionTimeline(std::cout) ||
+        !validatePhase9Textures(std::cout) ||
+        !validateSceneIntegrity(std::cout))
         return 1;
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -557,7 +657,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 8 Directional Shadows",
+                                          "Pyramid at Giza - Phase 9 Integrated Construction",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -593,6 +693,7 @@ int main(int argc, char** argv)
                      "0 camera reset, O orbit, T transport follow, G guided demo, K camera info, "
                      "U automatic sun, [/] sun time, F1/F2/F3 morning/noon/evening, "
                      "V lighting debug, H shadows, J shadow-factor debug, "
+                     "X textures, B timelapse, ,/. timelapse speed, Home/End 0/100%, "
                      "C culling, F wireframe, Space pause, R animation reset, N next state, "
                      "L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
     }
@@ -628,12 +729,21 @@ int main(int argc, char** argv)
         scene.setLightingDebugMode(initialLightingMode);
         scene.setShadowsEnabled(startWithShadows);
         scene.setShadowDebugMode(initialShadowDebugMode);
+        scene.setTexturesEnabled(startWithTextures);
+        scene.setConstructionProgress(initialConstructionProgress);
+        scene.setConstructionSpeed(initialConstructionSpeed);
+        scene.setConstructionPlaying(startTimelapse);
         printSunState(scene, "Initial sun");
         std::cout << "Lighting debug mode: " << scene.lightingDebugModeName() << '\n';
         std::cout << "Directional shadows: " << (scene.shadowsEnabled() ? "ON" : "OFF")
                   << ", debug: " << scene.shadowDebugModeName()
                   << ", resolution: " << scene.shadowSettings().resolution << " x "
                   << scene.shadowSettings().resolution << '\n';
+        std::cout << "Material textures: " << (scene.texturesEnabled() ? "ON" : "OFF")
+                  << "; construction: " << scene.constructionProgress() * 100.0f
+                  << "% (" << scene.constructionStageName() << "), speed "
+                  << scene.constructionSpeed() << "x, timelapse "
+                  << (startTimelapse ? "PLAYING" : "PAUSED") << '\n';
         if (initialCameraMode == "orbit")
             state.cameraController.togglePyramidOrbit();
         else if (initialCameraMode == "follow")

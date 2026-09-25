@@ -84,7 +84,7 @@ bool validatePrimitiveFoundation(std::ostream& output)
     meshes.push_back({PrimitiveGenerator::createPyramid(), 16, 18});
     meshes.push_back({PrimitiveGenerator::createDisk(), 33, 96});
     meshes.push_back({PrimitiveGenerator::createCylinder(), 132, 384});
-    meshes.push_back({PrimitiveGenerator::createSphere(), 994, 5952});
+    meshes.push_back({PrimitiveGenerator::createSphere(), 1025, 5952});
 
     bool allValid = true;
     output << "Phase 1 CPU geometry validation\n";

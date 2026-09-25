@@ -13,6 +13,7 @@ Course project status:
 - **Phase 6.5 - Complete:** pre-Phase 7 machinery, access, workshop, repair, and river-logistics enrichment
 - **Phase 7 - Complete:** directional sun lighting, material response, and daylight control
 - **Phase 8 - Complete:** moving directional-sun shadow mapping with bias and 3x3 PCF
+- **Phase 9 - Complete:** scene integrity, independent construction timelapse, dynamic infrastructure, animation refinement, and procedural UV textures
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -50,6 +51,19 @@ sun moves the shadows from long morning silhouettes through shorter noon contact
 to long evening shadows in the opposite direction. Static and animated geometry use one
 shared per-frame transform list in both passes. With shadows enabled the depth and visible
 passes total approximately 18,926 maximum indexed draw calls.
+
+Phase 9 preserves the exact 7,561-block Phase 5.6 scene as the default 75-percent
+construction checkpoint and adds a deterministic 90-second timeline from foundation to
+the complete 7,714-block pyramid. Temporary ramps, scaffolds, repository stones,
+background workers, parked sledges, and speculative pulley wheels respond to the
+construction stage. The world ground now covers the calculated content bounds with
+34-71 units of horizontal margin and a presentation skirt.
+
+Seven deterministic procedural material textures use the existing UV attribute plus a
+shared white fallback. Textures are uploaded once, reused by all matching materials, and
+bound separately from the shadow map. The sphere now has an intentional U=0/U=1 seam
+duplicate. Maximum estimates are approximately 9,690 visible indexed draws and 19,380
+combined shadow plus visible draws.
 
 ## Build and run
 
@@ -91,6 +105,11 @@ build\PyramidGiza.exe
 - `H`: toggle directional shadows
 - `J`: toggle normal rendering / shadow-factor visualization
 
+- `X`: toggle procedural material textures
+- `B`: play/pause the independent construction timelapse
+- `,` / `.`: decrease/increase timelapse speed (0.25x to 8x)
+- `Home` / `End`: set construction progress to 0 / 100 percent
+
 ## Validation
 
 ```powershell
@@ -105,6 +124,9 @@ build\PyramidGiza.exe --validate-camera
 build\PyramidGiza.exe --validate-enrichment
 build\PyramidGiza.exe --validate-lighting
 build\PyramidGiza.exe --validate-shadows
+build\PyramidGiza.exe --validate-construction
+build\PyramidGiza.exe --validate-textures
+build\PyramidGiza.exe --validate-layout
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -116,6 +138,8 @@ normal|diffuse|specular|normals|unlit` support deterministic lighting checks.
 `--shadow-resolution 2048|4096` support deterministic shadow checks.
 `--smoke-duration SECONDS` keeps the hidden smoke-test renderer active for a timed
 animation regression (up to 60 seconds).
+Construction startup options are --construction-progress 0..1, --timelapse, and
+--timelapse-speed 0.25..8. Use --textures or --no-textures for A/B runtime checks.
 Build output and captures are ignored by Git.
 
 ## Documentation
@@ -131,8 +155,11 @@ Build output and captures are ignored by Git.
 - [Phase 6.5 object enrichment](docs/PHASE6_5_OBJECT_ENRICHMENT.md)
 - [Phase 7 lighting and sun](docs/PHASE7_LIGHTING_AND_SUN.md)
 - [Phase 8 directional shadow mapping](docs/PHASE8_SHADOW_MAPPING.md)
+- [Phase 9 integration, timelapse, and textures](docs/PHASE9_INTEGRATION_TIMELAPSE_TEXTURES.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
 pulley-rig, river-landing, workshop/repair, scaffold-access, material, sun-state, and
 lighting-control, shadow-setting, shadow-validation, and shadow-control tables.
+Phase 9 adds world-bounds, layout-validation, construction-timeline, construction-stage,
+infrastructure-stage, texture, UV-mapping, material-texture, and texture-control tables.

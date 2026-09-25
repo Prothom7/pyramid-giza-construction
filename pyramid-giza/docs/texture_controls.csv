@@ -1,0 +1,5 @@
+Input,Action,Scope,Notes
+X,Toggle procedural material textures,Runtime,Lighting shadows geometry and material base colors remain active
+--textures,Start with textures enabled,CLI,Default behavior
+--no-textures,Start with textures disabled,CLI,Useful A/B regression
+--validate-textures,Run texture registry determinism and UV checks,CLI,No OpenGL context required

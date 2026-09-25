@@ -79,7 +79,7 @@ Mouse or movement input cancels it immediately.
 ## Projection and zoom
 
 Preset FOV values are 48-52 degrees. Wheel zoom is constrained to 30-75 degrees. The near
-plane remains 0.7 and the far plane remains 550: sufficient for the Nile, quarry, wide-site,
+plane remains 0.7 and Phase 9 raises the far plane to 700: sufficient for the expanded ground, Nile, quarry, wide-site,
 and Sphinx views without adopting a depth-precision-damaging extreme ratio. Aspect ratio is
 read from the current framebuffer.
 

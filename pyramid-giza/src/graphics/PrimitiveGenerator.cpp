@@ -214,7 +214,8 @@ MeshData PrimitiveGenerator::createSphere(float radius, unsigned int latitudeSeg
 
     MeshData mesh{"Sphere"};
     const unsigned int ringCount = latitudeSegments - 1;
-    mesh.vertices.reserve(2 + ringCount * longitudeSegments);
+    const unsigned int ringStride = longitudeSegments + 1;
+    mesh.vertices.reserve(2 + ringCount * ringStride);
     mesh.indices.reserve(6 * longitudeSegments * (latitudeSegments - 1));
 
     mesh.vertices.push_back(makeVertex({0.0f, radius, 0.0f}, {0.0f, 1.0f, 0.0f},
@@ -226,7 +227,7 @@ MeshData PrimitiveGenerator::createSphere(float radius, unsigned int latitudeSeg
         const float ringRadius = radius * std::sin(phi);
         const float y = radius * std::cos(phi);
 
-        for (unsigned int longitude = 0; longitude < longitudeSegments; ++longitude)
+        for (unsigned int longitude = 0; longitude <= longitudeSegments; ++longitude)
         {
             const float u = static_cast<float>(longitude) /
                             static_cast<float>(longitudeSegments);
@@ -245,32 +246,31 @@ MeshData PrimitiveGenerator::createSphere(float radius, unsigned int latitudeSeg
     for (unsigned int longitude = 0; longitude < longitudeSegments; ++longitude)
     {
         const std::uint32_t current = firstRing + longitude;
-        const std::uint32_t next = firstRing + ((longitude + 1) % longitudeSegments);
+        const std::uint32_t next = current + 1;
         mesh.indices.insert(mesh.indices.end(), {0, next, current});
     }
 
     for (unsigned int ring = 0; ring + 1 < ringCount; ++ring)
     {
-        const std::uint32_t upper = firstRing + ring * longitudeSegments;
-        const std::uint32_t lower = upper + longitudeSegments;
+        const std::uint32_t upper = firstRing + ring * ringStride;
+        const std::uint32_t lower = upper + ringStride;
         for (unsigned int longitude = 0; longitude < longitudeSegments; ++longitude)
         {
-            const std::uint32_t nextLongitude = (longitude + 1) % longitudeSegments;
             const std::uint32_t upperCurrent = upper + longitude;
-            const std::uint32_t upperNext = upper + nextLongitude;
+            const std::uint32_t upperNext = upperCurrent + 1;
             const std::uint32_t lowerCurrent = lower + longitude;
-            const std::uint32_t lowerNext = lower + nextLongitude;
+            const std::uint32_t lowerNext = lowerCurrent + 1;
             mesh.indices.insert(mesh.indices.end(),
                                 {upperCurrent, upperNext, lowerCurrent,
                                  upperNext, lowerNext, lowerCurrent});
         }
     }
 
-    const std::uint32_t lastRing = firstRing + (ringCount - 1) * longitudeSegments;
+    const std::uint32_t lastRing = firstRing + (ringCount - 1) * ringStride;
     for (unsigned int longitude = 0; longitude < longitudeSegments; ++longitude)
     {
         const std::uint32_t current = lastRing + longitude;
-        const std::uint32_t next = lastRing + ((longitude + 1) % longitudeSegments);
+        const std::uint32_t next = current + 1;
         mesh.indices.insert(mesh.indices.end(), {current, next, bottomPole});
     }
     return mesh;

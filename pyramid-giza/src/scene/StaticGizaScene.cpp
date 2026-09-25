@@ -38,6 +38,7 @@ StaticGizaScene::StaticGizaScene(int shadowResolution)
 {
     shadowSettings_.resolution = shadowResolution;
     shadowMap_.initialize(shadowSettings_.resolution, shadowSettings_.resolution);
+    textures_.initialize();
     objects_.reserve(9800);
     frameObjects_.reserve(9800);
     workers_.reserve(44);
@@ -52,17 +53,31 @@ StaticGizaScene::StaticGizaScene(int shadowResolution)
     buildNileAndContext();
     buildHeavyLiftingRig();
     buildObjectEnrichment();
+    buildConstructionStages();
     buildCompositeObjects();
+
+    for (std::size_t index = heroWorkerCount; index < workers_.size(); ++index)
+    {
+        workers_[index].minimumConstructionProgress =
+            0.04f + 0.06f * static_cast<float>(index % 5u);
+        workers_[index].maximumConstructionProgress =
+            index % 4u == 0u ? 0.90f : 1.01f;
+    }
 
     // Maximum draw count includes the dynamic loaded sledge, two ropes,
     // the hand-attached mallet, and the three-part animated lever.
-    stats_.totalDrawCalls = objects_.size() + stats_.workerParts +
+    stats_.totalDrawCalls = objects_.size() + stagedObjects_.size() +
+                            dynamicPulleyWheels_.size() + pyramidBlocks_.size() +
+                            stats_.workerParts +
                             (loadedSledgeParts_.size() - 1) + 2 + 2 + 3;
     stats_.shadowDepthDrawCalls = stats_.totalDrawCalls;
     stats_.combinedDrawCalls = stats_.totalDrawCalls + stats_.shadowDepthDrawCalls;
 
+    PyramidLayoutConfig completeConfig = pyramidConfig_;
+    completeConfig.completedLevels = completeConfig.baseBlocksPerSide;
+    completeConfig.partialFromLevel = completeConfig.baseBlocksPerSide;
     const PyramidLayoutStats pyramidStats = PyramidLayout::statistics(
-        pyramidConfig_, PyramidLayout::generate(pyramidConfig_));
+        completeConfig, pyramidBlocks_);
     std::cout << "Monumental Giza site: " << stats_.pyramidBlocks << " pyramid blocks, "
               << stats_.totalDrawCalls << " maximum draw calls\n"
               << "Pyramid footprint: " << pyramidStats.baseWidth << " x "
@@ -82,6 +97,10 @@ StaticGizaScene::StaticGizaScene(int shadowResolution)
               << "Object enrichment: " << stats_.enrichmentObjects << " primitive instances, "
               << stats_.anchorPosts << " anchors, " << stats_.ladders << " ladders, "
               << stats_.boats << " boats, 1 workshop and 1 sledge-repair station\n";
+    std::cout << "Construction timeline: default " << constructionTimeline_.progress() * 100.0f
+              << "% = " << stats_.pyramidBlocks << " visible blocks, final "
+              << pyramidBlocks_.size() << " blocks; procedural textures use approximately "
+              << textures_.memoryBytes() / 1024u << " KiB\n";
     std::cout << "Directional shadow framebuffer complete: " << shadowMap_.width() << " x "
               << shadowMap_.height() << " D24, " << stats_.shadowDepthDrawCalls
               << " depth draws, " << stats_.combinedDrawCalls
@@ -133,32 +152,39 @@ void StaticGizaScene::addStaticSledge(const glm::vec3& position, float rotationY
 
 void StaticGizaScene::buildGround()
 {
-    // Four plateau slabs leave an actual opening for the recessed open-cut quarry.
+    // Four expanded slabs cover all content with a presentation margin while
+    // retaining an actual opening for the recessed open-cut quarry.
     addObject(ScenePrimitive::Plane,
-              makeTransform({-179.0f, -0.02f, -30.0f}, {}, {42.0f, 1.0f, 300.0f}),
+              makeTransform({-184.0f, -0.02f, -45.0f}, {}, {52.0f, 1.0f, 330.0f}),
               MaterialId::Sand);
     addObject(ScenePrimitive::Plane,
-              makeTransform({31.0f, -0.02f, -30.0f}, {}, {258.0f, 1.0f, 300.0f}),
+              makeTransform({56.0f, -0.02f, -45.0f}, {}, {308.0f, 1.0f, 330.0f}),
               MaterialId::Sand);
     addObject(ScenePrimitive::Plane,
-              makeTransform({-128.0f, -0.02f, 57.5f}, {}, {60.0f, 1.0f, 85.0f}),
+              makeTransform({-128.0f, -0.02f, 67.5f}, {}, {60.0f, 1.0f, 105.0f}),
               MaterialId::Sand);
     addObject(ScenePrimitive::Plane,
-              makeTransform({-128.0f, -0.02f, -117.5f}, {}, {60.0f, 1.0f, 125.0f}),
+              makeTransform({-128.0f, -0.02f, -132.5f}, {}, {60.0f, 1.0f, 155.0f}),
               MaterialId::Sand);
+    addObject(ScenePrimitive::Cube,
+              makeTransform({-211.5f, -0.32f, -45.0f}, {}, {3.0f, 0.6f, 336.0f}),
+              MaterialId::RampEarth);
+    addObject(ScenePrimitive::Cube,
+              makeTransform({211.5f, -0.32f, -45.0f}, {}, {3.0f, 0.6f, 336.0f}),
+              MaterialId::RampEarth);
+    addObject(ScenePrimitive::Cube,
+              makeTransform({0.0f, -0.32f, -211.5f}, {}, {420.0f, 0.6f, 3.0f}),
+              MaterialId::RampEarth);
+    addObject(ScenePrimitive::Cube,
+              makeTransform({0.0f, -0.32f, 121.5f}, {}, {420.0f, 0.6f, 3.0f}),
+              MaterialId::RampEarth);
 }
 
 void StaticGizaScene::buildPyramid()
 {
-    const std::vector<PyramidBlockPlacement> blocks = PyramidLayout::generate(pyramidConfig_);
-    for (const PyramidBlockPlacement& block : blocks)
-    {
-        const MaterialId material = (block.level % 4 == 1 || block.level % 4 == 2)
-                                        ? MaterialId::LimestoneVariation
-                                        : MaterialId::Limestone;
-        addObject(ScenePrimitive::Cube, makeTransform(block.position, {}, block.scale), material);
-    }
-    stats_.pyramidBlocks = blocks.size();
+    pyramidBlocks_ = PyramidLayout::generateComplete(pyramidConfig_);
+    stats_.pyramidBlocks =
+        constructionTimeline_.visibleBlockCount(pyramidBlocks_, pyramidConfig_);
 }
 
 void StaticGizaScene::buildTransportLanes()
@@ -715,9 +741,76 @@ void StaticGizaScene::buildObjectEnrichment()
     buildWorkshopRepairAndInspection();
     buildRiverLanding();
     buildUpperPlatformDetails();
-    stats_.enrichmentObjects = objects_.size() - start;
+    stats_.enrichmentObjects = objects_.size() - start + dynamicPulleyWheels_.size();
     if (stats_.enrichmentObjects != ObjectEnrichment::expectedStaticInstances)
         throw std::runtime_error("Object-enrichment instance count changed unexpectedly");
+}
+
+void StaticGizaScene::buildConstructionStages()
+{
+    const auto addStaged = [this](ScenePrimitive primitive, const glm::mat4& model,
+                                  MaterialId material, float minimum, float maximum)
+    {
+        if (!isFiniteNonSingularTransform(model))
+            throw std::runtime_error("Staged infrastructure has an invalid transform");
+        stagedObjects_.push_back({{primitive, model, material}, minimum, maximum});
+    };
+
+    // Temporary access ramps migrate upward and are removed as the summit closes.
+    addStaged(ScenePrimitive::Cube,
+              makeTransform({-34.0f, 2.0f, -9.0f}, {0.0f, 0.0f, -7.0f},
+                            {18.0f, 0.65f, 4.0f}),
+              MaterialId::RampEarth, 0.05f, 0.48f);
+    addStaged(ScenePrimitive::Cube,
+              makeTransform({25.0f, 10.0f, -17.0f}, {0.0f, -24.0f, -10.0f},
+                            {15.0f, 0.58f, 3.6f}),
+              MaterialId::RampEarth, 0.38f, 0.82f);
+    addStaged(ScenePrimitive::Cube,
+              makeTransform({8.0f, 19.0f, -33.0f}, {0.0f, -18.0f, -12.0f},
+                            {11.0f, 0.50f, 3.1f}),
+              MaterialId::RampEarth, 0.70f, 0.985f);
+
+    const std::vector<ObjectPart> scaffold = Scaffold::createModule();
+    const struct StageScaffold
+    {
+        glm::vec3 position;
+        float minimum;
+        float maximum;
+    } scaffolds[]{{{-30.0f, 5.4f, -5.5f}, 0.12f, 0.58f},
+                  {{22.0f, 10.8f, -12.0f}, 0.42f, 0.86f},
+                  {{7.0f, 18.9f, -31.0f}, 0.70f, 0.995f}};
+    for (const StageScaffold& placement : scaffolds)
+        for (const ObjectPart& part : scaffold)
+            addStaged(part.primitive,
+                      makeTransform(placement.position, {}, {1.0f, 1.0f, 1.0f}) *
+                          part.localTransform,
+                      part.material, placement.minimum, placement.maximum);
+
+    for (int block = 0; block < 12; ++block)
+    {
+        const int row = block / 4;
+        const int column = block % 4;
+        addStaged(ScenePrimitive::Cube,
+                  makeTransform({-38.0f + column * 3.1f, 1.0f,
+                                 43.0f + row * 3.2f}, {},
+                                {2.75f, 2.0f, 2.75f}),
+                  MaterialId::PreparedStone, 0.08f,
+                  0.58f + 0.035f * static_cast<float>(block));
+    }
+
+    const std::vector<ObjectPart> emptySledge = Sledge::create(false);
+    for (const auto& stagedSledge :
+         {std::pair<glm::mat4, glm::vec2>{
+              makeTransform({-63.0f, 0.0f, 44.0f}, {0.0f, 72.0f, 0.0f},
+                            {1.0f, 1.0f, 1.0f}),
+              {0.10f, 0.68f}},
+          std::pair<glm::mat4, glm::vec2>{
+              makeTransform({-22.0f, 0.0f, 50.0f}, {0.0f, 18.0f, 0.0f},
+                            {1.0f, 1.0f, 1.0f}),
+              {0.55f, 0.97f}}})
+        for (const ObjectPart& part : emptySledge)
+            addStaged(part.primitive, stagedSledge.first * part.localTransform,
+                      part.material, stagedSledge.second.x, stagedSledge.second.y);
 }
 
 void StaticGizaScene::buildRopeInfrastructure()
@@ -779,10 +872,12 @@ void StaticGizaScene::buildRopeInfrastructure()
             const float x = (static_cast<float>(wheel) -
                              0.5f * static_cast<float>(rig.wheelCount - 1)) * wheelSpacing;
             wheelCenter.x = x;
-            addObject(ScenePrimitive::Cylinder,
-                      root * makeTransform(wheelCenter, {90.0f, 0.0f, 0.0f},
-                                           {0.92f, 0.32f, 0.92f}),
-                      MaterialId::Wood);
+            const std::size_t rigIndex = dynamicPulleyWheels_.size();
+            dynamicPulleyWheels_.push_back({
+                root, wheelCenter, {0.92f, 0.32f, 0.92f},
+                31.0f * static_cast<float>(rigIndex),
+                std::min(0.70f, 0.12f + 0.14f * static_cast<float>(rigIndex)),
+                rig.type == RopeRigType::AFrameLift ? 0.995f : 0.92f});
             addObject(ScenePrimitive::Cylinder,
                       root * makeTransform(wheelCenter, {90.0f, 0.0f, 0.0f},
                                            {0.18f, rig.depth + 0.50f, 0.18f}),
@@ -1267,8 +1362,9 @@ void StaticGizaScene::buildCompositeObjects()
 
 void StaticGizaScene::update(float deltaTime)
 {
-    // Construction animation and time of day are intentionally independent.
+    // Hero animation, timelapse, and time of day are intentionally independent.
     sunController_.update(deltaTime);
+    constructionTimeline_.update(deltaTime);
     if (coordinatedAnimationEnabled_)
         animationController_.update(deltaTime);
     else if (articulationPreviewEnabled_ && std::isfinite(deltaTime) && deltaTime > 0.0f)
@@ -1413,6 +1509,45 @@ void StaticGizaScene::collectFrameObjects()
 {
     frameObjects_.clear();
     frameObjects_.insert(frameObjects_.end(), objects_.begin(), objects_.end());
+    const float constructionProgress = constructionTimeline_.progress();
+    for (const StagedSceneObject& staged : stagedObjects_)
+        if (constructionProgress >= staged.minimumProgress &&
+            constructionProgress <= staged.maximumProgress)
+            frameObjects_.push_back(staged.object);
+
+    for (const DynamicPulleyWheel& wheel : dynamicPulleyWheels_)
+    {
+        if (constructionProgress < wheel.minimumProgress ||
+            constructionProgress > wheel.maximumProgress)
+            continue;
+        const float spin = wheel.phase + constructionProgress * 1440.0f +
+                           animationController_.elapsedTime() * 35.0f;
+        glm::mat4 model = glm::translate(wheel.root, wheel.center);
+        model = glm::rotate(model, glm::radians(90.0f), {1.0f, 0.0f, 0.0f});
+        model = glm::rotate(model, glm::radians(spin), {0.0f, 1.0f, 0.0f});
+        model = glm::scale(model, wheel.scale);
+        frameObjects_.push_back({ScenePrimitive::Cylinder, model, MaterialId::Wood});
+    }
+
+    for (const PyramidBlockPlacement& block : pyramidBlocks_)
+    {
+        const ConstructionBlockState state =
+            constructionTimeline_.blockState(block, pyramidConfig_);
+        if (!state.visible)
+            continue;
+        glm::vec3 position = block.position;
+        if (state.frontier)
+        {
+            const float remaining = 1.0f - state.placementAmount;
+            position += glm::vec3{remaining * 2.0f, remaining * 4.0f,
+                                  remaining * 1.2f};
+        }
+        const MaterialId material = (block.level % 4 == 1 || block.level % 4 == 2)
+                                        ? MaterialId::LimestoneVariation
+                                        : MaterialId::Limestone;
+        frameObjects_.push_back({ScenePrimitive::Cube,
+                                 makeTransform(position, {}, block.scale), material});
+    }
 
     const auto drawPart = [&](ScenePrimitive primitive, const glm::mat4& model,
                               MaterialId materialId) {
@@ -1424,6 +1559,9 @@ void StaticGizaScene::collectFrameObjects()
     for (std::size_t index = 0; index < workers_.size(); ++index)
     {
         const WorkerInstance& worker = workers_[index];
+        if (constructionProgress < worker.minimumConstructionProgress ||
+            constructionProgress > worker.maximumConstructionProgress)
+            continue;
         glm::mat4 root = worker.root;
         WorkerJointAngles angles = worker.jointAngles;
         if (coordinatedAnimationEnabled_ && worker.isHero && index < heroWorkerCount)
@@ -1560,6 +1698,8 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
     shader_.setFloat("shadowStrength", shadowSettings_.shadowStrength);
     shadowMap_.bindDepthTexture(0);
     shader_.setInt("shadowMap", 0);
+    shader_.setInt("materialTexture", 1);
+    shader_.setInt("texturesEnabled", texturesEnabled_ ? 1 : 0);
 
     for (const SceneObject& object : frameObjects_)
     {
@@ -1572,6 +1712,10 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         shader_.setFloat("materialDiffuse", material.diffuseStrength);
         shader_.setFloat("materialSpecular", material.specularStrength);
         shader_.setFloat("materialShininess", material.shininess);
+        shader_.setVec2("materialTextureScale", material.textureScale);
+        shader_.setVec2("materialTextureOffset", material.textureOffset);
+        shader_.setFloat("materialTextureBlend", material.textureBlend);
+        textures_.bind(material.texture, 1);
         meshFor(object.primitive).draw();
     }
 }

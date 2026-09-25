@@ -1,4 +1,4 @@
 Shape,Generation Method,Radius,Height,Segments,Latitude Segments,Longitude Segments,Formula,Expected Vertex Count,Expected Index Count,Expected Triangle Count,Notes
 Disk,Angular rim plus center,0.5,,32,,,"theta=2*pi*i/S; x=r*cos(theta); z=r*sin(theta)",S+1 = 33,3S = 96,S = 32,Modulo closes rim and final draw mode is GL_TRIANGLES
 Cylinder,Rotate vertical profile around Y,0.5,1.0,32,,,"theta=2*pi*i/S; side normal=(cos(theta);0;sin(theta))",4S+4 = 132,12S = 384,4S = 128,Side seam and cap normal domains require attribute duplication
-Sphere,Latitude and longitude angular sampling,0.5,,,32,32,"x=r*sin(phi)*cos(theta); y=r*cos(phi); z=r*sin(phi)*sin(theta)",2+(L-1)S = 994,6S(L-1) = 5952,2S(L-1) = 1984,Single pole vertices avoid degenerate pole quads
+Sphere,Latitude and longitude angular sampling,0.5,,,32,32,"x=r*sin(phi)*cos(theta); y=r*cos(phi); z=r*sin(phi)*sin(theta)",2+(L-1)(S+1) = 1025,6S(L-1) = 5952,2S(L-1) = 1984,Single pole vertices avoid degenerate pole quads; each ring duplicates the U=0 position at U=1

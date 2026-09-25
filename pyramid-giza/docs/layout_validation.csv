@@ -1,0 +1,11 @@
+Check,Result,CountOrValue,ExemptionOrReason
+Zone transforms finite,Pass,13,None
+Content inside ground coverage,Pass,All zones,None
+Horizontal safety margin,Pass,43/43/34/71,Minimum required 30
+Intentional zone overlaps,Pass,16,Workflow interfaces between extraction repositories loading ramp scaffold camp and monument
+Unexpected zone overlaps,Pass,0,None
+Quarry opening,Pass,60 by 70 approximate,Intentional recessed open-cut void
+Hero transport samples,Pass,101,Path remains inside ground and consecutive samples under 3 units
+Camera far coverage,Pass,700 vs 542.561,Near remains 0.7 for depth precision
+Shadow horizontal coverage,Pass,470 by 470,Content AABB lies inside Phase 8 light volume
+Board-edge treatment,Pass,Four low perimeter skirt cuboids,Presentation boundary not physical world wall

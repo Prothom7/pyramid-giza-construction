@@ -145,7 +145,7 @@ as `normalMatrix`. The showcase's stretched cuboid is an explicit visual test of
 | Pyramid | four separately normaled side triangles plus four base vertices | 16 | 18 | 6 |
 | Disk (32) | center plus 32 angular rim samples | 33 | 96 | 32 |
 | Cylinder (32) | indexed side plus independent top and bottom caps | 132 | 384 | 128 |
-| Sphere (32 x 32) | two poles plus 31 rings of 32 vertices | 994 | 5952 | 1984 |
+| Sphere (32 x 32) | two poles plus 31 rings of 33 seam-aware vertices | 1025 | 5952 | 1984 |
 
 ### Triangle and plane
 
