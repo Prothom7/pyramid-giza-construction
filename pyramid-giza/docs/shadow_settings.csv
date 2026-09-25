@@ -1,0 +1,23 @@
+Setting,Value,Purpose,Notes
+Default resolution,4096 x 4096,Site-wide depth-map detail,2048 is available through CLI and was runtime-tested
+Depth format,GL_DEPTH_COMPONENT24,Store closest light-space depth,One shared depth texture
+Min filter,GL_NEAREST,Manual depth sampling,PCF is performed explicitly in GLSL
+Mag filter,GL_NEAREST,Manual depth sampling,PCF is performed explicitly in GLSL
+Wrap S/T,GL_CLAMP_TO_BORDER,Prevent repeated edge depths,Border depth is 1.0
+Shadow texture unit,0,Bind depth texture for lit pass,No material textures currently conflict
+Shadow center,"(-20 18 -8)",Stable active-site focus,Independent of the viewer camera
+Light distance,320,Position directional-light camera,Position is center minus sunDirection times distance
+Orthographic left/right,-235 / +235,Cover active world width,470-unit light-space span
+Orthographic bottom/top,-235 / +235,Cover active world height,470-unit light-space span
+Near plane,1,Light-space depth start,Positive and close to light camera
+Far plane,700,Light-space depth end,Covers quarry depth through pyramid/scaffolds
+Minimum bias,0.00035,Reduce front-facing acne,Tuned against block tops and ground
+Slope bias,0.0025,Reduce grazing-angle acne,Scaled by one minus N dot L
+PCF kernel,3 x 3,Soften jagged shadow edges,9 manual depth comparisons
+Shadow strength,0.90,Retain readability in shadow,Ambient remains unshadowed
+Polygon offset,Disabled,Avoid redundant detachment control,Bias alone was sufficient
+Depth culling,Inherit active state / normally GL_BACK,Keep thin casters,Front-face culling was not used
+Caster exclusions,None,Keep complete scene consistency,All shared frame objects enter depth pass
+Visible draw calls,9463 maximum,Normal Phase 7 camera pass,Unchanged
+Depth draw calls,9463 maximum,Phase 8 sun pass,Skipped when shadows are disabled
+Combined draw calls,18926 maximum,Shadowed frame total,No instancing rewrite

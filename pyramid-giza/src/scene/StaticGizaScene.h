@@ -8,6 +8,7 @@
 #include "Shader.h"
 #include "animation/ConstructionAnimation.h"
 #include "graphics/Mesh.h"
+#include "lighting/ShadowMap.h"
 #include "lighting/SunController.h"
 #include "objects/Worker.h"
 #include "scene/PyramidLayout.h"
@@ -45,15 +46,18 @@ struct StaticGizaSceneStats
     std::size_t sledgeInstances = 0;
     std::size_t compositeEquipmentParts = 0;
     std::size_t totalDrawCalls = 0;
+    std::size_t shadowDepthDrawCalls = 0;
+    std::size_t combinedDrawCalls = 0;
 };
 
 class StaticGizaScene
 {
 public:
-    StaticGizaScene();
+    explicit StaticGizaScene(int shadowResolution = ShadowSettings::defaultResolution);
 
     void render(const glm::mat4& view, const glm::mat4& projection,
-                const glm::vec3& cameraPosition);
+                const glm::vec3& cameraPosition,
+                int viewportWidth, int viewportHeight);
     void update(float deltaTime);
     void togglePlayback();
     void toggleCoordinatedAnimation();
@@ -71,6 +75,14 @@ public:
     void setSunAutomatic(bool enabled);
     void cycleLightingDebugMode();
     void setLightingDebugMode(LightingDebugMode mode);
+    void toggleShadows() { shadowsEnabled_ = !shadowsEnabled_; }
+    void setShadowsEnabled(bool enabled) { shadowsEnabled_ = enabled; }
+    bool shadowsEnabled() const { return shadowsEnabled_; }
+    void cycleShadowDebugMode();
+    void setShadowDebugMode(ShadowDebugMode mode);
+    ShadowDebugMode shadowDebugMode() const { return shadowDebugMode_; }
+    const char* shadowDebugModeName() const;
+    const ShadowSettings& shadowSettings() const { return shadowSettings_; }
     bool animationPaused() const { return animationController_.paused(); }
     bool animationLooping() const { return animationController_.looping(); }
     bool coordinatedAnimationEnabled() const { return coordinatedAnimationEnabled_; }
@@ -129,15 +141,20 @@ private:
     void buildRiverLanding();
     void buildUpperPlatformDetails();
     void buildCompositeObjects();
+    void collectFrameObjects();
     const Mesh& meshFor(ScenePrimitive primitive) const;
 
     Shader shader_;
+    Shader depthShader_;
+    ShadowMap shadowMap_;
+    ShadowSettings shadowSettings_;
     Mesh plane_;
     Mesh cube_;
     Mesh cylinder_;
     Mesh sphere_;
     PyramidLayoutConfig pyramidConfig_;
     std::vector<SceneObject> objects_;
+    std::vector<SceneObject> frameObjects_;
     std::vector<WorkerInstance> workers_;
     std::vector<ObjectPart> loadedSledgeParts_;
     ConstructionAnimationController animationController_;
@@ -147,5 +164,7 @@ private:
     float articulationSpeed_ = 1.0f;
     bool articulationPreviewEnabled_ = true;
     bool coordinatedAnimationEnabled_ = true;
+    bool shadowsEnabled_ = true;
+    ShadowDebugMode shadowDebugMode_ = ShadowDebugMode::Normal;
     StaticGizaSceneStats stats_;
 };

@@ -1,0 +1,12 @@
+Key,Action,Default,Notes
+H,Toggle directional shadows,ON,OFF skips the depth pass and reproduces Phase 7 lighting
+J,Cycle shadow debug mode,Normal,Factor mode uses white for lit and dark for shadowed
+U,Toggle automatic daylight,ON,Sun motion recomputes the light-space matrix and depth map
+Left Bracket,Move sun backward by 0.5 hours,08:00,Switches automatic daylight off
+Right Bracket,Move sun forward by 0.5 hours,08:00,Switches automatic daylight off
+F1,Select morning shadow state,08:00,Long morning shadows
+F2,Select noon shadow state,12:00,Shorter high-sun shadows
+F3,Select evening shadow state,17:00,Long opposite-direction shadows
+V,Cycle Phase 7 lighting debug,Normal,Normals and unlit modes ignore shadowing
+C,Toggle face culling,ON,Depth pass inherits the active culling state
+F,Toggle visible wireframe,OFF,Depth pass remains filled and restores visible polygon mode

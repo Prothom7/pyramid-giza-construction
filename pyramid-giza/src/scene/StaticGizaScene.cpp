@@ -5,6 +5,7 @@
 #include <iostream>
 #include <stdexcept>
 
+#include <glad/glad.h>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -27,14 +28,18 @@ glm::vec3 rampSide(const RampDescriptor& ramp)
 }
 } // namespace
 
-StaticGizaScene::StaticGizaScene()
+StaticGizaScene::StaticGizaScene(int shadowResolution)
     : shader_("shaders/basic.vert", "shaders/basic.frag"),
+      depthShader_("shaders/shadow_depth.vert", "shaders/shadow_depth.frag"),
       plane_(PrimitiveGenerator::createPlane()),
       cube_(PrimitiveGenerator::createCube()),
       cylinder_(PrimitiveGenerator::createCylinder()),
       sphere_(PrimitiveGenerator::createSphere())
 {
+    shadowSettings_.resolution = shadowResolution;
+    shadowMap_.initialize(shadowSettings_.resolution, shadowSettings_.resolution);
     objects_.reserve(9800);
+    frameObjects_.reserve(9800);
     workers_.reserve(44);
     buildGround();
     buildPyramid();
@@ -53,6 +58,8 @@ StaticGizaScene::StaticGizaScene()
     // the hand-attached mallet, and the three-part animated lever.
     stats_.totalDrawCalls = objects_.size() + stats_.workerParts +
                             (loadedSledgeParts_.size() - 1) + 2 + 2 + 3;
+    stats_.shadowDepthDrawCalls = stats_.totalDrawCalls;
+    stats_.combinedDrawCalls = stats_.totalDrawCalls + stats_.shadowDepthDrawCalls;
 
     const PyramidLayoutStats pyramidStats = PyramidLayout::statistics(
         pyramidConfig_, PyramidLayout::generate(pyramidConfig_));
@@ -75,6 +82,10 @@ StaticGizaScene::StaticGizaScene()
               << "Object enrichment: " << stats_.enrichmentObjects << " primitive instances, "
               << stats_.anchorPosts << " anchors, " << stats_.ladders << " ladders, "
               << stats_.boats << " boats, 1 workshop and 1 sledge-repair station\n";
+    std::cout << "Directional shadow framebuffer complete: " << shadowMap_.width() << " x "
+              << shadowMap_.height() << " D24, " << stats_.shadowDepthDrawCalls
+              << " depth draws, " << stats_.combinedDrawCalls
+              << " maximum combined draws\n";
 }
 
 void StaticGizaScene::addObject(ScenePrimitive primitive, const glm::mat4& model,
@@ -1358,6 +1369,30 @@ void StaticGizaScene::setLightingDebugMode(LightingDebugMode mode)
     sunController_.setDebugMode(mode);
 }
 
+void StaticGizaScene::cycleShadowDebugMode()
+{
+    const int count = static_cast<int>(ShadowDebugMode::Count);
+    const int next = (static_cast<int>(shadowDebugMode_) + 1) % count;
+    shadowDebugMode_ = static_cast<ShadowDebugMode>(next);
+}
+
+void StaticGizaScene::setShadowDebugMode(ShadowDebugMode mode)
+{
+    const int value = static_cast<int>(mode);
+    if (value >= 0 && value < static_cast<int>(ShadowDebugMode::Count))
+        shadowDebugMode_ = mode;
+}
+
+const char* StaticGizaScene::shadowDebugModeName() const
+{
+    switch (shadowDebugMode_)
+    {
+    case ShadowDebugMode::Normal: return "Normal shadowed render";
+    case ShadowDebugMode::Factor: return "Shadow factor (white lit, dark shadow)";
+    default: return "Unknown";
+    }
+}
+
 const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
 {
     switch (primitive)
@@ -1374,36 +1409,15 @@ const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
     }
 }
 
-void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
-                             const glm::vec3& cameraPosition)
+void StaticGizaScene::collectFrameObjects()
 {
-    shader_.use();
-    shader_.setMat4("view", view);
-    shader_.setMat4("projection", projection);
-    shader_.setVec3("viewPosition", cameraPosition);
-    const SunState& sun = sunController_.state();
-    shader_.setVec3("sunDirection", sun.light.direction);
-    shader_.setVec3("sunColor", sun.light.color);
-    shader_.setFloat("sunIntensity", sun.light.intensity);
-    shader_.setVec3("ambientColor", sun.ambientColor);
-    shader_.setFloat("ambientIntensity", sun.ambientIntensity);
-    shader_.setInt("lightingDebugMode", static_cast<int>(sunController_.debugMode()));
+    frameObjects_.clear();
+    frameObjects_.insert(frameObjects_.end(), objects_.begin(), objects_.end());
 
     const auto drawPart = [&](ScenePrimitive primitive, const glm::mat4& model,
                               MaterialId materialId) {
-        shader_.setMat4("model", model);
-        shader_.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
-        const Material& material = materialDefinition(materialId);
-        shader_.setVec3("materialBaseColor", material.baseColor);
-        shader_.setFloat("materialAmbient", material.ambientStrength);
-        shader_.setFloat("materialDiffuse", material.diffuseStrength);
-        shader_.setFloat("materialSpecular", material.specularStrength);
-        shader_.setFloat("materialShininess", material.shininess);
-        meshFor(primitive).draw();
+        frameObjects_.push_back({primitive, model, materialId});
     };
-
-    for (const SceneObject& object : objects_)
-        drawPart(object.primitive, object.model, object.material);
 
     const ConstructionAnimationSnapshot animation = animationController_.snapshot();
     std::vector<Worker::EvaluatedPose> evaluatedWorkers(workers_.size());
@@ -1497,4 +1511,67 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
     drawPart(ScenePrimitive::Cube,
              ConstructionAnimationController::leverStoneModel(liftOffset),
              MaterialId::PreparedStone);
+}
+
+void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
+                             const glm::vec3& cameraPosition,
+                             int viewportWidth, int viewportHeight)
+{
+    collectFrameObjects();
+    const SunState& sun = sunController_.state();
+    const LightSpaceState lightSpace =
+        calculateLightSpace(sun.light.direction, shadowSettings_);
+
+    if (shadowsEnabled_)
+    {
+        GLint polygonMode[2] = {GL_FILL, GL_FILL};
+        glGetIntegerv(GL_POLYGON_MODE, polygonMode);
+        // The visible pass may be wireframe, but the depth map must contain filled
+        // triangles. Culling state is deliberately inherited (normally GL_BACK) so
+        // thin ropes, ladders, limbs, and scaffold pieces remain reliable casters.
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        shadowMap_.beginDepthPass();
+        depthShader_.use();
+        depthShader_.setMat4("lightSpaceMatrix", lightSpace.matrix);
+        for (const SceneObject& object : frameObjects_)
+        {
+            depthShader_.setMat4("model", object.model);
+            meshFor(object.primitive).draw();
+        }
+        shadowMap_.endDepthPass(viewportWidth, viewportHeight);
+        glPolygonMode(GL_FRONT_AND_BACK, polygonMode[0]);
+    }
+
+    shader_.use();
+    shader_.setMat4("view", view);
+    shader_.setMat4("projection", projection);
+    shader_.setMat4("lightSpaceMatrix", lightSpace.matrix);
+    shader_.setVec3("viewPosition", cameraPosition);
+    shader_.setVec3("sunDirection", sun.light.direction);
+    shader_.setVec3("sunColor", sun.light.color);
+    shader_.setFloat("sunIntensity", sun.light.intensity);
+    shader_.setVec3("ambientColor", sun.ambientColor);
+    shader_.setFloat("ambientIntensity", sun.ambientIntensity);
+    shader_.setInt("lightingDebugMode", static_cast<int>(sunController_.debugMode()));
+    shader_.setInt("shadowsEnabled", shadowsEnabled_ ? 1 : 0);
+    shader_.setInt("shadowDebugMode", static_cast<int>(shadowDebugMode_));
+    shader_.setFloat("shadowMinimumBias", shadowSettings_.minimumBias);
+    shader_.setFloat("shadowSlopeBias", shadowSettings_.slopeBias);
+    shader_.setFloat("shadowStrength", shadowSettings_.shadowStrength);
+    shadowMap_.bindDepthTexture(0);
+    shader_.setInt("shadowMap", 0);
+
+    for (const SceneObject& object : frameObjects_)
+    {
+        shader_.setMat4("model", object.model);
+        shader_.setMat3("normalMatrix",
+                        glm::transpose(glm::inverse(glm::mat3(object.model))));
+        const Material& material = materialDefinition(object.material);
+        shader_.setVec3("materialBaseColor", material.baseColor);
+        shader_.setFloat("materialAmbient", material.ambientStrength);
+        shader_.setFloat("materialDiffuse", material.diffuseStrength);
+        shader_.setFloat("materialSpecular", material.specularStrength);
+        shader_.setFloat("materialShininess", material.shininess);
+        meshFor(object.primitive).draw();
+    }
 }

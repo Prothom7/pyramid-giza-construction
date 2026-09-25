@@ -16,6 +16,7 @@
 #include "camera/CameraController.h"
 #include "camera/CameraValidation.h"
 #include "graphics/GeometryValidation.h"
+#include "lighting/ShadowMap.h"
 #include "lighting/SunController.h"
 #include "objects/CompositeValidation.h"
 #include "objects/WorkerHierarchyValidation.h"
@@ -255,6 +256,18 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
         std::cout << "Lighting debug mode: "
                   << state->scene->lightingDebugModeName() << '\n';
     }
+    else if (key == GLFW_KEY_H && state->scene != nullptr)
+    {
+        state->scene->toggleShadows();
+        std::cout << "Directional shadows: "
+                  << (state->scene->shadowsEnabled() ? "ON" : "OFF") << '\n';
+    }
+    else if (key == GLFW_KEY_J && state->scene != nullptr)
+    {
+        state->scene->cycleShadowDebugMode();
+        std::cout << "Shadow debug mode: "
+                  << state->scene->shadowDebugModeName() << '\n';
+    }
     else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9)
         setCameraPreset(*state, key - GLFW_KEY_0, (mods & GLFW_MOD_SHIFT) != 0);
 }
@@ -330,7 +343,9 @@ int main(int argc, char** argv)
     bool cameraValidationOnly = false;
     bool enrichmentValidationOnly = false;
     bool lightingValidationOnly = false;
+    bool shadowValidationOnly = false;
     bool smokeTest = false;
+    float smokeDurationSeconds = 0.0f;
     bool startWireframe = false;
     bool startWithCulling = true;
     int cameraPreset = 1;
@@ -338,7 +353,10 @@ int main(int argc, char** argv)
     float initialSunTime = SunController::morningTime;
     bool sunTimeSpecified = false;
     bool startAutomaticSun = true;
+    bool startWithShadows = true;
+    int shadowResolution = ShadowSettings::defaultResolution;
     LightingDebugMode initialLightingMode = LightingDebugMode::Normal;
+    ShadowDebugMode initialShadowDebugMode = ShadowDebugMode::Normal;
     std::string capturePath;
     std::string initialCameraMode = "free";
     for (int argument = 1; argument < argc; ++argument)
@@ -364,8 +382,28 @@ int main(int argc, char** argv)
             enrichmentValidationOnly = true;
         else if (option == "--validate-lighting")
             lightingValidationOnly = true;
+        else if (option == "--validate-shadows")
+            shadowValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
+        else if (option == "--smoke-duration" && argument + 1 < argc)
+        {
+            try
+            {
+                smokeDurationSeconds = std::stof(argv[++argument]);
+            }
+            catch (...)
+            {
+                std::cerr << "Smoke duration must be between 0 and 60 seconds.\n";
+                return 2;
+            }
+            if (smokeDurationSeconds <= 0.0f || smokeDurationSeconds > 60.0f)
+            {
+                std::cerr << "Smoke duration must be between 0 and 60 seconds.\n";
+                return 2;
+            }
+            smokeTest = true;
+        }
         else if (option == "--wireframe")
             startWireframe = true;
         else if (option == "--no-cull")
@@ -433,6 +471,30 @@ int main(int argc, char** argv)
             startAutomaticSun = true;
         else if (option == "--static-sun")
             startAutomaticSun = false;
+        else if (option == "--shadows")
+            startWithShadows = true;
+        else if (option == "--no-shadows")
+            startWithShadows = false;
+        else if (option == "--shadow-debug-factor")
+            initialShadowDebugMode = ShadowDebugMode::Factor;
+        else if (option == "--shadow-resolution" && argument + 1 < argc)
+        {
+            try
+            {
+                shadowResolution = std::stoi(argv[++argument]);
+            }
+            catch (...)
+            {
+                std::cerr << "Shadow resolution must be a power of two from 512 to 8192.\n";
+                return 2;
+            }
+            if (shadowResolution < 512 || shadowResolution > 8192 ||
+                (shadowResolution & (shadowResolution - 1)) != 0)
+            {
+                std::cerr << "Shadow resolution must be a power of two from 512 to 8192.\n";
+                return 2;
+            }
+        }
         else if (option == "--lighting-mode" && argument + 1 < argc)
         {
             if (!parseLightingDebugMode(argv[++argument], initialLightingMode))
@@ -468,11 +530,14 @@ int main(int argc, char** argv)
         return validateObjectEnrichment(std::cout) ? 0 : 1;
     if (lightingValidationOnly)
         return validatePhase7Lighting(std::cout) ? 0 : 1;
+    if (shadowValidationOnly)
+        return validatePhase8Shadows(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
         !validateIndustrialLandscape(std::cout) || !validateCameraNavigation(std::cout) ||
-        !validateObjectEnrichment(std::cout) || !validatePhase7Lighting(std::cout))
+        !validateObjectEnrichment(std::cout) || !validatePhase7Lighting(std::cout) ||
+        !validatePhase8Shadows(std::cout))
         return 1;
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -492,7 +557,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 7 Lighting and Moving Sun",
+                                          "Pyramid at Giza - Phase 8 Directional Shadows",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -527,7 +592,7 @@ int main(int argc, char** argv)
                      "wheel zoom/orbit radius, 1-9 smooth views, Shift+1-9 instant, "
                      "0 camera reset, O orbit, T transport follow, G guided demo, K camera info, "
                      "U automatic sun, [/] sun time, F1/F2/F3 morning/noon/evening, "
-                     "V lighting debug, "
+                     "V lighting debug, H shadows, J shadow-factor debug, "
                      "C culling, F wireframe, Space pause, R animation reset, N next state, "
                      "L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
     }
@@ -549,7 +614,7 @@ int main(int argc, char** argv)
     bool runtimeSucceeded = true;
     try
     {
-        StaticGizaScene scene;
+        StaticGizaScene scene(shadowResolution);
         state.scene = &scene;
         if (initialAnimationTime > 0.0f)
         {
@@ -561,8 +626,14 @@ int main(int argc, char** argv)
         scene.setSunTime(sunTimeSpecified ? initialSunTime : SunController::morningTime);
         scene.setSunAutomatic(startAutomaticSun);
         scene.setLightingDebugMode(initialLightingMode);
+        scene.setShadowsEnabled(startWithShadows);
+        scene.setShadowDebugMode(initialShadowDebugMode);
         printSunState(scene, "Initial sun");
         std::cout << "Lighting debug mode: " << scene.lightingDebugModeName() << '\n';
+        std::cout << "Directional shadows: " << (scene.shadowsEnabled() ? "ON" : "OFF")
+                  << ", debug: " << scene.shadowDebugModeName()
+                  << ", resolution: " << scene.shadowSettings().resolution << " x "
+                  << scene.shadowSettings().resolution << '\n';
         if (initialCameraMode == "orbit")
             state.cameraController.togglePyramidOrbit();
         else if (initialCameraMode == "follow")
@@ -576,6 +647,7 @@ int main(int argc, char** argv)
                       << CameraController::modeName(state.cameraController.mode()) << '\n';
         }
         float previousTime = static_cast<float>(glfwGetTime());
+        const float smokeStartTime = previousTime;
         int renderedFrames = 0;
 
         while (glfwWindowShouldClose(window) == GLFW_FALSE)
@@ -607,7 +679,8 @@ int main(int argc, char** argv)
                 static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight),
                 CameraController::nearPlane, CameraController::farPlane);
             const Camera& activeCamera = state.cameraController.camera();
-            scene.render(activeCamera.GetViewMatrix(), projection, activeCamera.Position);
+            scene.render(activeCamera.GetViewMatrix(), projection, activeCamera.Position,
+                         framebufferWidth, framebufferHeight);
 
             ++renderedFrames;
             if (smokeTest && renderedFrames == 3 && !capturePath.empty())
@@ -617,9 +690,17 @@ int main(int argc, char** argv)
             glfwSwapBuffers(window);
             glfwPollEvents();
 
-            if (smokeTest && renderedFrames >= 3)
+            const bool timedSmokeComplete =
+                smokeDurationSeconds > 0.0f &&
+                currentTime - smokeStartTime >= smokeDurationSeconds;
+            const bool shortSmokeComplete =
+                smokeDurationSeconds <= 0.0f && renderedFrames >= 3;
+            if (smokeTest && (timedSmokeComplete || shortSmokeComplete))
                 break;
         }
+        if (smokeDurationSeconds > 0.0f)
+            std::cout << "Timed OpenGL smoke duration completed: "
+                      << smokeDurationSeconds << " seconds.\n";
         state.scene = nullptr;
     }
     catch (const std::exception& error)

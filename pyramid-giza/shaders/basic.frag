@@ -3,6 +3,7 @@
 in vec3 WorldPosition;
 in vec3 WorldNormal;
 in vec2 TexCoord;
+in vec4 FragPosLightSpace;
 
 out vec4 FragColor;
 
@@ -19,6 +20,40 @@ uniform vec3 ambientColor;
 uniform float ambientIntensity;
 uniform vec3 viewPosition;
 uniform int lightingDebugMode;
+uniform sampler2D shadowMap;
+uniform int shadowsEnabled;
+uniform int shadowDebugMode;
+uniform float shadowMinimumBias;
+uniform float shadowSlopeBias;
+uniform float shadowStrength;
+
+float calculateShadow(vec3 normal, vec3 toLight)
+{
+    if (shadowsEnabled == 0 || FragPosLightSpace.w <= 0.0)
+        return 0.0;
+
+    vec3 projected = FragPosLightSpace.xyz / FragPosLightSpace.w;
+    projected = projected * 0.5 + 0.5;
+    if (projected.x < 0.0 || projected.x > 1.0 ||
+        projected.y < 0.0 || projected.y > 1.0 ||
+        projected.z < 0.0 || projected.z > 1.0)
+        return 0.0;
+
+    float bias = max(shadowSlopeBias * (1.0 - max(dot(normal, toLight), 0.0)),
+                     shadowMinimumBias);
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
+    float shadow = 0.0;
+    for (int x = -1; x <= 1; ++x)
+    {
+        for (int y = -1; y <= 1; ++y)
+        {
+            float closestDepth = texture(shadowMap,
+                                         projected.xy + vec2(x, y) * texelSize).r;
+            shadow += projected.z - bias > closestDepth ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 9.0;
+}
 
 void main()
 {
@@ -37,17 +72,21 @@ void main()
     vec3 ambient = ambientIntensity * materialAmbient * materialBaseColor * ambientColor;
     vec3 diffuse = sunIntensity * materialDiffuse * nDotL * materialBaseColor * sunColor;
     vec3 specular = sunIntensity * materialSpecular * blinnFactor * sunColor;
+    float shadow = calculateShadow(normal, toLight);
+    float visibility = 1.0 - shadow * shadowStrength;
 
     vec3 result;
-    if (lightingDebugMode == 1)
-        result = diffuse;
+    if (shadowDebugMode == 1)
+        result = vec3(visibility);
+    else if (lightingDebugMode == 1)
+        result = visibility * diffuse;
     else if (lightingDebugMode == 2)
-        result = specular;
+        result = visibility * specular;
     else if (lightingDebugMode == 3)
         result = normal * 0.5 + 0.5;
     else if (lightingDebugMode == 4)
         result = materialBaseColor;
     else
-        result = ambient + diffuse + specular;
+        result = ambient + visibility * (diffuse + specular);
     FragColor = vec4(result, 1.0);
 }

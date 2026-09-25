@@ -1,0 +1,8 @@
+State,SunTime,ExpectedDirection,ExpectedShadowCharacter,TestPreset,Notes
+Morning,08:00,toward -X and +Z,long angled shadows and strong pyramid/scaffold silhouettes,1,Static sun pyramid overview
+Noon,12:00,mostly downward with small -X component,short contact-focused shadows beneath workers blocks and sledges,2,Static sun pyramid-base view
+Evening,17:00,toward -X and -Z,long shadows opposite the morning Z direction,1,Static sun monumental overview
+Quarry,08:00,morning direction,terrace walls bays ramp and workers show depth,4,Extraction close-up
+Ramp,17:00,evening direction,sledge workers ropes scaffolds and platform cast current silhouettes,6,Animation time 16 seconds
+Nile,12:00,high sun,trees and context cast while water receives generic shadows,8,No reflection shadow system
+Sphinx,17:00,evening direction,context object casts and receives generic shadows,9,Landmark remains secondary

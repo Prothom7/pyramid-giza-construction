@@ -7,11 +7,13 @@ layout (location = 2) in vec2 aTexCoord;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat4 lightSpaceMatrix;
 uniform mat3 normalMatrix;
 
 out vec3 WorldPosition;
 out vec3 WorldNormal;
 out vec2 TexCoord;
+out vec4 FragPosLightSpace;
 
 void main()
 {
@@ -22,5 +24,6 @@ void main()
     // again after interpolation.
     WorldNormal = normalize(normalMatrix * aNormal);
     TexCoord = aTexCoord;
+    FragPosLightSpace = lightSpaceMatrix * worldPosition;
     gl_Position = projection * view * worldPosition;
 }

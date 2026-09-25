@@ -12,6 +12,7 @@ Course project status:
 - **Phase 6 - Complete:** camera navigation, inspection modes, and guided presentation
 - **Phase 6.5 - Complete:** pre-Phase 7 machinery, access, workshop, repair, and river-logistics enrichment
 - **Phase 7 - Complete:** directional sun lighting, material response, and daylight control
+- **Phase 8 - Complete:** moving directional-sun shadow mapping with bias and 3x3 PCF
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -33,16 +34,22 @@ transport follow, a seven-shot guided demo, safe FOV zoom, and debug pose output
 changing world geometry or the rendering pipeline.
 
 The enrichment pass adds 327 static primitive instances and four support workers. The
-maximum draw count is approximately 9,463, while all scene objects still share the same
-four uploaded meshes. Pulley/roller rigs are explicitly presented as speculative
-graphics demonstrations rather than historically certain Khufu-era machinery.
+visible pass has approximately 9,463 maximum draw calls, while all scene objects still
+share the same four uploaded meshes. Pulley/roller rigs are explicitly presented as
+speculative graphics demonstrations rather than historically certain Khufu-era machinery.
 
 Phase 7 replaces the earlier fixed light with a world-space directional sun and
 centralized ambient/diffuse/specular material properties. The daylight controller
 provides deterministic morning, noon, and evening states plus a slow automatic cycle
 that is independent of the 28.5-second construction animation. Lighting debug outputs
 make diffuse, specular, world-normal, and unlit-base-color behavior easy to inspect.
-Shadow mapping is deliberately deferred to Phase 8.
+
+Phase 8 adds one 4096 x 4096 directional depth map, a stable world-centered orthographic
+light camera, slope-aware bias, and manual 3x3 percentage-closer filtering. The existing
+sun moves the shadows from long morning silhouettes through shorter noon contact shadows
+to long evening shadows in the opposite direction. Static and animated geometry use one
+shared per-frame transform list in both passes. With shadows enabled the depth and visible
+passes total approximately 18,926 maximum indexed draw calls.
 
 ## Build and run
 
@@ -81,6 +88,8 @@ build\PyramidGiza.exe
 - `[` / `]`: move the sun backward/forward by 0.5 simulated hours
 - `F1` / `F2` / `F3`: morning (08:00) / noon (12:00) / evening (17:00)
 - `V`: cycle normal, diffuse-only, specular-only, world-normal, and unlit lighting output
+- `H`: toggle directional shadows
+- `J`: toggle normal rendering / shadow-factor visualization
 
 ## Validation
 
@@ -95,6 +104,7 @@ build\PyramidGiza.exe --validate-industrial
 build\PyramidGiza.exe --validate-camera
 build\PyramidGiza.exe --validate-enrichment
 build\PyramidGiza.exe --validate-lighting
+build\PyramidGiza.exe --validate-shadows
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -102,6 +112,10 @@ build\PyramidGiza.exe --smoke-test --preset 1
 free|orbit|follow|demo`, and `--capture output.ppm` support deterministic runtime checks.
 `--sun-time HOURS`, `--auto-sun`, `--static-sun`, and `--lighting-mode
 normal|diffuse|specular|normals|unlit` support deterministic lighting checks.
+`--shadows`, `--no-shadows`, `--shadow-debug-factor`, and
+`--shadow-resolution 2048|4096` support deterministic shadow checks.
+`--smoke-duration SECONDS` keeps the hidden smoke-test renderer active for a timed
+animation regression (up to 60 seconds).
 Build output and captures are ignored by Git.
 
 ## Documentation
@@ -116,8 +130,9 @@ Build output and captures are ignored by Git.
 - [Phase 6](docs/PHASE6_CAMERA_NAVIGATION.md)
 - [Phase 6.5 object enrichment](docs/PHASE6_5_OBJECT_ENRICHMENT.md)
 - [Phase 7 lighting and sun](docs/PHASE7_LIGHTING_AND_SUN.md)
+- [Phase 8 directional shadow mapping](docs/PHASE8_SHADOW_MAPPING.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
 pulley-rig, river-landing, workshop/repair, scaffold-access, material, sun-state, and
-lighting-control tables.
+lighting-control, shadow-setting, shadow-validation, and shadow-control tables.
