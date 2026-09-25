@@ -1,0 +1,4 @@
+State,TimeOfDay,DirectionX,DirectionY,DirectionZ,ColorR,ColorG,ColorB,Intensity,Purpose
+Morning,8.0,-0.241845,-0.707107,0.664463,1.000000,0.840000,0.686667,0.910000,Warm low-angle directional contrast
+Noon,12.0,-0.207912,-0.978148,0.000000,1.000000,0.960000,0.860000,1.100000,High neutral sun and top-surface readability
+Evening,17.0,-0.038120,-0.486062,-0.873093,1.000000,0.743333,0.576667,0.818351,Warm opposite-side low-angle contrast

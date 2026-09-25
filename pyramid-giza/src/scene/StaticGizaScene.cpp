@@ -1256,6 +1256,8 @@ void StaticGizaScene::buildCompositeObjects()
 
 void StaticGizaScene::update(float deltaTime)
 {
+    // Construction animation and time of day are intentionally independent.
+    sunController_.update(deltaTime);
     if (coordinatedAnimationEnabled_)
         animationController_.update(deltaTime);
     else if (articulationPreviewEnabled_ && std::isfinite(deltaTime) && deltaTime > 0.0f)
@@ -1311,6 +1313,51 @@ void StaticGizaScene::resetAnimation()
     articulationTime_ = 0.0f;
 }
 
+void StaticGizaScene::toggleAutomaticSun()
+{
+    sunController_.toggleAutomatic();
+}
+
+void StaticGizaScene::adjustSunTime(float hours)
+{
+    sunController_.adjustTime(hours);
+}
+
+void StaticGizaScene::selectMorningSun()
+{
+    sunController_.selectMorning();
+}
+
+void StaticGizaScene::selectNoonSun()
+{
+    sunController_.selectNoon();
+}
+
+void StaticGizaScene::selectEveningSun()
+{
+    sunController_.selectEvening();
+}
+
+void StaticGizaScene::setSunTime(float hours)
+{
+    sunController_.setTimeOfDay(hours);
+}
+
+void StaticGizaScene::setSunAutomatic(bool enabled)
+{
+    sunController_.setAutomatic(enabled);
+}
+
+void StaticGizaScene::cycleLightingDebugMode()
+{
+    sunController_.cycleDebugMode();
+}
+
+void StaticGizaScene::setLightingDebugMode(LightingDebugMode mode)
+{
+    sunController_.setDebugMode(mode);
+}
+
 const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
 {
     switch (primitive)
@@ -1334,18 +1381,24 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
     shader_.setMat4("view", view);
     shader_.setMat4("projection", projection);
     shader_.setVec3("viewPosition", cameraPosition);
-    shader_.setVec3("lightDirection", {-0.55f, -1.0f, -0.30f});
-    shader_.setVec3("lightColor", {1.0f, 0.94f, 0.82f});
+    const SunState& sun = sunController_.state();
+    shader_.setVec3("sunDirection", sun.light.direction);
+    shader_.setVec3("sunColor", sun.light.color);
+    shader_.setFloat("sunIntensity", sun.light.intensity);
+    shader_.setVec3("ambientColor", sun.ambientColor);
+    shader_.setFloat("ambientIntensity", sun.ambientIntensity);
+    shader_.setInt("lightingDebugMode", static_cast<int>(sunController_.debugMode()));
 
     const auto drawPart = [&](ScenePrimitive primitive, const glm::mat4& model,
                               MaterialId materialId) {
         shader_.setMat4("model", model);
         shader_.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
         const Material& material = materialDefinition(materialId);
-        shader_.setVec3("objectColor", material.color);
-        shader_.setFloat("materialAmbient", material.ambient);
-        shader_.setFloat("materialDiffuse", material.diffuse);
-        shader_.setFloat("materialSpecular", material.specular);
+        shader_.setVec3("materialBaseColor", material.baseColor);
+        shader_.setFloat("materialAmbient", material.ambientStrength);
+        shader_.setFloat("materialDiffuse", material.diffuseStrength);
+        shader_.setFloat("materialSpecular", material.specularStrength);
+        shader_.setFloat("materialShininess", material.shininess);
         meshFor(primitive).draw();
     };
 

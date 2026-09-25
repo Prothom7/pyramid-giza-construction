@@ -11,6 +11,7 @@ Course project status:
 - **Phase 5.6 - Complete:** quarry, stone logistics, Nile, and environmental context
 - **Phase 6 - Complete:** camera navigation, inspection modes, and guided presentation
 - **Phase 6.5 - Complete:** pre-Phase 7 machinery, access, workshop, repair, and river-logistics enrichment
+- **Phase 7 - Complete:** directional sun lighting, material response, and daylight control
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -35,6 +36,13 @@ The enrichment pass adds 327 static primitive instances and four support workers
 maximum draw count is approximately 9,463, while all scene objects still share the same
 four uploaded meshes. Pulley/roller rigs are explicitly presented as speculative
 graphics demonstrations rather than historically certain Khufu-era machinery.
+
+Phase 7 replaces the earlier fixed light with a world-space directional sun and
+centralized ambient/diffuse/specular material properties. The daylight controller
+provides deterministic morning, noon, and evening states plus a slow automatic cycle
+that is independent of the 28.5-second construction animation. Lighting debug outputs
+make diffuse, specular, world-normal, and unlit-base-color behavior easy to inspect.
+Shadow mapping is deliberately deferred to Phase 8.
 
 ## Build and run
 
@@ -69,6 +77,10 @@ build\PyramidGiza.exe
 - `Space`: pause/resume; `N`: next state; `R`: reset; `L`: loop
 - `M`: coordinated animation/pose-preview mode; `+/-`: animation speed
 - `P`: cycle debug pose; `Esc`: exit
+- `U`: toggle automatic daylight motion
+- `[` / `]`: move the sun backward/forward by 0.5 simulated hours
+- `F1` / `F2` / `F3`: morning (08:00) / noon (12:00) / evening (17:00)
+- `V`: cycle normal, diffuse-only, specular-only, world-normal, and unlit lighting output
 
 ## Validation
 
@@ -82,11 +94,14 @@ build\PyramidGiza.exe --validate-site
 build\PyramidGiza.exe --validate-industrial
 build\PyramidGiza.exe --validate-camera
 build\PyramidGiza.exe --validate-enrichment
+build\PyramidGiza.exe --validate-lighting
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
 `--wireframe`, `--no-cull`, `--animation-time SECONDS`, `--camera-mode
 free|orbit|follow|demo`, and `--capture output.ppm` support deterministic runtime checks.
+`--sun-time HOURS`, `--auto-sun`, `--static-sun`, and `--lighting-mode
+normal|diffuse|specular|normals|unlit` support deterministic lighting checks.
 Build output and captures are ignored by Git.
 
 ## Documentation
@@ -100,7 +115,9 @@ Build output and captures are ignored by Git.
 - [Phase 5.6](docs/PHASE5_6_QUARRY_LOGISTICS_ENVIRONMENT.md)
 - [Phase 6](docs/PHASE6_CAMERA_NAVIGATION.md)
 - [Phase 6.5 object enrichment](docs/PHASE6_5_OBJECT_ENRICHMENT.md)
+- [Phase 7 lighting and sun](docs/PHASE7_LIGHTING_AND_SUN.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
-pulley-rig, river-landing, workshop/repair, and scaffold-access tables.
+pulley-rig, river-landing, workshop/repair, scaffold-access, material, sun-state, and
+lighting-control tables.

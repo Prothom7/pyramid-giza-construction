@@ -25,6 +25,7 @@ add_executable(PyramidGiza
     src/Camera.cpp
     src/camera/CameraController.cpp
     src/camera/CameraValidation.cpp
+    src/lighting/SunController.cpp
     src/graphics/Mesh.cpp
     src/graphics/PrimitiveGenerator.cpp
     src/graphics/GeometryValidation.cpp
@@ -87,3 +88,4 @@ add_test(NAME Phase5_5MonumentalSiteValidation COMMAND PyramidGiza --validate-si
 add_test(NAME Phase5_6IndustrialLandscapeValidation COMMAND PyramidGiza --validate-industrial)
 add_test(NAME Phase6CameraNavigationValidation COMMAND PyramidGiza --validate-camera)
 add_test(NAME Phase6_5ObjectEnrichmentValidation COMMAND PyramidGiza --validate-enrichment)
+add_test(NAME Phase7LightingValidation COMMAND PyramidGiza --validate-lighting)

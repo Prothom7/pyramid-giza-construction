@@ -1,0 +1,18 @@
+Material,BaseR,BaseG,BaseB,Ambient,Diffuse,Specular,Shininess,UsedBy,Notes
+Sand,0.76,0.60,0.35,0.22,0.76,0.025,8,Desert ground,Warm and nearly matte
+Limestone,0.86,0.75,0.54,0.20,0.84,0.10,28,Pyramid blocks and Sphinx,Strong diffuse with restrained highlight
+LimestoneVariation,0.75,0.63,0.42,0.20,0.80,0.08,22,Pyramid variation and quarry terraces,Slightly darker stone
+QuarryStone,0.50,0.43,0.34,0.22,0.70,0.025,8,Raw blocks quarry walls and stone tools,Rough low-specular extraction material
+PreparedStone,0.90,0.80,0.59,0.20,0.86,0.14,34,Dressed blocks and repositories,Cleaner and slightly tighter highlight
+RampEarth,0.48,0.31,0.17,0.22,0.70,0.02,8,Ramps roads and work pads,Matte compacted earth
+Wood,0.34,0.18,0.08,0.19,0.76,0.12,22,Scaffolds sledges boats tools and poles,Warm timber
+DarkWood,0.23,0.11,0.045,0.19,0.72,0.10,18,Frames benches rails and runners,Darker structural timber
+Skin,0.58,0.32,0.18,0.24,0.78,0.08,24,Worker heads hands and limbs,Readable restrained highlight
+ClothingLinen,0.78,0.70,0.50,0.22,0.80,0.05,16,Worker linen and boat cloth,Soft cloth response
+ClothingBlue,0.18,0.32,0.44,0.20,0.82,0.08,20,Worker clothing,Cool visual distinction
+Headwear,0.72,0.59,0.34,0.22,0.78,0.05,14,Worker headwear,Soft woven response
+Rope,0.48,0.34,0.18,0.20,0.72,0.025,8,Sledge ropes rigs and alignment lines,Fibrous and matte
+ToolMetal,0.55,0.27,0.09,0.16,0.68,0.48,52,Copper-like tools axles and markers,Simple non-PBR copper-like highlight
+Water,0.10,0.36,0.50,0.25,0.72,0.55,64,Nile,Strongest specular response; no reflection/refraction
+Floodplain,0.36,0.43,0.22,0.23,0.74,0.025,8,River-edge ground,Dark matte river-edge earth/vegetation base
+Foliage,0.18,0.34,0.10,0.20,0.76,0.035,10,Trees and palms,Low-specular green

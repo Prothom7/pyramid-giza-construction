@@ -30,15 +30,17 @@ enum class MaterialId
     ToolMetal,
     Water,
     Floodplain,
-    Foliage
+    Foliage,
+    Count
 };
 
 struct Material
 {
-    glm::vec3 color;
-    float ambient;
-    float diffuse;
-    float specular;
+    glm::vec3 baseColor;
+    float ambientStrength;
+    float diffuseStrength;
+    float specularStrength;
+    float shininess;
 };
 
 struct ObjectPart

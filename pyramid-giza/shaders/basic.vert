@@ -17,6 +17,9 @@ void main()
 {
     vec4 worldPosition = model * vec4(aPosition, 1.0);
     WorldPosition = worldPosition.xyz;
+    // inverse-transpose normalMatrix keeps this world-space normal correct under
+    // the scene's extensive non-uniform scaling. The fragment stage normalizes
+    // again after interpolation.
     WorldNormal = normalize(normalMatrix * aNormal);
     TexCoord = aTexCoord;
     gl_Position = projection * view * worldPosition;

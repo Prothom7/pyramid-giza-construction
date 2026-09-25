@@ -8,6 +8,7 @@
 #include "Shader.h"
 #include "animation/ConstructionAnimation.h"
 #include "graphics/Mesh.h"
+#include "lighting/SunController.h"
 #include "objects/Worker.h"
 #include "scene/PyramidLayout.h"
 #include "scene/SceneTypes.h"
@@ -61,6 +62,15 @@ public:
     void adjustAnimationSpeed(float amount);
     void cycleDemoPose();
     void resetAnimation();
+    void toggleAutomaticSun();
+    void adjustSunTime(float hours);
+    void selectMorningSun();
+    void selectNoonSun();
+    void selectEveningSun();
+    void setSunTime(float hours);
+    void setSunAutomatic(bool enabled);
+    void cycleLightingDebugMode();
+    void setLightingDebugMode(LightingDebugMode mode);
     bool animationPaused() const { return animationController_.paused(); }
     bool animationLooping() const { return animationController_.looping(); }
     bool coordinatedAnimationEnabled() const { return coordinatedAnimationEnabled_; }
@@ -70,6 +80,14 @@ public:
         return ConstructionAnimationController::stateName(animationController_.state());
     }
     const char* demoPoseName() const { return Worker::poseName(demoPose_); }
+    const SunState& sunState() const { return sunController_.state(); }
+    bool automaticSun() const { return sunController_.automatic(); }
+    LightingDebugMode lightingDebugMode() const { return sunController_.debugMode(); }
+    const char* lightingDebugModeName() const
+    {
+        return SunController::debugModeName(sunController_.debugMode());
+    }
+    glm::vec3 skyColor() const { return sunController_.state().skyColor; }
     glm::vec3 transportTarget() const;
 
     const StaticGizaSceneStats& stats() const { return stats_; }
@@ -123,6 +141,7 @@ private:
     std::vector<WorkerInstance> workers_;
     std::vector<ObjectPart> loadedSledgeParts_;
     ConstructionAnimationController animationController_;
+    SunController sunController_;
     WorkerPose demoPose_ = WorkerPose::Standing;
     float articulationTime_ = 0.0f;
     float articulationSpeed_ = 1.0f;

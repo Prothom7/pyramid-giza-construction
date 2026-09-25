@@ -16,6 +16,7 @@
 #include "camera/CameraController.h"
 #include "camera/CameraValidation.h"
 #include "graphics/GeometryValidation.h"
+#include "lighting/SunController.h"
 #include "objects/CompositeValidation.h"
 #include "objects/WorkerHierarchyValidation.h"
 #include "scene/PyramidLayout.h"
@@ -54,6 +55,33 @@ void setCameraPreset(AppState& state, int preset, bool instant)
 void glfwErrorCallback(int code, const char* description)
 {
     std::cerr << "GLFW error " << code << ": " << description << '\n';
+}
+
+void printSunState(const StaticGizaScene& scene, const char* prefix)
+{
+    const SunState& sun = scene.sunState();
+    std::cout << prefix << ": " << sun.timeOfDay << ":00, automatic "
+              << (scene.automaticSun() ? "ON" : "OFF")
+              << ", direction (" << sun.light.direction.x << ", "
+              << sun.light.direction.y << ", " << sun.light.direction.z
+              << "), intensity " << sun.light.intensity << '\n';
+}
+
+bool parseLightingDebugMode(const std::string& value, LightingDebugMode& mode)
+{
+    if (value == "normal")
+        mode = LightingDebugMode::Normal;
+    else if (value == "diffuse")
+        mode = LightingDebugMode::DiffuseOnly;
+    else if (value == "specular")
+        mode = LightingDebugMode::SpecularOnly;
+    else if (value == "normals")
+        mode = LightingDebugMode::Normals;
+    else if (value == "unlit")
+        mode = LightingDebugMode::UnlitBaseColor;
+    else
+        return false;
+    return true;
 }
 
 void framebufferSizeCallback(GLFWwindow*, int width, int height)
@@ -191,6 +219,42 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
                   << pose.fovDegrees << " mode = "
                   << CameraController::modeName(state->cameraController.mode()) << '\n';
     }
+    else if (key == GLFW_KEY_U && state->scene != nullptr)
+    {
+        state->scene->toggleAutomaticSun();
+        printSunState(*state->scene, "Automatic sun toggled");
+    }
+    else if (key == GLFW_KEY_LEFT_BRACKET && state->scene != nullptr)
+    {
+        state->scene->adjustSunTime(-SunController::manualStepHours);
+        printSunState(*state->scene, "Sun time adjusted");
+    }
+    else if (key == GLFW_KEY_RIGHT_BRACKET && state->scene != nullptr)
+    {
+        state->scene->adjustSunTime(SunController::manualStepHours);
+        printSunState(*state->scene, "Sun time adjusted");
+    }
+    else if (key == GLFW_KEY_F1 && state->scene != nullptr)
+    {
+        state->scene->selectMorningSun();
+        printSunState(*state->scene, "Morning preset");
+    }
+    else if (key == GLFW_KEY_F2 && state->scene != nullptr)
+    {
+        state->scene->selectNoonSun();
+        printSunState(*state->scene, "Noon preset");
+    }
+    else if (key == GLFW_KEY_F3 && state->scene != nullptr)
+    {
+        state->scene->selectEveningSun();
+        printSunState(*state->scene, "Evening preset");
+    }
+    else if (key == GLFW_KEY_V && state->scene != nullptr)
+    {
+        state->scene->cycleLightingDebugMode();
+        std::cout << "Lighting debug mode: "
+                  << state->scene->lightingDebugModeName() << '\n';
+    }
     else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9)
         setCameraPreset(*state, key - GLFW_KEY_0, (mods & GLFW_MOD_SHIFT) != 0);
 }
@@ -265,11 +329,16 @@ int main(int argc, char** argv)
     bool industrialValidationOnly = false;
     bool cameraValidationOnly = false;
     bool enrichmentValidationOnly = false;
+    bool lightingValidationOnly = false;
     bool smokeTest = false;
     bool startWireframe = false;
     bool startWithCulling = true;
     int cameraPreset = 1;
     float initialAnimationTime = 0.0f;
+    float initialSunTime = SunController::morningTime;
+    bool sunTimeSpecified = false;
+    bool startAutomaticSun = true;
+    LightingDebugMode initialLightingMode = LightingDebugMode::Normal;
     std::string capturePath;
     std::string initialCameraMode = "free";
     for (int argument = 1; argument < argc; ++argument)
@@ -293,6 +362,8 @@ int main(int argc, char** argv)
             cameraValidationOnly = true;
         else if (option == "--validate-enrichment")
             enrichmentValidationOnly = true;
+        else if (option == "--validate-lighting")
+            lightingValidationOnly = true;
         else if (option == "--smoke-test")
             smokeTest = true;
         else if (option == "--wireframe")
@@ -338,6 +409,38 @@ int main(int argc, char** argv)
                 return 2;
             }
         }
+        else if (option == "--sun-time" && argument + 1 < argc)
+        {
+            try
+            {
+                initialSunTime = std::stof(argv[++argument]);
+            }
+            catch (...)
+            {
+                std::cerr << "Sun time must be between 6 and 18 hours.\n";
+                return 2;
+            }
+            if (initialSunTime < SunController::daylightStart ||
+                initialSunTime > SunController::daylightEnd)
+            {
+                std::cerr << "Sun time must be between 6 and 18 hours.\n";
+                return 2;
+            }
+            sunTimeSpecified = true;
+            startAutomaticSun = false;
+        }
+        else if (option == "--auto-sun")
+            startAutomaticSun = true;
+        else if (option == "--static-sun")
+            startAutomaticSun = false;
+        else if (option == "--lighting-mode" && argument + 1 < argc)
+        {
+            if (!parseLightingDebugMode(argv[++argument], initialLightingMode))
+            {
+                std::cerr << "Lighting mode must be normal, diffuse, specular, normals, or unlit.\n";
+                return 2;
+            }
+        }
         else
         {
             std::cerr << "Unknown or incomplete option: " << option << '\n';
@@ -363,11 +466,13 @@ int main(int argc, char** argv)
         return validateCameraNavigation(std::cout) ? 0 : 1;
     if (enrichmentValidationOnly)
         return validateObjectEnrichment(std::cout) ? 0 : 1;
+    if (lightingValidationOnly)
+        return validatePhase7Lighting(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
         !validateIndustrialLandscape(std::cout) || !validateCameraNavigation(std::cout) ||
-        !validateObjectEnrichment(std::cout))
+        !validateObjectEnrichment(std::cout) || !validatePhase7Lighting(std::cout))
         return 1;
 
     glfwSetErrorCallback(glfwErrorCallback);
@@ -387,7 +492,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 6.5 Object Enrichment",
+                                          "Pyramid at Giza - Phase 7 Lighting and Moving Sun",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -421,6 +526,8 @@ int main(int argc, char** argv)
         std::cout << "Controls: W/A/S/D/Q/E move, Shift fast, Ctrl precision, mouse looks, "
                      "wheel zoom/orbit radius, 1-9 smooth views, Shift+1-9 instant, "
                      "0 camera reset, O orbit, T transport follow, G guided demo, K camera info, "
+                     "U automatic sun, [/] sun time, F1/F2/F3 morning/noon/evening, "
+                     "V lighting debug, "
                      "C culling, F wireframe, Space pause, R animation reset, N next state, "
                      "L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
     }
@@ -449,6 +556,13 @@ int main(int argc, char** argv)
             scene.update(initialAnimationTime);
             std::cout << "Animation initialized at state: " << scene.animationStateName() << '\n';
         }
+        // Apply the requested lighting after animation initialization so the sun clock
+        // is never implicitly advanced by --animation-time.
+        scene.setSunTime(sunTimeSpecified ? initialSunTime : SunController::morningTime);
+        scene.setSunAutomatic(startAutomaticSun);
+        scene.setLightingDebugMode(initialLightingMode);
+        printSunState(scene, "Initial sun");
+        std::cout << "Lighting debug mode: " << scene.lightingDebugModeName() << '\n';
         if (initialCameraMode == "orbit")
             state.cameraController.togglePyramidOrbit();
         else if (initialCameraMode == "follow")
@@ -484,7 +598,8 @@ int main(int argc, char** argv)
             }
 
             glViewport(0, 0, framebufferWidth, framebufferHeight);
-            glClearColor(0.47f, 0.68f, 0.86f, 1.0f);
+            const glm::vec3 skyColor = scene.skyColor();
+            glClearColor(skyColor.r, skyColor.g, skyColor.b, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             const glm::mat4 projection = glm::perspective(

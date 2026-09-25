@@ -1,0 +1,8 @@
+Key,Action,Range,Default,Notes
+U,Toggle automatic sun,ON/OFF,ON,Independent from construction animation playback
+Left Bracket,Move time backward,06:00 to 18:00 in 0.5-hour steps,08:00,Switches to manual sun mode
+Right Bracket,Move time forward,06:00 to 18:00 in 0.5-hour steps,08:00,Switches to manual sun mode
+F1,Select morning preset,08:00,Automatic ON at startup,Selects 08:00 and pauses automatic sun
+F2,Select noon preset,12:00,Automatic ON at startup,Selects 12:00 and pauses automatic sun
+F3,Select evening preset,17:00,Automatic ON at startup,Selects 17:00 and pauses automatic sun
+V,Cycle lighting visualization,Normal/Diffuse/Specular/Normals/Unlit,Normal Blinn-Phong,Fragment-shader debug mode
