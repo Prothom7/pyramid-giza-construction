@@ -68,6 +68,8 @@ public:
     void toggleLooping() { looping_ = !looping_; }
     void advanceState();
     void setSpeed(float speed);
+    void setLooping(bool looping) { looping_ = looping; }
+    void seek(float elapsedTime, bool playing);
 
     ConstructionAnimationSnapshot snapshot() const;
 

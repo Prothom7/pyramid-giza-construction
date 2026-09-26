@@ -34,6 +34,7 @@ add_executable(PyramidGiza
     src/graphics/Frustum.cpp
     src/graphics/InstanceBatch.cpp
     src/effects/ParticleSystem.cpp
+    src/presentation/ShowcaseController.cpp
     src/scene/PyramidLayout.cpp
     src/scene/MonumentalSite.cpp
     src/scene/IndustrialLandscape.cpp
@@ -106,3 +107,6 @@ add_test(NAME Phase10PerformanceStructureValidation COMMAND PyramidGiza --valida
 add_test(NAME Phase11ParticleValidation COMMAND PyramidGiza --validate-particles)
 add_test(NAME Phase11EffectEventValidation COMMAND PyramidGiza --validate-effect-events)
 add_test(NAME Phase11EnvironmentMotionValidation COMMAND PyramidGiza --validate-environment-motion)
+add_test(NAME Phase12ShowcaseTimelineValidation COMMAND PyramidGiza --validate-showcase-timeline)
+add_test(NAME Phase12ShowcaseCameraValidation COMMAND PyramidGiza --validate-showcase-camera)
+add_test(NAME Phase12ShowcaseStateValidation COMMAND PyramidGiza --validate-showcase-state)

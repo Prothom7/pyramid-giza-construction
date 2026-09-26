@@ -16,6 +16,7 @@ Course project status:
 - **Phase 9 - Complete:** scene integrity, independent construction timelapse, dynamic infrastructure, animation refinement, and procedural UV textures
 - **Phase 10 - Complete:** indexed GPU instancing, construction-aware batching, conservative frustum culling, and render statistics
 - **Phase 11 - Complete:** instanced construction dust, animated Nile UVs, and subtle vegetation motion
+- **Phase 12 - Complete:** deterministic synchronized cinematic showcase and final presentation flow
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -84,6 +85,14 @@ foliage transforms feed both the visible and shadow passes. Dust is alpha blende
 opaque geometry, keeps depth testing, disables only depth writes and culling temporarily,
 and never enters the shadow map.
 
+Phase 12 adds a 101-second, 14-shot final showcase driven by a CPU-only
+`ShowcaseController`. It coordinates the existing camera, 28.5-second hero sequence,
+90-second construction timeline, sun, shadows, and atmospheric effects without adding
+a render pass or owning their simulation logic. The narrative covers the site, quarry,
+extraction, repositories, loading, transport, ramp, upper work, accelerated build,
+completed 7,714-block pyramid, Nile/Sphinx context, and a six-second golden-hour final
+hold. Direct time seek and 0.25x-4x playback support repeatable testing and recording.
+
 ## Build and run
 
 ```powershell
@@ -112,6 +121,9 @@ build\PyramidGiza.exe
 - `O`: toggle pyramid orbit
 - `T`: toggle animated transport follow
 - `G`: start/stop the guided seven-shot demo
+- `F5`: start/restart the full synchronized Phase 12 showcase
+- `Shift + F5`: cancel the showcase and return to manual camera control
+- `F6`: pause/resume the showcase presentation clock
 - `K`: print camera position, yaw, pitch, FOV, and mode
 - `C`: toggle back-face culling; `F`: toggle filled/wireframe
 - `Space`: pause/resume; `N`: next state; `R`: reset; `L`: loop
@@ -157,6 +169,7 @@ build\PyramidGiza.exe --validate-particles
 build\PyramidGiza.exe --validate-effect-events
 build\PyramidGiza.exe --validate-environment-motion
 build\PyramidGiza.exe --validate-effects
+build\PyramidGiza.exe --validate-showcase
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -174,6 +187,10 @@ Use `--render-stats` to print the latest frame, `--benchmark-render` for a two-s
 hidden benchmark, and `--no-frustum-culling` for a visibility-control comparison.
 `--effects` and `--no-effects` provide deterministic A/B startup, while
 `--particle-capacity 64..2048` changes the fixed pool capacity (default 512).
+`--showcase` starts the complete automated presentation,
+`--showcase-time 0..101` seeks its coordinated state directly, and
+`--showcase-speed 0.25..4` accelerates or slows its independent presentation clock.
+The older `G` mode remains a camera-only guided tour; F5 is the synchronized showcase.
 Build output and captures are ignored by Git.
 
 ## Documentation
@@ -192,6 +209,7 @@ Build output and captures are ignored by Git.
 - [Phase 9 integration, timelapse, and textures](docs/PHASE9_INTEGRATION_TIMELAPSE_TEXTURES.md)
 - [Phase 10 renderer optimization](docs/PHASE10_RENDERER_OPTIMIZATION.md)
 - [Phase 11 atmospheric effects](docs/PHASE11_ATMOSPHERIC_EFFECTS.md)
+- [Phase 12 cinematic showcase](docs/PHASE12_CINEMATIC_SHOWCASE.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
@@ -203,3 +221,4 @@ Phase 10 adds instance-batch, instance-attribute, frustum-culling, and measured
 render-performance tables.
 Phase 11 adds particle-system, effect-control, environmental-motion, and effect-performance
 tables.
+Phase 12 adds showcase-shot, action, control, and camera-path-validation tables.

@@ -131,6 +131,18 @@ void ConstructionAnimationController::setSpeed(float speed)
     speed_ = std::clamp(speed, 0.25f, 4.0f);
 }
 
+void ConstructionAnimationController::seek(float elapsedTime, bool playing)
+{
+    if (!std::isfinite(elapsedTime))
+        return;
+    reset();
+    looping_ = false;
+    speed_ = 1.0f;
+    const float target = std::clamp(elapsedTime, 0.0f, sequenceDuration());
+    update(target);
+    paused_ = !playing || target >= sequenceDuration() - 1.0e-5f;
+}
+
 ConstructionState ConstructionAnimationController::nextState(ConstructionState state)
 {
     switch (state)

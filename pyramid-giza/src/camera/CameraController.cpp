@@ -79,6 +79,14 @@ CameraPose CameraController::currentPose() const
             "Current", "Current camera state"};
 }
 
+void CameraController::setPose(const CameraPose& pose)
+{
+    transition_ = {};
+    mode_ = CameraMode::Free;
+    applyPose(pose);
+    constrainToWorld();
+}
+
 CameraPose CameraController::interpolatePose(const CameraPose& start,
                                              const CameraPose& target,
                                              float progress)

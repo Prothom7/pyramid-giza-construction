@@ -92,6 +92,10 @@ public:
     void advanceAnimationState();
     void toggleAnimationLoop();
     void adjustAnimationSpeed(float amount);
+    void setAnimationSpeed(float speed) { animationController_.setSpeed(speed); }
+    void setAnimationLooping(bool looping) { animationController_.setLooping(looping); }
+    void seekAnimation(float elapsedTime, bool playing);
+    void seekPresentationEnvironment(float elapsedTime);
     void cycleDemoPose();
     void resetAnimation();
     void toggleAutomaticSun();

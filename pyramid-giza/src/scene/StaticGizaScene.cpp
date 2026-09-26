@@ -1694,6 +1694,29 @@ void StaticGizaScene::adjustAnimationSpeed(float amount)
     animationController_.setSpeed(animationController_.speed() + amount);
 }
 
+void StaticGizaScene::seekAnimation(float elapsedTime, bool playing)
+{
+    animationController_.seek(elapsedTime, playing);
+    particles_.clear();
+    sledgeEmissionAccumulator_ = 0.0f;
+    effectEventSerial_ = 1;
+    previousSledgePosition_ = glm::vec3{
+        animationController_.snapshot().loadedSledgeRoot[3]};
+}
+
+void StaticGizaScene::seekPresentationEnvironment(float elapsedTime)
+{
+    if (!std::isfinite(elapsedTime))
+        return;
+    environmentTime_ = std::fmod(std::max(0.0f, elapsedTime), 400.0f);
+    particles_.clear();
+    sledgeEmissionAccumulator_ = 0.0f;
+    ambientEmissionAccumulator_ = 0.0f;
+    effectEventSerial_ = 1;
+    previousSledgePosition_ = glm::vec3{
+        animationController_.snapshot().loadedSledgeRoot[3]};
+}
+
 void StaticGizaScene::cycleDemoPose()
 {
     demoPose_ = Worker::nextPose(demoPose_);

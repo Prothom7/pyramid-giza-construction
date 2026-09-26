@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -24,6 +25,7 @@
 #include "lighting/SunController.h"
 #include "objects/CompositeValidation.h"
 #include "objects/WorkerHierarchyValidation.h"
+#include "presentation/ShowcaseController.h"
 #include "scene/PyramidLayout.h"
 #include "scene/IndustrialLandscape.h"
 #include "scene/MonumentalSite.h"
@@ -35,10 +37,13 @@ namespace
 {
 constexpr int initialWidth = 1280;
 constexpr int initialHeight = 720;
+constexpr const char* defaultWindowTitle =
+    "Pyramid at Giza - Phase 12 Final Showcase";
 
 struct AppState
 {
     CameraController cameraController;
+    ShowcaseController showcaseController;
     float lastMouseX = initialWidth * 0.5f;
     float lastMouseY = initialHeight * 0.5f;
     float deltaTime = 0.0f;
@@ -71,6 +76,78 @@ void printSunState(const StaticGizaScene& scene, const char* prefix)
               << ", direction (" << sun.light.direction.x << ", "
               << sun.light.direction.y << ", " << sun.light.direction.z
               << "), intensity " << sun.light.intensity << '\n';
+}
+
+void setShowcaseWindowTitle(GLFWwindow* window, const AppState& state)
+{
+    if (window == nullptr)
+        return;
+    if (!state.showcaseController.controlsCamera())
+    {
+        glfwSetWindowTitle(window, defaultWindowTitle);
+        return;
+    }
+
+    const ShowcaseFrame frame = state.showcaseController.frame();
+    const ShowcaseShot& shot = ShowcaseController::shots()[frame.shotIndex];
+    const std::string title =
+        std::string(defaultWindowTitle) + " | Showcase: " + shot.id +
+        " | " + ShowcaseController::modeName(state.showcaseController.mode());
+    glfwSetWindowTitle(window, title.c_str());
+}
+
+void synchronizeShowcase(AppState& state, bool synchronizeSimulation)
+{
+    const ShowcaseFrame frame = state.showcaseController.frame();
+    state.cameraController.setPose(frame.camera);
+    if (state.scene == nullptr)
+        return;
+
+    state.scene->setSunAutomatic(false);
+    state.scene->setSunTime(frame.sunTime);
+    if (!synchronizeSimulation)
+        return;
+
+    state.scene->setConstructionProgress(frame.constructionProgress);
+    state.scene->setConstructionSpeed(frame.constructionSpeed);
+    state.scene->setConstructionPlaying(frame.constructionPlaying);
+    state.scene->setAnimationSpeed(1.0f);
+    state.scene->setAnimationLooping(false);
+    state.scene->seekAnimation(frame.heroTime, frame.heroPlaying);
+    state.scene->seekPresentationEnvironment(frame.showcaseTime);
+}
+
+void announceShowcaseShot(const AppState& state)
+{
+    const ShowcaseFrame frame = state.showcaseController.frame();
+    const ShowcaseShot& shot = ShowcaseController::shots()[frame.shotIndex];
+    std::cout << "Showcase shot " << frame.shotIndex + 1 << '/'
+              << ShowcaseController::shotCount << ": " << shot.id
+              << " - " << shot.purpose << " (t=" << frame.showcaseTime
+              << "s, construction " << frame.constructionProgress * 100.0f
+              << "%, sun " << frame.sunTime << ":00).\n";
+}
+
+void startShowcase(AppState& state, GLFWwindow* window, float time = 0.0f)
+{
+    state.showcaseController.start(time);
+    synchronizeShowcase(state, true);
+    state.showcaseController.consumeShotChanged();
+    state.firstMouse = true;
+    announceShowcaseShot(state);
+    setShowcaseWindowTitle(window, state);
+}
+
+void cancelShowcaseForManualInput(AppState& state, GLFWwindow* window,
+                                  const char* reason)
+{
+    if (!state.showcaseController.controlsCamera())
+        return;
+    state.showcaseController.cancel();
+    state.firstMouse = true;
+    setShowcaseWindowTitle(window, state);
+    std::cout << "Showcase canceled by " << reason
+              << "; free camera restored.\n";
 }
 
 bool parseLightingDebugMode(const std::string& value, LightingDebugMode& mode)
@@ -108,8 +185,12 @@ void mouseCallback(GLFWwindow* window, double xPosition, double yPosition)
         state->lastMouseX = x;
         state->lastMouseY = y;
         state->firstMouse = false;
+        return;
     }
 
+    if (std::abs(x - state->lastMouseX) > 0.01f ||
+        std::abs(y - state->lastMouseY) > 0.01f)
+        cancelShowcaseForManualInput(*state, window, "mouse look");
     state->cameraController.handleMouseDelta(x - state->lastMouseX,
                                              state->lastMouseY - y);
     state->lastMouseX = x;
@@ -119,8 +200,11 @@ void mouseCallback(GLFWwindow* window, double xPosition, double yPosition)
 void scrollCallback(GLFWwindow* window, double, double yOffset)
 {
     auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
-    if (state != nullptr)
+    if (state != nullptr && std::abs(yOffset) > 0.001)
+    {
+        cancelShowcaseForManualInput(*state, window, "mouse wheel input");
         state->cameraController.handleScroll(static_cast<float>(yOffset));
+    }
 }
 
 void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
@@ -132,7 +216,27 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
     if (state == nullptr)
         return;
 
-    if (key == GLFW_KEY_C)
+    if (key == GLFW_KEY_F5)
+    {
+        if ((mods & GLFW_MOD_SHIFT) != 0)
+            cancelShowcaseForManualInput(*state, window, "Shift+F5");
+        else
+            startShowcase(*state, window);
+    }
+    else if (key == GLFW_KEY_F6)
+    {
+        if (state->showcaseController.controlsCamera() &&
+            !state->showcaseController.complete())
+        {
+            state->showcaseController.togglePaused();
+            setShowcaseWindowTitle(window, *state);
+            std::cout << "Showcase: "
+                      << ShowcaseController::modeName(
+                             state->showcaseController.mode())
+                      << ".\n";
+        }
+    }
+    else if (key == GLFW_KEY_C)
     {
         state->cullingEnabled = !state->cullingEnabled;
         if (state->cullingEnabled)
@@ -191,12 +295,14 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
     }
     else if (key == GLFW_KEY_0)
     {
+        cancelShowcaseForManualInput(*state, window, "camera reset");
         state->cameraController.reset();
         state->firstMouse = true;
         std::cout << "Camera reset to monumental overview.\n";
     }
     else if (key == GLFW_KEY_O)
     {
+        cancelShowcaseForManualInput(*state, window, "orbit command");
         state->cameraController.togglePyramidOrbit();
         state->firstMouse = true;
         std::cout << "Camera mode: "
@@ -204,6 +310,7 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
     }
     else if (key == GLFW_KEY_T && state->scene != nullptr)
     {
+        cancelShowcaseForManualInput(*state, window, "follow-camera command");
         state->cameraController.toggleTransportFollow(state->scene->transportTarget());
         state->firstMouse = true;
         std::cout << "Camera mode: "
@@ -211,6 +318,7 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
     }
     else if (key == GLFW_KEY_G)
     {
+        cancelShowcaseForManualInput(*state, window, "guided-demo command");
         state->cameraController.toggleGuidedDemo();
         state->firstMouse = true;
         std::cout << "Camera mode: "
@@ -326,9 +434,25 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
         }
     }
     else if (key == GLFW_KEY_I && state->scene != nullptr)
+    {
         state->scene->printRenderStats(std::cout);
+        if (state->showcaseController.controlsCamera())
+        {
+            const ShowcaseFrame frame = state->showcaseController.frame();
+            std::cout << "  showcase: "
+                      << ShowcaseController::modeName(
+                             state->showcaseController.mode())
+                      << ", shot "
+                      << ShowcaseController::shots()[frame.shotIndex].id
+                      << ", time " << frame.showcaseTime << " / "
+                      << ShowcaseController::totalDuration() << " seconds\n";
+        }
+    }
     else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9)
+    {
+        cancelShowcaseForManualInput(*state, window, "camera preset");
         setCameraPreset(*state, key - GLFW_KEY_0, (mods & GLFW_MOD_SHIFT) != 0);
+    }
 }
 
 void processInput(GLFWwindow* window, AppState& state)
@@ -343,6 +467,16 @@ void processInput(GLFWwindow* window, AppState& state)
     else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
              glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
         speedMode = CameraSpeedMode::Fast;
+
+    const bool cameraMovement =
+        glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
+    if (cameraMovement)
+        cancelShowcaseForManualInput(state, window, "manual movement");
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         state.cameraController.move(CameraMovement::FORWARD, state.deltaTime, speedMode);
@@ -413,6 +547,10 @@ int main(int argc, char** argv)
     bool effectEventValidationOnly = false;
     bool environmentMotionValidationOnly = false;
     bool effectsValidationOnly = false;
+    bool showcaseTimelineValidationOnly = false;
+    bool showcaseCameraValidationOnly = false;
+    bool showcaseStateValidationOnly = false;
+    bool showcaseValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -428,6 +566,9 @@ int main(int argc, char** argv)
     bool startWithTextures = true;
     bool startWithFrustumCulling = true;
     bool startWithEffects = true;
+    bool startShowcasePresentation = false;
+    float initialShowcaseTime = 0.0f;
+    float initialShowcaseSpeed = 1.0f;
     bool startTimelapse = false;
     float initialConstructionProgress = ConstructionTimelineController::defaultProgress;
     float initialConstructionSpeed = 1.0f;
@@ -482,6 +623,60 @@ int main(int argc, char** argv)
             environmentMotionValidationOnly = true;
         else if (option == "--validate-effects")
             effectsValidationOnly = true;
+        else if (option == "--validate-showcase-timeline")
+            showcaseTimelineValidationOnly = true;
+        else if (option == "--validate-showcase-camera")
+            showcaseCameraValidationOnly = true;
+        else if (option == "--validate-showcase-state")
+            showcaseStateValidationOnly = true;
+        else if (option == "--validate-showcase")
+            showcaseValidationOnly = true;
+        else if (option == "--showcase")
+            startShowcasePresentation = true;
+        else if (option == "--showcase-time" && argument + 1 < argc)
+        {
+            try
+            {
+                initialShowcaseTime = std::stof(argv[++argument]);
+            }
+            catch (...)
+            {
+                std::cerr << "Showcase time must be between 0 and "
+                          << ShowcaseController::totalDuration() << " seconds.\n";
+                return 2;
+            }
+            if (initialShowcaseTime < 0.0f ||
+                initialShowcaseTime > ShowcaseController::totalDuration())
+            {
+                std::cerr << "Showcase time must be between 0 and "
+                          << ShowcaseController::totalDuration() << " seconds.\n";
+                return 2;
+            }
+            startShowcasePresentation = true;
+        }
+        else if (option == "--showcase-speed" && argument + 1 < argc)
+        {
+            try
+            {
+                initialShowcaseSpeed = std::stof(argv[++argument]);
+            }
+            catch (...)
+            {
+                std::cerr << "Showcase speed must be between "
+                          << ShowcaseController::minimumSpeed << " and "
+                          << ShowcaseController::maximumSpeed << ".\n";
+                return 2;
+            }
+            if (initialShowcaseSpeed < ShowcaseController::minimumSpeed ||
+                initialShowcaseSpeed > ShowcaseController::maximumSpeed)
+            {
+                std::cerr << "Showcase speed must be between "
+                          << ShowcaseController::minimumSpeed << " and "
+                          << ShowcaseController::maximumSpeed << ".\n";
+                return 2;
+            }
+            startShowcasePresentation = true;
+        }
         else if (option == "--effects")
             startWithEffects = true;
         else if (option == "--no-effects")
@@ -725,6 +920,18 @@ int main(int argc, char** argv)
                        validatePhase11EnvironmentMotion(std::cout)
                    ? 0
                    : 1;
+    if (showcaseTimelineValidationOnly)
+        return validatePhase12ShowcaseTimeline(std::cout) ? 0 : 1;
+    if (showcaseCameraValidationOnly)
+        return validatePhase12ShowcaseCamera(std::cout) ? 0 : 1;
+    if (showcaseStateValidationOnly)
+        return validatePhase12ShowcaseState(std::cout) ? 0 : 1;
+    if (showcaseValidationOnly)
+        return validatePhase12ShowcaseTimeline(std::cout) &&
+                       validatePhase12ShowcaseCamera(std::cout) &&
+                       validatePhase12ShowcaseState(std::cout)
+                   ? 0
+                   : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
@@ -739,7 +946,10 @@ int main(int argc, char** argv)
         !validatePhase10PerformanceStructure(std::cout) ||
         !validatePhase11Particles(std::cout) ||
         !validatePhase11EffectEvents(std::cout) ||
-        !validatePhase11EnvironmentMotion(std::cout))
+        !validatePhase11EnvironmentMotion(std::cout) ||
+        !validatePhase12ShowcaseTimeline(std::cout) ||
+        !validatePhase12ShowcaseCamera(std::cout) ||
+        !validatePhase12ShowcaseState(std::cout))
         return 1;
 
     if (benchmarkRender && smokeDurationSeconds <= 0.0f)
@@ -762,7 +972,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 11 Atmospheric Effects",
+                                          defaultWindowTitle,
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -796,6 +1006,7 @@ int main(int argc, char** argv)
         std::cout << "Controls: W/A/S/D/Q/E move, Shift fast, Ctrl precision, mouse looks, "
                      "wheel zoom/orbit radius, 1-9 smooth views, Shift+1-9 instant, "
                      "0 camera reset, O orbit, T transport follow, G guided demo, K camera info, "
+                     "F5 start/restart final showcase, Shift+F5 cancel, F6 pause/resume showcase, "
                      "U automatic sun, [/] sun time, F1/F2/F3 morning/noon/evening, "
                      "V lighting debug, H shadows, J shadow-factor debug, "
                      "X textures, B timelapse, ,/. timelapse speed, Home/End 0/100%, "
@@ -869,6 +1080,14 @@ int main(int argc, char** argv)
             std::cout << "Camera initialized in mode: "
                       << CameraController::modeName(state.cameraController.mode()) << '\n';
         }
+        if (startShowcasePresentation)
+        {
+            state.showcaseController.setSpeed(initialShowcaseSpeed);
+            startShowcase(state, window, initialShowcaseTime);
+            std::cout << "Final showcase started at " << initialShowcaseTime
+                      << " seconds, speed " << initialShowcaseSpeed << "x; total "
+                      << ShowcaseController::totalDuration() << " seconds.\n";
+        }
         float previousTime = static_cast<float>(glfwGetTime());
         const float smokeStartTime = previousTime;
         int renderedFrames = 0;
@@ -880,8 +1099,35 @@ int main(int argc, char** argv)
             previousTime = currentTime;
             if (!smokeTest)
                 processInput(window, state);
-            scene.update(state.deltaTime);
-            state.cameraController.update(state.deltaTime, scene.transportTarget());
+
+            if (state.showcaseController.playing())
+            {
+                scene.update(state.deltaTime * state.showcaseController.speed());
+                state.showcaseController.update(state.deltaTime);
+                const bool shotChanged =
+                    state.showcaseController.consumeShotChanged();
+                synchronizeShowcase(state, shotChanged ||
+                                                state.showcaseController.complete());
+                if (shotChanged)
+                {
+                    announceShowcaseShot(state);
+                    setShowcaseWindowTitle(window, state);
+                }
+                if (state.showcaseController.consumeCompleted())
+                {
+                    std::cout << "Final showcase complete; holding the final "
+                                 "golden-hour overview.\n";
+                    setShowcaseWindowTitle(window, state);
+                }
+            }
+            else if (state.showcaseController.controlsCamera())
+                synchronizeShowcase(state, false);
+            else
+            {
+                scene.update(state.deltaTime);
+                state.cameraController.update(state.deltaTime,
+                                              scene.transportTarget());
+            }
 
             int framebufferWidth = 0;
             int framebufferHeight = 0;
@@ -917,8 +1163,13 @@ int main(int argc, char** argv)
                 smokeDurationSeconds > 0.0f &&
                 currentTime - smokeStartTime >= smokeDurationSeconds;
             const bool shortSmokeComplete =
-                smokeDurationSeconds <= 0.0f && renderedFrames >= 3;
-            if (smokeTest && (timedSmokeComplete || shortSmokeComplete))
+                smokeDurationSeconds <= 0.0f && !startShowcasePresentation &&
+                renderedFrames >= 3;
+            const bool showcaseSmokeComplete =
+                startShowcasePresentation &&
+                state.showcaseController.complete();
+            if (smokeTest && (timedSmokeComplete || shortSmokeComplete ||
+                              showcaseSmokeComplete))
                 break;
         }
         if (smokeDurationSeconds > 0.0f)
@@ -928,6 +1179,17 @@ int main(int argc, char** argv)
         {
             scene.printRenderStats(std::cout);
             scene.printEffectStats(std::cout);
+        }
+        if (startShowcasePresentation)
+        {
+            const ShowcaseFrame finalFrame = state.showcaseController.frame();
+            std::cout << "Showcase runtime ended at " << finalFrame.showcaseTime
+                      << " seconds in "
+                      << ShowcaseController::modeName(
+                             state.showcaseController.mode())
+                      << " mode, shot "
+                      << ShowcaseController::shots()[finalFrame.shotIndex].id
+                      << ".\n";
         }
         state.scene = nullptr;
     }

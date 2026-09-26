@@ -75,6 +75,7 @@ public:
     const CameraTransition& transition() const { return transition_; }
 
     CameraPose currentPose() const;
+    void setPose(const CameraPose& pose);
     void selectPreset(std::size_t index, bool instant);
     void reset();
     void update(float deltaTime, const glm::vec3& transportTarget);
