@@ -1,0 +1,5 @@
+Scenario,ConstructionProgress,ActiveParticles,ParticleCapacity,ParticleDrawCalls,ParticleInstances,VisibleDrawCalls,ShadowDrawCalls,CPUUpdateMs,CPUCollectionSubmissionMs,Notes
+"75% noon representative",0.75,15,512,1,15,1943,1954,0.003,9.420,"Effects/shadows/textures on; static noon; sample frame"
+"Full 30-second hero runtime",0.75,11,512,1,11,1943,1954,0.003,19.058,"Final clean-build run covered complete 28.5-second hero sequence; zero OpenGL errors"
+"Direct complete checkpoint",1.00,15,512,1,15,1761,1772,0.003,8.315,"Direct jump emitted no historical placement flood; zero OpenGL errors"
+"Accelerated 0-to-100 timelapse",1.00,7,512,1,7,1763,1774,0.003,10.501,"Final clean-build 13-second runtime at 8x reached Complete; peak active 358/512; placement emission capped; zero OpenGL errors"

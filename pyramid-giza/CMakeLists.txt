@@ -33,6 +33,7 @@ add_executable(PyramidGiza
     src/graphics/Texture.cpp
     src/graphics/Frustum.cpp
     src/graphics/InstanceBatch.cpp
+    src/effects/ParticleSystem.cpp
     src/scene/PyramidLayout.cpp
     src/scene/MonumentalSite.cpp
     src/scene/IndustrialLandscape.cpp
@@ -102,3 +103,6 @@ add_test(NAME Phase9SceneIntegrityValidation COMMAND PyramidGiza --validate-layo
 add_test(NAME Phase10InstancingValidation COMMAND PyramidGiza --validate-instancing)
 add_test(NAME Phase10FrustumValidation COMMAND PyramidGiza --validate-frustum)
 add_test(NAME Phase10PerformanceStructureValidation COMMAND PyramidGiza --validate-renderer-structure)
+add_test(NAME Phase11ParticleValidation COMMAND PyramidGiza --validate-particles)
+add_test(NAME Phase11EffectEventValidation COMMAND PyramidGiza --validate-effect-events)
+add_test(NAME Phase11EnvironmentMotionValidation COMMAND PyramidGiza --validate-environment-motion)

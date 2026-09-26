@@ -11,6 +11,7 @@
 #include "Shader.h"
 #include "animation/ConstructionAnimation.h"
 #include "animation/ConstructionTimeline.h"
+#include "effects/ParticleSystem.h"
 #include "graphics/Frustum.h"
 #include "graphics/InstanceBatch.h"
 #include "graphics/Mesh.h"
@@ -69,13 +70,18 @@ struct RenderStats
     std::uint64_t culledInstances = 0;
     std::uint64_t materialChanges = 0;
     std::uint64_t textureBinds = 0;
+    std::uint64_t particleDrawCalls = 0;
+    std::uint64_t particleInstances = 0;
+    std::uint64_t emittedParticles = 0;
+    double particleUpdateMilliseconds = 0.0;
     double cpuSubmissionMilliseconds = 0.0;
 };
 
 class StaticGizaScene
 {
 public:
-    explicit StaticGizaScene(int shadowResolution = ShadowSettings::defaultResolution);
+    explicit StaticGizaScene(int shadowResolution = ShadowSettings::defaultResolution,
+                             std::size_t particleCapacity = ParticleSystem::defaultCapacity);
 
     void render(const glm::mat4& view, const glm::mat4& projection,
                 const glm::vec3& cameraPosition,
@@ -109,9 +115,9 @@ public:
     bool texturesEnabled() const { return texturesEnabled_; }
     void toggleConstructionTimelapse() { constructionTimeline_.togglePlayback(); }
     void adjustConstructionSpeed(int direction) { constructionTimeline_.adjustSpeed(direction); }
-    void resetConstruction() { constructionTimeline_.reset(); }
-    void completeConstruction() { constructionTimeline_.complete(); }
-    void setConstructionProgress(float progress) { constructionTimeline_.setProgress(progress); }
+    void resetConstruction();
+    void completeConstruction();
+    void setConstructionProgress(float progress);
     void setConstructionSpeed(float speed) { constructionTimeline_.setSpeed(speed); }
     void setConstructionPlaying(bool playing) { constructionTimeline_.setPlaying(playing); }
     float constructionProgress() const { return constructionTimeline_.progress(); }
@@ -145,6 +151,12 @@ public:
     bool frustumCullingEnabled() const { return frustumCullingEnabled_; }
     const RenderStats& renderStats() const { return renderStats_; }
     void printRenderStats(std::ostream& output) const;
+    void toggleEffects();
+    void setEffectsEnabled(bool enabled);
+    bool effectsEnabled() const { return effectsEnabled_; }
+    std::size_t activeParticles() const { return particles_.activeCount(); }
+    std::size_t particleCapacity() const { return particles_.capacity(); }
+    void printEffectStats(std::ostream& output) const;
 
     const StaticGizaSceneStats& stats() const { return stats_; }
     const PyramidLayoutConfig& pyramidConfig() const { return pyramidConfig_; }
@@ -190,6 +202,14 @@ private:
         BoundingSphere bounds;
     };
 
+    struct TreeMotionPart
+    {
+        std::size_t objectIndex = 0;
+        std::size_t treeIndex = 0;
+        glm::mat4 baseModel{1.0f};
+        glm::vec3 pivot{0.0f};
+    };
+
     void addObject(ScenePrimitive primitive, const glm::mat4& model, MaterialId material);
     void addComposite(const glm::mat4& root, const std::vector<ObjectPart>& parts);
     void addWorker(const glm::vec3& position, float rotationY, WorkerPose pose,
@@ -217,6 +237,16 @@ private:
     void buildConstructionStages();
     void collectFrameObjects();
     void updateFrontierBatches();
+    void updateAtmosphericEffects(float deltaTime, float previousAnimationTime,
+                                  float previousConstructionProgress,
+                                  bool constructionWasPlaying);
+    void emitSledgeDust(const glm::vec3& previousPosition,
+                        const ConstructionAnimationSnapshot& animation,
+                        float deltaTime);
+    void emitMalletDust(float previousAnimationTime, float currentAnimationTime);
+    void emitPlacementDust(float previousProgress, float currentProgress,
+                           bool constructionWasPlaying);
+    void emitAmbientDust(float deltaTime);
     std::size_t activeStableCount(const PyramidInstanceGroup& group) const;
     float primitiveLocalRadius(ScenePrimitive primitive) const;
     bool objectVisible(const SceneObject& object, const Frustum& frustum,
@@ -234,6 +264,7 @@ private:
     Mesh cylinder_;
     Mesh sphere_;
     TextureLibrary textures_;
+    ParticleSystem particles_;
     PyramidLayoutConfig pyramidConfig_;
     std::vector<PyramidBlockPlacement> pyramidBlocks_;
     std::vector<PyramidInstanceGroup> pyramidInstanceGroups_;
@@ -244,6 +275,7 @@ private:
     std::vector<SceneObject> frameObjects_;
     std::vector<StagedSceneObject> stagedObjects_;
     std::vector<DynamicPulleyWheel> dynamicPulleyWheels_;
+    std::vector<TreeMotionPart> treeMotionParts_;
     std::vector<WorkerInstance> workers_;
     std::vector<ObjectPart> loadedSledgeParts_;
     ConstructionAnimationController animationController_;
@@ -252,11 +284,17 @@ private:
     WorkerPose demoPose_ = WorkerPose::Standing;
     float articulationTime_ = 0.0f;
     float articulationSpeed_ = 1.0f;
+    float environmentTime_ = 0.0f;
+    float sledgeEmissionAccumulator_ = 0.0f;
+    float ambientEmissionAccumulator_ = 0.0f;
+    std::uint32_t effectEventSerial_ = 1;
+    glm::vec3 previousSledgePosition_{10.0f, 0.0f, 40.0f};
     bool articulationPreviewEnabled_ = true;
     bool coordinatedAnimationEnabled_ = true;
     bool shadowsEnabled_ = true;
     bool texturesEnabled_ = true;
     bool frustumCullingEnabled_ = true;
+    bool effectsEnabled_ = true;
     ShadowDebugMode shadowDebugMode_ = ShadowDebugMode::Normal;
     StaticGizaSceneStats stats_;
     RenderStats renderStats_;

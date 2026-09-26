@@ -314,6 +314,17 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
         std::cout << "Frustum culling: "
                   << (state->scene->frustumCullingEnabled() ? "ON" : "OFF") << '\n';
     }
+    else if (key == GLFW_KEY_F4 && state->scene != nullptr)
+    {
+        if ((mods & GLFW_MOD_SHIFT) != 0)
+            state->scene->printEffectStats(std::cout);
+        else
+        {
+            state->scene->toggleEffects();
+            std::cout << "Atmospheric effects: "
+                      << (state->scene->effectsEnabled() ? "ON" : "OFF") << '\n';
+        }
+    }
     else if (key == GLFW_KEY_I && state->scene != nullptr)
         state->scene->printRenderStats(std::cout);
     else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9)
@@ -398,6 +409,10 @@ int main(int argc, char** argv)
     bool instancingValidationOnly = false;
     bool frustumValidationOnly = false;
     bool rendererStructureValidationOnly = false;
+    bool particleValidationOnly = false;
+    bool effectEventValidationOnly = false;
+    bool environmentMotionValidationOnly = false;
+    bool effectsValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -412,10 +427,12 @@ int main(int argc, char** argv)
     bool startWithShadows = true;
     bool startWithTextures = true;
     bool startWithFrustumCulling = true;
+    bool startWithEffects = true;
     bool startTimelapse = false;
     float initialConstructionProgress = ConstructionTimelineController::defaultProgress;
     float initialConstructionSpeed = 1.0f;
     int shadowResolution = ShadowSettings::defaultResolution;
+    std::size_t particleCapacity = ParticleSystem::defaultCapacity;
     LightingDebugMode initialLightingMode = LightingDebugMode::Normal;
     ShadowDebugMode initialShadowDebugMode = ShadowDebugMode::Normal;
     std::string capturePath;
@@ -457,6 +474,36 @@ int main(int argc, char** argv)
             frustumValidationOnly = true;
         else if (option == "--validate-renderer-structure")
             rendererStructureValidationOnly = true;
+        else if (option == "--validate-particles")
+            particleValidationOnly = true;
+        else if (option == "--validate-effect-events")
+            effectEventValidationOnly = true;
+        else if (option == "--validate-environment-motion")
+            environmentMotionValidationOnly = true;
+        else if (option == "--validate-effects")
+            effectsValidationOnly = true;
+        else if (option == "--effects")
+            startWithEffects = true;
+        else if (option == "--no-effects")
+            startWithEffects = false;
+        else if (option == "--particle-capacity" && argument + 1 < argc)
+        {
+            try
+            {
+                particleCapacity = static_cast<std::size_t>(
+                    std::stoul(argv[++argument]));
+            }
+            catch (...)
+            {
+                std::cerr << "Particle capacity must be between 64 and 2048.\n";
+                return 2;
+            }
+            if (particleCapacity < 64u || particleCapacity > 2048u)
+            {
+                std::cerr << "Particle capacity must be between 64 and 2048.\n";
+                return 2;
+            }
+        }
         else if (option == "--benchmark-render")
         {
             benchmarkRender = true;
@@ -666,6 +713,18 @@ int main(int argc, char** argv)
         return validatePhase10Frustum(std::cout) ? 0 : 1;
     if (rendererStructureValidationOnly)
         return validatePhase10PerformanceStructure(std::cout) ? 0 : 1;
+    if (particleValidationOnly)
+        return validatePhase11Particles(std::cout) ? 0 : 1;
+    if (effectEventValidationOnly)
+        return validatePhase11EffectEvents(std::cout) ? 0 : 1;
+    if (environmentMotionValidationOnly)
+        return validatePhase11EnvironmentMotion(std::cout) ? 0 : 1;
+    if (effectsValidationOnly)
+        return validatePhase11Particles(std::cout) &&
+                       validatePhase11EffectEvents(std::cout) &&
+                       validatePhase11EnvironmentMotion(std::cout)
+                   ? 0
+                   : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
@@ -677,7 +736,10 @@ int main(int argc, char** argv)
         !validateSceneIntegrity(std::cout) ||
         !validatePhase10Instancing(std::cout) ||
         !validatePhase10Frustum(std::cout) ||
-        !validatePhase10PerformanceStructure(std::cout))
+        !validatePhase10PerformanceStructure(std::cout) ||
+        !validatePhase11Particles(std::cout) ||
+        !validatePhase11EffectEvents(std::cout) ||
+        !validatePhase11EnvironmentMotion(std::cout))
         return 1;
 
     if (benchmarkRender && smokeDurationSeconds <= 0.0f)
@@ -700,7 +762,7 @@ int main(int argc, char** argv)
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(initialWidth, initialHeight,
-                                          "Pyramid at Giza - Phase 10 Optimized Rendering",
+                                          "Pyramid at Giza - Phase 11 Atmospheric Effects",
                                           nullptr, nullptr);
     if (window == nullptr)
     {
@@ -737,7 +799,7 @@ int main(int argc, char** argv)
                      "U automatic sun, [/] sun time, F1/F2/F3 morning/noon/evening, "
                      "V lighting debug, H shadows, J shadow-factor debug, "
                      "X textures, B timelapse, ,/. timelapse speed, Home/End 0/100%, "
-                     "Y frustum culling, I render stats, "
+                     "Y frustum culling, I render stats, F4 effects, Shift+F4 effect stats, "
                      "C culling, F wireframe, Space pause, R animation reset, N next state, "
                      "L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
     }
@@ -759,7 +821,7 @@ int main(int argc, char** argv)
     bool runtimeSucceeded = true;
     try
     {
-        StaticGizaScene scene(shadowResolution);
+        StaticGizaScene scene(shadowResolution, particleCapacity);
         state.scene = &scene;
         if (initialAnimationTime > 0.0f)
         {
@@ -775,6 +837,7 @@ int main(int argc, char** argv)
         scene.setShadowDebugMode(initialShadowDebugMode);
         scene.setTexturesEnabled(startWithTextures);
         scene.setFrustumCullingEnabled(startWithFrustumCulling);
+        scene.setEffectsEnabled(startWithEffects);
         scene.setConstructionProgress(initialConstructionProgress);
         scene.setConstructionSpeed(initialConstructionSpeed);
         scene.setConstructionPlaying(startTimelapse);
@@ -790,7 +853,10 @@ int main(int argc, char** argv)
                   << "; construction: " << scene.constructionProgress() * 100.0f
                   << "% (" << scene.constructionStageName() << "), speed "
                   << scene.constructionSpeed() << "x, timelapse "
-                  << (startTimelapse ? "PLAYING" : "PAUSED") << '\n';
+                  << (startTimelapse ? "PLAYING" : "PAUSED")
+                  << "; atmospheric effects: "
+                  << (scene.effectsEnabled() ? "ON" : "OFF")
+                  << ", particle capacity " << scene.particleCapacity() << '\n';
         if (initialCameraMode == "orbit")
             state.cameraController.togglePyramidOrbit();
         else if (initialCameraMode == "follow")
@@ -859,7 +925,10 @@ int main(int argc, char** argv)
             std::cout << "Timed OpenGL smoke duration completed: "
                       << smokeDurationSeconds << " seconds.\n";
         if (renderStatsRequested || benchmarkRender)
+        {
             scene.printRenderStats(std::cout);
+            scene.printEffectStats(std::cout);
+        }
         state.scene = nullptr;
     }
     catch (const std::exception& error)

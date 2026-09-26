@@ -33,7 +33,7 @@ glm::vec3 rampSide(const RampDescriptor& ramp)
 }
 } // namespace
 
-StaticGizaScene::StaticGizaScene(int shadowResolution)
+StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapacity)
     : shader_("shaders/basic.vert", "shaders/basic.frag"),
       instancedShader_("shaders/basic_instanced.vert", "shaders/basic.frag"),
       depthShader_("shaders/shadow_depth.vert", "shaders/shadow_depth.frag"),
@@ -42,7 +42,8 @@ StaticGizaScene::StaticGizaScene(int shadowResolution)
       plane_(PrimitiveGenerator::createPlane()),
       cube_(PrimitiveGenerator::createCube()),
       cylinder_(PrimitiveGenerator::createCylinder()),
-      sphere_(PrimitiveGenerator::createSphere())
+      sphere_(PrimitiveGenerator::createSphere()),
+      particles_(particleCapacity)
 {
     GLint maximumVertexAttributes = 0;
     glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maximumVertexAttributes);
@@ -52,6 +53,7 @@ StaticGizaScene::StaticGizaScene(int shadowResolution)
     shadowSettings_.resolution = shadowResolution;
     shadowMap_.initialize(shadowSettings_.resolution, shadowSettings_.resolution);
     textures_.initialize();
+    particles_.initializeGpu();
     objects_.reserve(9800);
     frameObjects_.reserve(9800);
     workers_.reserve(44);
@@ -68,6 +70,8 @@ StaticGizaScene::StaticGizaScene(int shadowResolution)
     buildObjectEnrichment();
     buildConstructionStages();
     buildCompositeObjects();
+    previousSledgePosition_ = glm::vec3{
+        animationController_.snapshot().loadedSledgeRoot[3]};
 
     for (std::size_t index = heroWorkerCount; index < workers_.size(); ++index)
     {
@@ -121,7 +125,9 @@ StaticGizaScene::StaticGizaScene(int shadowResolution)
               << " maximum combined draws\n"
               << "Phase 10 renderer: " << pyramidInstanceGroups_.size()
               << " static pyramid batches + " << frontierBatches_.size()
-              << " dynamic frontier batches; conservative frustum culling ON\n";
+              << " dynamic frontier batches; conservative frustum culling ON\n"
+              << "Phase 11 effects: " << particles_.capacity()
+              << " shared billboard-particle slots, one indexed instanced draw\n";
 }
 
 void StaticGizaScene::addObject(ScenePrimitive primitive, const glm::mat4& model,
@@ -751,11 +757,18 @@ void StaticGizaScene::buildNileAndContext()
                                 {0.34f, height, 0.34f}),
                   MaterialId::Wood);
         for (int leaf = 0; leaf < 5; ++leaf)
+        {
+            const glm::mat4 leafModel =
+                makeTransform(trees[index] + glm::vec3{0.0f, height + 0.15f, 0.0f},
+                              {-12.0f, static_cast<float>(leaf) * 72.0f, 16.0f},
+                              {0.48f, 0.16f, 4.0f});
+            const std::size_t objectIndex = objects_.size();
             addObject(ScenePrimitive::Cube,
-                      makeTransform(trees[index] + glm::vec3{0.0f, height + 0.15f, 0.0f},
-                                    {-12.0f, static_cast<float>(leaf) * 72.0f, 16.0f},
-                                    {0.48f, 0.16f, 4.0f}),
+                      leafModel,
                       MaterialId::Foliage);
+            treeMotionParts_.push_back({objectIndex, index, leafModel,
+                                        trees[index] + glm::vec3{0.0f, height, 0.0f}});
+        }
     }
     stats_.treeInstances = trees.size();
 
@@ -1451,12 +1464,198 @@ void StaticGizaScene::buildCompositeObjects()
 void StaticGizaScene::update(float deltaTime)
 {
     // Hero animation, timelapse, and time of day are intentionally independent.
+    const float previousAnimationTime = animationController_.elapsedTime();
+    const float previousConstructionProgress = constructionTimeline_.progress();
+    const bool constructionWasPlaying = constructionTimeline_.playing();
+    const glm::vec3 previousSledge = previousSledgePosition_;
     sunController_.update(deltaTime);
     constructionTimeline_.update(deltaTime);
     if (coordinatedAnimationEnabled_)
         animationController_.update(deltaTime);
     else if (articulationPreviewEnabled_ && std::isfinite(deltaTime) && deltaTime > 0.0f)
         articulationTime_ += deltaTime * articulationSpeed_;
+
+    particles_.update(deltaTime);
+    if (effectsEnabled_ && std::isfinite(deltaTime) && deltaTime > 0.0f)
+    {
+        environmentTime_ = std::fmod(environmentTime_ + deltaTime, 400.0f);
+        updateAtmosphericEffects(deltaTime, previousAnimationTime,
+                                 previousConstructionProgress,
+                                 constructionWasPlaying);
+    }
+    previousSledgePosition_ = glm::vec3{
+        animationController_.snapshot().loadedSledgeRoot[3]};
+    if (!coordinatedAnimationEnabled_)
+        previousSledgePosition_ = previousSledge;
+}
+
+void StaticGizaScene::updateAtmosphericEffects(float deltaTime,
+                                                float previousAnimationTime,
+                                                float previousConstructionProgress,
+                                                bool constructionWasPlaying)
+{
+    const ConstructionAnimationSnapshot animation = animationController_.snapshot();
+    emitSledgeDust(previousSledgePosition_, animation, deltaTime);
+    emitMalletDust(previousAnimationTime, animationController_.elapsedTime());
+    emitPlacementDust(previousConstructionProgress, constructionTimeline_.progress(),
+                      constructionWasPlaying);
+    emitAmbientDust(deltaTime);
+}
+
+void StaticGizaScene::emitSledgeDust(
+    const glm::vec3& previousPosition,
+    const ConstructionAnimationSnapshot& animation, float deltaTime)
+{
+    const bool movingState = animation.state == ConstructionState::PullGround ||
+                             animation.state == ConstructionState::ApproachRamp ||
+                             animation.state == ConstructionState::RampPull;
+    const glm::vec3 currentPosition{animation.loadedSledgeRoot[3]};
+    const float distance = glm::distance(previousPosition, currentPosition);
+    if (!coordinatedAnimationEnabled_ || !movingState || distance > 5.0f)
+        return;
+    const float speed = deltaTime > 1.0e-6f ? distance / deltaTime : 0.0f;
+    const std::size_t count = sledgeDustEmissionCount(
+        speed, deltaTime, sledgeEmissionAccumulator_);
+    if (count == 0) return;
+    glm::vec3 direction = currentPosition - previousPosition;
+    direction.y = 0.0f;
+    if (glm::length(direction) > 1.0e-5f)
+        direction = glm::normalize(direction);
+    else
+        direction = {0.0f, 0.0f, -1.0f};
+
+    for (std::size_t index = 0; index < count; ++index)
+    {
+        ParticleEmission emission;
+        const float runnerSide = index % 2 == 0 ? -0.55f : 0.55f;
+        emission.origin = glm::vec3{animation.loadedSledgeRoot *
+            glm::vec4{runnerSide, 0.16f, 1.72f, 1.0f}};
+        emission.positionSpread = {0.22f, 0.05f, 0.22f};
+        emission.baseVelocity = -direction * 0.28f + glm::vec3{0.0f, 0.44f, 0.0f};
+        emission.velocitySpread = {0.20f, 0.14f, 0.20f};
+        emission.color = {0.72f, 0.54f, 0.31f};
+        emission.lifetimeMin = 0.75f;
+        emission.lifetimeMax = 1.35f;
+        emission.startSizeMin = 0.13f;
+        emission.startSizeMax = 0.25f;
+        emission.endSizeMultiplier = 2.7f;
+        emission.startAlpha = 0.22f;
+        particles_.emitBurst(emission, 1, effectEventSerial_++);
+    }
+}
+
+void StaticGizaScene::emitMalletDust(float previousAnimationTime,
+                                     float currentAnimationTime)
+{
+    const int impacts = std::min(1, malletImpactEvents(
+        previousAnimationTime, currentAnimationTime));
+    if (impacts == 0 || !coordinatedAnimationEnabled_) return;
+    ParticleEmission emission;
+    emission.origin = {-122.7f, -7.20f, -15.7f};
+    emission.positionSpread = {0.34f, 0.04f, 0.34f};
+    emission.baseVelocity = {0.0f, 0.72f, 0.0f};
+    emission.velocitySpread = {0.62f, 0.34f, 0.62f};
+    emission.color = {0.72f, 0.69f, 0.60f};
+    emission.lifetimeMin = 0.45f;
+    emission.lifetimeMax = 0.95f;
+    emission.startSizeMin = 0.08f;
+    emission.startSizeMax = 0.17f;
+    emission.endSizeMultiplier = 2.1f;
+    emission.startAlpha = 0.28f;
+    emission.gravity = -0.72f;
+    emission.kind = ParticleKind::StoneDust;
+    particles_.emitBurst(emission, 14, effectEventSerial_++);
+}
+
+void StaticGizaScene::emitPlacementDust(float previousProgress,
+                                        float currentProgress,
+                                        bool constructionWasPlaying)
+{
+    if (!constructionWasPlaying || currentProgress <= previousProgress)
+        return;
+
+    // A fast timelapse may settle many stones in one update. Limit the visible
+    // puffs so acceleration communicates activity without creating a dust wall.
+    constexpr std::size_t maximumEventsPerFrame = 4;
+    std::size_t eventCount = 0;
+    for (const PyramidBlockPlacement& block : pyramidBlocks_)
+    {
+        if (!ConstructionTimelineController::isFrontierCandidate(block))
+            continue;
+        const float threshold = ConstructionTimelineController::stableThreshold(
+            block, pyramidConfig_);
+        if (!placementSettlementCrossed(previousProgress, currentProgress, threshold))
+            continue;
+
+        ParticleEmission emission;
+        emission.origin = block.position + glm::vec3{0.0f, block.scale.y * 0.45f, 0.0f};
+        emission.positionSpread = {block.scale.x * 0.30f, 0.025f,
+                                   block.scale.z * 0.30f};
+        emission.baseVelocity = {0.0f, 0.28f, 0.0f};
+        emission.velocitySpread = {0.46f, 0.15f, 0.46f};
+        emission.color = {0.75f, 0.69f, 0.55f};
+        emission.lifetimeMin = 0.40f;
+        emission.lifetimeMax = 0.82f;
+        emission.startSizeMin = 0.09f;
+        emission.startSizeMax = 0.18f;
+        emission.endSizeMultiplier = 2.4f;
+        emission.startAlpha = 0.20f;
+        emission.gravity = -0.34f;
+        emission.kind = ParticleKind::PlacementDust;
+        particles_.emitBurst(emission, 6, effectEventSerial_++);
+        if (++eventCount == maximumEventsPerFrame)
+            break;
+    }
+}
+
+void StaticGizaScene::emitAmbientDust(float deltaTime)
+{
+    constexpr float particlesPerSecond = 1.25f;
+    ambientEmissionAccumulator_ += particlesPerSecond * deltaTime;
+    const std::size_t count = std::min<std::size_t>(
+        2, static_cast<std::size_t>(std::floor(ambientEmissionAccumulator_)));
+    ambientEmissionAccumulator_ -= static_cast<float>(count);
+    if (count == 0)
+        return;
+
+    const float progress = constructionTimeline_.progress();
+    const unsigned int activeLevel = constructionTimeline_.activeLevel(pyramidConfig_);
+    const float upperHeight = pyramidConfig_.origin.y +
+                              (static_cast<float>(activeLevel) + 0.5f) *
+                                  pyramidConfig_.blockHeight;
+    const std::array<glm::vec3, 4> zones{{
+        {-124.0f, -7.10f, -14.0f},
+        {-31.0f, 0.12f, 35.0f},
+        {0.0f, 0.20f + progress * 16.0f, 34.0f - progress * 19.0f},
+        {0.0f, upperHeight + 0.25f, 0.0f}}};
+    const std::size_t availableZones =
+        progress < 0.25f ? 2u : (progress < 0.65f ? 3u : 4u);
+
+    for (std::size_t index = 0; index < count; ++index)
+    {
+        const std::size_t zoneIndex =
+            static_cast<std::size_t>(effectEventSerial_ + index) % availableZones;
+        ParticleEmission emission;
+        emission.origin = zones[zoneIndex];
+        emission.positionSpread = zoneIndex == 3u
+                                      ? glm::vec3{5.0f, 0.15f, 5.0f}
+                                      : glm::vec3{3.5f, 0.15f, 3.5f};
+        emission.baseVelocity = {0.10f, 0.18f, 0.04f};
+        emission.velocitySpread = {0.15f, 0.08f, 0.15f};
+        emission.color = zoneIndex == 0u
+                             ? glm::vec3{0.72f, 0.68f, 0.58f}
+                             : glm::vec3{0.72f, 0.55f, 0.34f};
+        emission.lifetimeMin = 1.6f;
+        emission.lifetimeMax = 2.8f;
+        emission.startSizeMin = 0.16f;
+        emission.startSizeMax = 0.30f;
+        emission.endSizeMultiplier = 2.5f;
+        emission.startAlpha = 0.075f;
+        emission.gravity = -0.035f;
+        emission.drag = 0.35f;
+        emission.kind = ParticleKind::AmbientDust;
+        particles_.emitBurst(emission, 1, effectEventSerial_++);
+    }
 }
 
 glm::vec3 StaticGizaScene::transportTarget() const
@@ -1506,6 +1705,53 @@ void StaticGizaScene::resetAnimation()
     animationController_.reset();
     demoPose_ = WorkerPose::Standing;
     articulationTime_ = 0.0f;
+    particles_.clear();
+    sledgeEmissionAccumulator_ = 0.0f;
+    effectEventSerial_ = 1;
+    previousSledgePosition_ = glm::vec3{
+        animationController_.snapshot().loadedSledgeRoot[3]};
+}
+
+void StaticGizaScene::resetConstruction()
+{
+    constructionTimeline_.reset();
+    particles_.clear();
+    ambientEmissionAccumulator_ = 0.0f;
+    effectEventSerial_ = 1;
+}
+
+void StaticGizaScene::completeConstruction()
+{
+    // Direct timeline jumps deliberately clear rather than replaying historical
+    // placement events. Puffs are emitted only by actual forward playback.
+    constructionTimeline_.complete();
+    particles_.clear();
+    ambientEmissionAccumulator_ = 0.0f;
+    effectEventSerial_ = 1;
+}
+
+void StaticGizaScene::setConstructionProgress(float progress)
+{
+    constructionTimeline_.setProgress(progress);
+    particles_.clear();
+    ambientEmissionAccumulator_ = 0.0f;
+    effectEventSerial_ = 1;
+}
+
+void StaticGizaScene::toggleEffects()
+{
+    setEffectsEnabled(!effectsEnabled_);
+}
+
+void StaticGizaScene::setEffectsEnabled(bool enabled)
+{
+    effectsEnabled_ = enabled;
+    particles_.clear();
+    sledgeEmissionAccumulator_ = 0.0f;
+    ambientEmissionAccumulator_ = 0.0f;
+    effectEventSerial_ = 1;
+    previousSledgePosition_ = glm::vec3{
+        animationController_.snapshot().loadedSledgeRoot[3]};
 }
 
 void StaticGizaScene::toggleAutomaticSun()
@@ -1677,6 +1923,22 @@ void StaticGizaScene::collectFrameObjects()
 {
     frameObjects_.clear();
     frameObjects_.insert(frameObjects_.end(), objects_.begin(), objects_.end());
+    if (effectsEnabled_)
+    {
+        // Only foliage moves. The pivoted mesh transform is used by both the
+        // shadow and visible passes because both consume frameObjects_.
+        for (const TreeMotionPart& part : treeMotionParts_)
+        {
+            const glm::mat4 pivotedSway =
+                glm::translate(glm::mat4{1.0f}, part.pivot) *
+                glm::rotate(glm::mat4{1.0f},
+                            glm::radians(treeSwayDegrees(environmentTime_,
+                                                        part.treeIndex)),
+                            glm::vec3{0.0f, 0.0f, 1.0f}) *
+                glm::translate(glm::mat4{1.0f}, -part.pivot);
+            frameObjects_[part.objectIndex].model = pivotedSway * part.baseModel;
+        }
+    }
     const float constructionProgress = constructionTimeline_.progress();
     for (const StagedSceneObject& staged : stagedObjects_)
         if (constructionProgress >= staged.minimumProgress &&
@@ -1934,8 +2196,13 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         program.setFloat("materialShininess", material.shininess);
         program.setVec2("materialTextureScale",
                         uvIsInstanced ? glm::vec2{1.0f} : material.textureScale);
+        glm::vec2 textureOffset = uvIsInstanced
+                                      ? glm::vec2{0.0f}
+                                      : material.textureOffset;
+        if (effectsEnabled_ && materialId == MaterialId::Water)
+            textureOffset += waterUvOffset(environmentTime_);
         program.setVec2("materialTextureOffset",
-                        uvIsInstanced ? glm::vec2{0.0f} : material.textureOffset);
+                        textureOffset);
         program.setFloat("materialTextureBlend", material.textureBlend);
         if (currentTexture != material.texture)
         {
@@ -2013,6 +2280,28 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         renderStats_.visibleTriangles += mesh.indexCount() / 3u;
     }
 
+    // Transparent dust follows all opaque geometry and never enters the shadow
+    // pass. Keep normal/shadow-factor debug views unobstructed.
+    const bool effectsVisible =
+        effectsEnabled_ && sunController_.debugMode() != LightingDebugMode::Normals &&
+        shadowDebugMode_ == ShadowDebugMode::Normal;
+    if (effectsVisible)
+    {
+        const glm::vec3 effectTint = glm::clamp(
+            sun.light.color * (0.42f + 0.40f * sun.light.intensity) +
+                sun.ambientColor * sun.ambientIntensity,
+            glm::vec3{0.22f}, glm::vec3{1.0f});
+        const ParticleRenderResult particles = particles_.render(
+            view, projection, cameraPosition, effectTint);
+        renderStats_.particleDrawCalls = particles.drawCalls;
+        renderStats_.particleInstances = particles.instances;
+        renderStats_.visibleDrawCalls += particles.drawCalls;
+        renderStats_.visibleInstances += particles.instances;
+        renderStats_.visibleTriangles += particles.triangles;
+    }
+    renderStats_.emittedParticles = particles_.emittedThisFrame();
+    renderStats_.particleUpdateMilliseconds = particles_.lastUpdateMilliseconds();
+
     renderStats_.cpuSubmissionMilliseconds =
         std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - submissionStart).count();
@@ -2021,7 +2310,7 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
 void StaticGizaScene::printRenderStats(std::ostream& output) const
 {
     output << std::fixed << std::setprecision(3)
-           << "Phase 10 render statistics (latest frame)\n"
+           << "Phase 11 render statistics (latest frame)\n"
            << "  construction: " << constructionTimeline_.progress() * 100.0f
            << "% (" << constructionStageName() << ")\n"
            << "  visible draws / instances / triangles: "
@@ -2040,6 +2329,35 @@ void StaticGizaScene::printRenderStats(std::ostream& output) const
            << "  material changes / texture binds: "
            << renderStats_.materialChanges << " / "
            << renderStats_.textureBinds << '\n'
+           << "  particles active / capacity / emitted: "
+           << particles_.activeCount() << " / " << particles_.capacity() << " / "
+           << renderStats_.emittedParticles << '\n'
+           << "  particle draws / instances / update: "
+           << renderStats_.particleDrawCalls << " / "
+           << renderStats_.particleInstances << " / "
+           << renderStats_.particleUpdateMilliseconds << " ms\n"
            << "  CPU collection + submission: "
            << renderStats_.cpuSubmissionMilliseconds << " ms\n";
+}
+
+void StaticGizaScene::printEffectStats(std::ostream& output) const
+{
+    output << std::fixed << std::setprecision(3)
+           << "Phase 11 effect statistics\n"
+           << "  enabled: " << (effectsEnabled_ ? "YES" : "NO") << '\n'
+           << "  active / peak / capacity: " << particles_.activeCount() << " / "
+           << particles_.peakActiveCount() << " / "
+           << particles_.capacity() << '\n'
+           << "  emitted latest frame / rejected total: "
+           << particles_.emittedThisFrame() << " / "
+           << particles_.rejectedTotal() << '\n'
+           << "  particle draws / instances: "
+           << renderStats_.particleDrawCalls << " / "
+           << renderStats_.particleInstances << '\n'
+           << "  CPU pool / instance buffer / texture: "
+           << particles_.cpuPoolBytes() << " / "
+           << particles_.instanceBufferBytes() << " / "
+           << particles_.textureBytes() << " bytes\n"
+           << "  last CPU update: " << particles_.lastUpdateMilliseconds()
+           << " ms\n";
 }

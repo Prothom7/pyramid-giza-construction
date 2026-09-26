@@ -1,0 +1,8 @@
+Key,Action,Default,CLIEquivalent,Notes
+F4,"Toggle particles, Nile UV motion, and foliage sway",On,"--effects / --no-effects","Disabling clears the fixed pool; G remains the guided camera demo"
+"Shift+F4","Print active/capacity/emitted counts, draws, memory, and CPU update time",N/A,"--render-stats","Console output only; does not alter effects"
+"CLI: --validate-effects","Run all Phase 11 CPU validation families",N/A,--validate-effects,"Particle, event, and environment-motion checks"
+"CLI: --validate-particles","Run particle pool/integration validation",N/A,--validate-particles,"Includes determinism, finite values, frame-rate equivalence, overflow, and reset"
+"CLI: --validate-effect-events","Run effect-trigger validation",N/A,--validate-effect-events,"Mallet, settlement, and moving/stationary sledge checks"
+"CLI: --validate-environment-motion","Run Nile/tree motion validation",N/A,--validate-environment-motion,"Finite, deterministic, bounded, and wrapped behavior"
+"CLI: --particle-capacity","Set fixed pool capacity",512,"--particle-capacity 64..2048","GPU instance buffer is allocated once to this capacity"

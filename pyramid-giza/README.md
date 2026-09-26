@@ -15,6 +15,7 @@ Course project status:
 - **Phase 8 - Complete:** moving directional-sun shadow mapping with bias and 3x3 PCF
 - **Phase 9 - Complete:** scene integrity, independent construction timelapse, dynamic infrastructure, animation refinement, and procedural UV textures
 - **Phase 10 - Complete:** indexed GPU instancing, construction-aware batching, conservative frustum culling, and render statistics
+- **Phase 11 - Complete:** instanced construction dust, animated Nile UVs, and subtle vegetation motion
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -75,6 +76,14 @@ draws at 75-percent construction; the complete pyramid measured 1,760 and 1,772,
 frusta use conservative bounding spheres, and compatible normal draws are sorted to
 reduce material uploads and texture binds.
 
+Phase 11 adds a fixed 512-slot deterministic CPU particle pool rendered in one indexed
+instanced billboard draw. Restrained emissions follow the moving loaded sledge, quarry
+mallet impacts, frontier-block settlement, and active work zones. The procedural Nile
+texture scrolls slowly and tree foliage sways around fixed trunk-top pivots; the same
+foliage transforms feed both the visible and shadow passes. Dust is alpha blended after
+opaque geometry, keeps depth testing, disables only depth writes and culling temporarily,
+and never enters the shadow map.
+
 ## Build and run
 
 ```powershell
@@ -121,6 +130,8 @@ build\PyramidGiza.exe
 - `Home` / `End`: set construction progress to 0 / 100 percent
 - `Y`: toggle conservative camera/light frustum culling
 - `I`: print current-frame render statistics
+- `F4`: toggle all atmospheric effects, Nile motion, and foliage sway
+- `Shift + F4`: print particle activity, memory, draw, and CPU-update statistics
 
 ## Validation
 
@@ -142,6 +153,10 @@ build\PyramidGiza.exe --validate-layout
 build\PyramidGiza.exe --validate-instancing
 build\PyramidGiza.exe --validate-frustum
 build\PyramidGiza.exe --validate-renderer-structure
+build\PyramidGiza.exe --validate-particles
+build\PyramidGiza.exe --validate-effect-events
+build\PyramidGiza.exe --validate-environment-motion
+build\PyramidGiza.exe --validate-effects
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -157,6 +172,8 @@ Construction startup options are --construction-progress 0..1, --timelapse, and
 --timelapse-speed 0.25..8. Use --textures or --no-textures for A/B runtime checks.
 Use `--render-stats` to print the latest frame, `--benchmark-render` for a two-second
 hidden benchmark, and `--no-frustum-culling` for a visibility-control comparison.
+`--effects` and `--no-effects` provide deterministic A/B startup, while
+`--particle-capacity 64..2048` changes the fixed pool capacity (default 512).
 Build output and captures are ignored by Git.
 
 ## Documentation
@@ -174,6 +191,7 @@ Build output and captures are ignored by Git.
 - [Phase 8 directional shadow mapping](docs/PHASE8_SHADOW_MAPPING.md)
 - [Phase 9 integration, timelapse, and textures](docs/PHASE9_INTEGRATION_TIMELAPSE_TEXTURES.md)
 - [Phase 10 renderer optimization](docs/PHASE10_RENDERER_OPTIMIZATION.md)
+- [Phase 11 atmospheric effects](docs/PHASE11_ATMOSPHERIC_EFFECTS.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
@@ -183,3 +201,5 @@ Phase 9 adds world-bounds, layout-validation, construction-timeline, constructio
 infrastructure-stage, texture, UV-mapping, material-texture, and texture-control tables.
 Phase 10 adds instance-batch, instance-attribute, frustum-culling, and measured
 render-performance tables.
+Phase 11 adds particle-system, effect-control, environmental-motion, and effect-performance
+tables.
