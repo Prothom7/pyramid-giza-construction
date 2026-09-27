@@ -1,5 +1,10 @@
 # Phase 12.5 - Post-showcase Construction Repair
 
+> Phase 12.6 supersedes the support-related implementation details below. The final
+> scene uses continuously filled ramps, three ground-founded scaffold groups, and no
+> upper connector or ramp-side stairs. See
+> [Phase 12.6](PHASE12_6_GROUNDING_AND_SUPPORT_REPAIR.md).
+
 ## Objective and diagnosis
 
 This pass repairs two visible presentation defects without replacing Phase 12 or the

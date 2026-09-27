@@ -73,7 +73,7 @@ const std::vector<AnchorPostDescriptor>& ObjectEnrichment::anchorPosts()
 const std::vector<LadderDescriptor>& ObjectEnrichment::ladders()
 {
     static const std::vector<LadderDescriptor> values{
-        {"QuarryLower", "Quarry", {-151.0f, -7.35f, -9.0f}, 0.0f, -8.0f,
+        {"QuarryLower", "Quarry", {-151.0f, -7.45f, -9.0f}, 0.0f, -8.0f,
          1.35f, 5.7f, 10, "Lower-to-middle terrace"},
         {"QuarryUpper", "Quarry", {-104.5f, -5.55f, -35.0f}, 90.0f, -7.0f,
          1.35f, 4.3f, 8, "Middle-to-upper terrace"},
@@ -81,9 +81,9 @@ const std::vector<LadderDescriptor>& ObjectEnrichment::ladders()
          1.25f, 7.8f, 13, "Front-west scaffold"},
         {"FrontEast", "Scaffold", {13.8f, 0.0f, 2.2f}, 0.0f, 7.0f,
          1.25f, 7.8f, 13, "Front-east scaffold"},
-        {"RampTop", "Scaffold", {8.0f, 8.55f, -4.4f}, 0.0f, -6.0f,
-         1.20f, 5.1f, 9, "Ramp-top scaffold"},
-        {"WestAccess", "Ramp access", {-43.2f, 4.95f, -22.6f}, 90.0f, -8.0f,
+        {"RampTop", "Scaffold", {8.0f, 0.0f, -4.4f}, 0.0f, -4.0f,
+         1.20f, 8.18f, 14, "Ramp-top scaffold"},
+        {"WestAccess", "Ramp access", {-43.2f, 0.0f, -22.6f}, 90.0f, -8.0f,
          1.25f, 4.8f, 8, "West access platform"},
         {"InspectionAccess", "Inspection station", {-49.0f, 0.0f, 8.4f}, 90.0f, -6.0f,
          1.15f, 2.2f, 5, "Raised inspection bed"},
@@ -169,7 +169,7 @@ bool validateObjectEnrichment(std::ostream& output)
     const bool deterministic = &repeatedRigs == &ObjectEnrichment::ropeRigs() &&
                                repeatedRigs.front().center ==
                                    ObjectEnrichment::ropeRigs().front().center;
-    // 327 static primitive instances plus four rigid-part workers (4 * 17).
+    // 349 support-aware primitive instances plus four rigid-part workers (4 * 17).
     const std::size_t estimatedAddedDrawCalls = ObjectEnrichment::expectedAddedDrawCalls;
     const bool performanceValid = estimatedAddedDrawCalls <=
                                   ObjectEnrichment::maximumAddedDrawCalls;

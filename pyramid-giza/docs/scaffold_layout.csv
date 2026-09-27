@@ -1,6 +1,4 @@
-ScaffoldID,ModuleType,WorldX,WorldY,WorldZ,RotationY,Levels,Bays,ModuleWidth,ModuleCount,MinProgress,MaxProgress,Purpose,Notes
-FrontWest,RigidPrimitiveModule,-24,0,2.8,0,3,3,4.6,9,0.05,0.48,Early west-face access,Removed before middle courses overtake it
-FrontEast,RigidPrimitiveModule,12,0,2.8,0,3,3,4.6,9,0.20,0.62,Lower-middle east-face access,Stage-aware shared modules
-RampTop,RigidPrimitiveModule,7.5,8.55,-4.8,0,2,2,4.6,4,0.62,0.90,Hero-ramp landing access,Outside the load corridor
-MiddleEast,RigidPrimitiveModule,24,10.8,-10,-24,2,2,4.6,4,0.42,0.72,Migrating middle-course access,Removed before upper closure
-SummitEast,RigidPrimitiveModule,43.5,19.25,-29,-20,2,2,4.6,4,0.72,0.985,Late upper-course access,Outside completed pyramid envelope and absent at completion
+ScaffoldID,ModuleType,WorldX,WorldY,WorldZ,RotationY,Levels,Bays,ModuleWidth,ModuleCount,MinProgress,MaxProgress,BaseSupport,Purpose,Notes
+FrontWest,RigidPrimitiveModule,-24,0,2.8,0,3,3,4.6,9,0.05,0.48,Desert ground,Early west-face access,Each upper tier begins on the platform below
+FrontEast,RigidPrimitiveModule,12,0,2.8,0,3,3,4.6,9,0.20,0.62,Desert ground,Lower-middle east-face access,Stage-aware shared modules
+RampTop,RigidPrimitiveModule,7.5,0,-4.8,0,3,2,4.6,6,0.62,0.90,Desert ground,Hero-ramp landing access,Ground-founded replacement for elevated floating group

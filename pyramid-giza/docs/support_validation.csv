@@ -1,0 +1,26 @@
+Checkpoint,ObjectID,ObjectType,Category,SupportType,ExpectedSupportY,ObjectBottomY,VerticalGap,Tolerance,Result,Notes
+0,MainHaulingLow,Ramp,Structure-supported,Stepped earth fill,Sampled,Sampled,MaxAbs 0.016,-0.08 to 0.08,PASS,Five longitudinal samples
+0,QuarryExitRamp,Ramp,Structure-supported,Quarry-floor earth fill,Sampled,Sampled,MaxAbs 0.051,-0.08 to 0.08,PASS,Five longitudinal samples
+0,FrontierBlocks,Pyramid blocks,Structure-supported,Ground or prior course,Computed,Computed,MaxAbs 0.040,-0.08 to 0.08,PASS,Footprint overlap required
+25,MainHaulingLow,Ramp,Structure-supported,Stepped earth fill,Sampled,Sampled,MaxAbs 0.016,-0.08 to 0.08,PASS,Five longitudinal samples
+25,WestAccessRamp,Ramp,Structure-supported,Stepped earth fill,Sampled,Sampled,MaxAbs 0.031,-0.08 to 0.08,PASS,Five longitudinal samples
+25,FrontWestScaffold,Scaffold,Ground-supported,Desert ground,0.000,0.000,0.000,-0.08 to 0.08,PASS,All base poles ground-founded
+25,FrontEastScaffold,Scaffold,Ground-supported,Desert ground,0.000,0.000,0.000,-0.08 to 0.08,PASS,All base poles ground-founded
+25,FrontierBlocks,Pyramid blocks,Structure-supported,Prior stable course,Computed,Computed,MaxAbs 0.040,-0.08 to 0.08,PASS,Exterior active set
+50,MainHaulingMiddle,Ramp,Structure-supported,Stepped earth fill,Sampled,Sampled,MaxAbs 0.039,-0.08 to 0.08,PASS,Five longitudinal samples
+50,WestAccessRamp,Ramp,Structure-supported,Stepped earth fill,Sampled,Sampled,MaxAbs 0.031,-0.08 to 0.08,PASS,Five longitudinal samples
+50,FrontEastScaffold,Scaffold,Ground-supported,Desert ground,0.000,0.000,0.000,-0.08 to 0.08,PASS,Ground-founded
+50,FrontierBlocks,Pyramid blocks,Structure-supported,Prior stable course,Computed,Computed,MaxAbs 0.040,-0.08 to 0.08,PASS,Exterior active set
+75,MainHaulingRamp,Ramp,Structure-supported,Stepped earth fill,Sampled,Sampled,MaxAbs 0.061,-0.08 to 0.08,PASS,Five longitudinal samples
+75,MainLanding,Landing,Structure-supported,Solid earth fill,8.150,8.150,0.000,-0.08 to 0.08,PASS,Horizontal filled landing
+75,RampTopScaffold,Scaffold,Ground-supported,Desert ground,0.000,0.000,0.000,-0.08 to 0.08,PASS,Three levels begin at ground
+75,UpperWorkDeck,Platform,Structure-supported,Ground-founded posts,8.200,8.200,0.000,-0.08 to 0.08,PASS,Eight posts and two crossbeams
+75,UpperPreparedStones,Stone queue,Structure-supported,Upper work deck,8.550,8.575,0.025,-0.08 to 0.08,PASS,Four staged stones
+75,ConstructionCrew,Workers,Structure-supported,Active ramp surface,Computed,Computed,0.000,-0.08 to 0.08,PASS,Feet use ramp-surface roots
+75,FrontierBlocks,Pyramid blocks,Structure-supported,Prior stable course,Computed,Computed,MaxAbs 0.040,-0.08 to 0.08,PASS,Meaningful footprint overlap
+100,QuarryExitRamp,Ramp,Structure-supported,Quarry-floor earth fill,Sampled,Sampled,MaxAbs 0.051,-0.08 to 0.08,PASS,Permanent route
+All,GroundStagingQueue,Prepared stones,Ground-supported,Desert ground,0.000,0.000,0.000,-0.08 to 0.08,PASS,Bottom derived from model matrix
+All,QuarryLowerLadder,Ladder,Ground-supported,Quarry floor,-7.450,-7.450,0.000,-0.08 to 0.11,PASS,Lean does not lift its foot
+All,WestAccessWalkway,Walkway,Structure-supported,Ramp plus ground posts,4.595,4.595,0.000,-0.08 to 0.08,PASS,Four explicit posts
+All,HeroRopes,Rope,Intentionally suspended,Worker and sledge endpoints,N/A,N/A,N/A,Documented,PASS,Excluded from grounding failure count
+All,LeverStone,Animated stone,Intentionally suspended,Lever rig,N/A,N/A,N/A,Documented,PASS,Only during deliberate lift

@@ -33,6 +33,7 @@
 #include "scene/ObjectEnrichment.h"
 #include "scene/SceneIntegrity.h"
 #include "scene/StaticGizaScene.h"
+#include "scene/SupportSystem.h"
 
 namespace
 {
@@ -556,6 +557,9 @@ int main(int argc, char** argv)
     bool showcaseValidationOnly = false;
     bool timelapseRepairValidationOnly = false;
     bool rampClearanceValidationOnly = false;
+    bool supportValidationOnly = false;
+    bool groundingValidationOnly = false;
+    bool stageDependencyValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -640,6 +644,12 @@ int main(int argc, char** argv)
             timelapseRepairValidationOnly = true;
         else if (option == "--validate-ramp-clearance")
             rampClearanceValidationOnly = true;
+        else if (option == "--validate-supports")
+            supportValidationOnly = true;
+        else if (option == "--validate-grounding")
+            groundingValidationOnly = true;
+        else if (option == "--validate-stage-dependencies")
+            stageDependencyValidationOnly = true;
         else if (option == "--showcase")
             startShowcasePresentation = true;
         else if (option == "--showcase-time" && argument + 1 < argc)
@@ -945,6 +955,12 @@ int main(int argc, char** argv)
         return validateTimelapsePlaybackRepair(std::cout) ? 0 : 1;
     if (rampClearanceValidationOnly)
         return validatePhase12_5RampClearance(std::cout) ? 0 : 1;
+    if (supportValidationOnly)
+        return validatePhase12_6Supports(std::cout) ? 0 : 1;
+    if (groundingValidationOnly)
+        return validatePhase12_6Grounding(std::cout) ? 0 : 1;
+    if (stageDependencyValidationOnly)
+        return validatePhase12_6StageDependencies(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
@@ -964,7 +980,10 @@ int main(int argc, char** argv)
         !validatePhase12ShowcaseCamera(std::cout) ||
         !validatePhase12ShowcaseState(std::cout) ||
         !validateTimelapsePlaybackRepair(std::cout) ||
-        !validatePhase12_5RampClearance(std::cout))
+        !validatePhase12_5RampClearance(std::cout) ||
+        !validatePhase12_6Supports(std::cout) ||
+        !validatePhase12_6Grounding(std::cout) ||
+        !validatePhase12_6StageDependencies(std::cout))
         return 1;
 
     if (benchmarkRender && smokeDurationSeconds <= 0.0f)

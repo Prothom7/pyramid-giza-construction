@@ -1,17 +1,17 @@
 Infrastructure,PrimitiveReuse,MinProgress,MaxProgress,StageBehavior
-MainHaulingLow,Cube/Cylinder,0.00,0.30,Low ramp rails rollers supports stairs and queued stones
-MainHaulingMiddle,Cube/Cylinder,0.30,0.62,Middle ramp replaces the early route
-MainHaulingRamp,Cube/Cylinder,0.62,0.90,Hero route used by the preserved transport animation
-MainLanding,Cube,0.62,0.90,Controlled landing joins hero ramp at the work face
-WestAccessRamp,Cube/Cylinder,0.05,0.62,Separate worker access removed as construction rises
-UpperConnector,Cube/Cylinder,0.62,0.985,Late east-face access with supports and queued stones
-QuarryExitRamp,Cube/Cylinder,0.00,1.01,Permanent terrain-supported quarry route
-ScaffoldGroups,Cube/Cylinder,0.05-0.72,0.48-0.985,Five groups migrate by construction stage
-ScaffoldLaddersAndWalkways,Cube,0.05-0.62,0.48-0.90,Access parts share the lifecycle of their ramp or scaffold group
+MainHaulingLow,Cube/Cylinder,0.00,0.30,Low ramp rails rollers and 64-segment ground fill
+MainHaulingMiddle,Cube/Cylinder,0.30,0.62,Middle filled ramp replaces early route
+MainHaulingRamp,Cube/Cylinder,0.62,0.90,Hero route with continuous fill
+MainLanding,Cube,0.62,0.90,Solid filled landing joins hero ramp at work deck
+WestAccessRamp,Cube/Cylinder,0.05,0.62,Filled worker route removed as construction rises
+QuarryExitRamp,Cube/Cylinder,0.00,1.01,Permanent quarry-floor filled route
+ScaffoldGroups,Cube/Cylinder,0.05-0.62,0.48-0.90,Three ground-founded groups migrate by stage
+ScaffoldLaddersAndWalkways,Cube/Cylinder,0.05-0.62,0.48-0.90,Feet and decks share support lifecycle
+UpperWorkDeck,Cube/Cylinder,0.62,0.90,Eight posts and two crossbeams support all upper props
 PreparedRepository,Cube,0.08,0.965,Twelve stones deplete deterministically
-StageStoneQueues,Cube,0.00-0.62,0.30-0.985,Three prepared stones follow each active haul stage
+StageStoneQueues,Cube,0.00-0.62,0.30-0.90,Three prepared stones occupy a ground-supported staging lane
 EarlyParkedSledge,Cube/Cylinder,0.10,0.68,Shared sledge composition
 LateParkedSledge,Cube/Cylinder,0.55,0.97,Shared sledge composition
-ConstructionCrews,Cube/Cylinder/Sphere,0.00,1.01,Four elevated crews move beside the active route then return to ground support
-BackgroundWorkers,Cube/Cylinder/Sphere,0.04-0.28,0.90-1.01,Non-construction workers retain deterministic arrival and departure staging
-PulleyWheels,Cylinder,0.12-0.70,0.92-0.995,Speculative wheels rotate by transform and are stage-limited
+ConstructionCrews,Cube/Cylinder/Sphere,0.00,1.01,Four crews stand on active ramp surfaces then ground
+BackgroundWorkers,Cube/Cylinder/Sphere,0.04-0.28,0.90-1.01,Deterministic arrival and departure staging
+PulleyWheels,Cylinder,0.12-0.70,0.92-0.995,Speculative frame-suspended wheels rotate by transform

@@ -14,6 +14,7 @@
 #include "objects/Scaffold.h"
 #include "scene/MonumentalSite.h"
 #include "scene/PyramidLayout.h"
+#include "scene/SupportSystem.h"
 
 namespace
 {
@@ -182,17 +183,17 @@ bool validatePhase12_5RampClearance(std::ostream& output)
                 continue;
             ++activeRamps;
             const Obb rampObb = rampBox(ramp, 0.04f);
-            const bool earthSupported = std::string(ramp.id) == "QuarryExitRamp";
-            if (!earthSupported && std::string(ramp.id) != "MainLanding")
+            for (float sample : {0.0f, 0.25f, 0.50f, 0.75f, 1.0f})
             {
-                for (float sample : {0.25f, 0.50f, 0.75f})
-                {
-                    const float height =
-                        MonumentalSite::rampSurfacePoint(ramp, sample).y -
-                        ramp.supportSurfaceY;
-                    if (!std::isfinite(height) || height <= 0.15f)
-                        ++unsupported;
-                }
+                const SupportSurface support =
+                    SceneSupport::rampFillAt(ramp, sample);
+                const float gap =
+                    SceneSupport::rampUndersideY(ramp, sample) -
+                    support.height;
+                if (!std::isfinite(gap) ||
+                    gap < SceneSupport::minimumContactGap ||
+                    gap > SceneSupport::maximumContactGap)
+                    ++unsupported;
             }
             if (ramp.animatedRoute &&
                 (ramp.width < 5.0f || ramp.sideClearance < 0.60f))

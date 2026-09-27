@@ -1,8 +1,7 @@
-RampID,StartX,StartY,StartZ,EndX,EndY,EndZ,Width,Thickness,MinProgress,MaxProgress,SideClearance,SupportSurfaceY,Role,AnimatedRoute,IntentionalContact,Notes
-MainHaulingLow,0,0.30,45,0,2.35,0.80,7.0,0.65,0.00,0.30,1.45,0.0,Early low-course haul,No,No,Stage-aware body rails rollers supports and side stairs
-MainHaulingMiddle,0,0.32,45,0,5.25,-1.70,7.0,0.68,0.30,0.62,1.45,0.0,Lower-middle haul,No,No,Replaces low route as courses rise
-MainHaulingRamp,0,0.35,45,0,8.20,-4.20,7.0,0.70,0.62,0.90,1.35,0.0,Hero upper-middle haul,Yes,No,Authoritative Phase 5 transport route
-MainLanding,0,8.20,-4.20,0,8.20,-5.25,7.8,0.40,0.62,0.90,0.25,0.0,Controlled pyramid-face landing,No,Yes,Joins the hero ramp outside visible blocks
-WestAccessRamp,-63,0.30,-25,-40,4.30,-25,4.5,0.60,0.05,0.62,1.40,0.0,West worker access,No,No,Separate worker route
-UpperConnector,42,8.70,-8,35.5,19.20,-27.5,3.6,0.52,0.62,0.985,1.50,0.0,Late east-face connector,No,No,Outside completed pyramid envelope
-QuarryExitRamp,-103,-6.20,-8,-91,0.35,9,7.5,0.65,0.00,1.01,0.40,-7.5,Quarry terrace exit,No,No,Earth-supported permanent route with side stairs
+RampID,StartX,StartY,StartZ,EndX,EndY,EndZ,Width,Thickness,MinProgress,MaxProgress,SideClearance,SupportSurfaceY,FillSegments,Role,AnimatedRoute,IntentionalContact,Notes
+MainHaulingLow,0,0.30,45,0,2.35,0.80,7.0,0.65,0.00,0.30,1.45,0.0,64,Early low-course haul,No,No,Continuous stepped earth fill; side stairs removed
+MainHaulingMiddle,0,0.32,45,0,5.25,-1.70,7.0,0.68,0.30,0.62,1.45,0.0,64,Lower-middle haul,No,No,Continuous stepped earth fill
+MainHaulingRamp,0,0.35,45,0,8.20,-4.20,7.0,0.70,0.62,0.90,1.35,0.0,64,Hero upper-middle haul,Yes,No,Continuous fill and supported landing junction
+MainLanding,0,8.35,-4.20,0,8.35,-5.25,7.8,0.40,0.62,0.90,0.25,0.0,1,Controlled pyramid-face landing,No,Yes,Solid filled landing with top at 8.55
+WestAccessRamp,-63,0.30,-25,-40,4.30,-25,4.5,0.60,0.05,0.62,1.40,0.0,64,West worker access,No,No,Continuous fill supports walkway endpoint
+QuarryExitRamp,-103,-6.20,-8,-91,0.35,9,7.5,0.65,0.00,1.01,0.40,-7.5,64,Quarry terrace exit,No,No,Permanent quarry-floor earth fill

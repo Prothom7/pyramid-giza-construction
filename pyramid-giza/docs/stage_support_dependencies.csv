@@ -1,0 +1,20 @@
+ObjectID,SupportID,Category,ObjectMinProgress,ObjectMaxProgress,SupportMinProgress,SupportMaxProgress,Rule,Result
+MainHaulingLow,MainHaulingLowFill,Structure-supported,0.00,0.30,0.00,0.30,Object implies support,PASS
+MainHaulingMiddle,MainHaulingMiddleFill,Structure-supported,0.30,0.62,0.30,0.62,Object implies support,PASS
+MainHaulingRamp,MainHaulingRampFill,Structure-supported,0.62,0.90,0.62,0.90,Object implies support,PASS
+MainLanding,MainLandingFill,Structure-supported,0.62,0.90,0.62,0.90,Object implies support,PASS
+WestAccessRamp,WestAccessRampFill,Structure-supported,0.05,0.62,0.05,0.62,Object implies support,PASS
+QuarryExitRamp,QuarryExitRampFill,Structure-supported,0.00,1.01,0.00,1.01,Object implies support,PASS
+FrontWestScaffold,DesertGround,Ground-supported,0.05,0.48,0.00,1.01,Object implies support,PASS
+FrontEastScaffold,DesertGround,Ground-supported,0.20,0.62,0.00,1.01,Object implies support,PASS
+RampTopScaffold,DesertGround,Ground-supported,0.62,0.90,0.00,1.01,Object implies support,PASS
+FrontWestLadder,FrontWestScaffold,Structure-supported,0.05,0.48,0.05,0.48,Object implies support,PASS
+FrontEastLadder,FrontEastScaffold,Structure-supported,0.20,0.62,0.20,0.62,Object implies support,PASS
+RampTopLadder,RampTopScaffold,Structure-supported,0.62,0.90,0.62,0.90,Object implies support,PASS
+WestAccessLadder,WestAccessRamp,Structure-supported,0.05,0.62,0.05,0.62,Object implies support,PASS
+UpperWorkDeck,UpperDeckPosts,Structure-supported,0.62,0.90,0.62,0.90,Object implies support,PASS
+UpperWorkProps,UpperWorkDeck,Structure-supported,0.62,0.90,0.62,0.90,Object implies support,PASS
+FrontierBlocks,PreviousPyramidCourse,Structure-supported,0.00,1.01,0.00,1.01,Object implies support,PASS
+HeroRopes,HeroSledgeAndWorkers,Intentionally suspended,0.00,1.01,0.00,1.01,Endpoints imply suspension,PASS
+PulleyRopes,PulleyFrames,Intentionally suspended,0.00,1.01,0.00,1.01,Frame implies suspension,PASS
+LeverStone,LeverRig,Intentionally suspended,0.00,1.01,0.00,1.01,Rig implies suspension,PASS

@@ -18,6 +18,7 @@ Course project status:
 - **Phase 11 - Complete:** instanced construction dust, animated Nile UVs, and subtle vegetation motion
 - **Phase 12 - Complete:** deterministic synchronized cinematic showcase and final presentation flow
 - **Phase 12.5 - Complete:** post-showcase construction playback and ramp/scaffold clearance repair
+- **Phase 12.6 - Complete:** grounding, support, and construction-stage spatial stability repair
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -38,7 +39,7 @@ Phase 6 adds three movement speeds, smooth/instant curated presets, pyramid orbi
 transport follow, a seven-shot guided demo, safe FOV zoom, and debug pose output without
 changing world geometry or the rendering pipeline.
 
-The enrichment pass adds 327 static primitive instances and four support workers. The
+The enrichment/support pass now contains 349 static primitive instances and four support workers. The
 visible pass has approximately 9,463 maximum draw calls, while all scene objects still
 share the same four uploaded meshes. Pulley/roller rigs are explicitly presented as
 speculative graphics demonstrations rather than historically certain Khufu-era machinery.
@@ -102,10 +103,13 @@ then pass through queued, approach, lift/slide, alignment, and settlement transf
 The exact 70/4,734/6,964/7,561/7,714 checkpoint counts remain unchanged.
 
 The same repair replaces overlapping permanent access slabs with low, middle, hero,
-landing, west-access, upper-connector, and quarry ramp descriptors. Ramp bodies, rails,
-rollers, supports, side stairs, scaffolds, queued stones, and elevated crews now follow
-construction-stage intervals. CPU OBB checks report no unintended ramp/pyramid,
-ramp/ramp, or ramp/scaffold intersection at 0, 25, 50, 75, and 100 percent.
+landing, west-access, and quarry ramp descriptors. Phase 12.6 then grounds those routes
+with fine stepped earth fill, removes unsupported side stairs and the late upper
+connector, starts all remaining scaffolds on terrain, and gives the upper work zone an
+eight-post deck. Queued stones use a ground lane, workers stand on active ramp surfaces,
+and frontier stones retain lower-course footprint overlap. CPU validation reports no
+unintended ramp intersections, unsupported samples, excessive support gaps, or
+stage-support visibility violations at 0, 25, 50, 75, and 100 percent.
 
 ## Build and run
 
@@ -186,6 +190,9 @@ build\PyramidGiza.exe --validate-effects
 build\PyramidGiza.exe --validate-showcase
 build\PyramidGiza.exe --validate-timelapse-repair
 build\PyramidGiza.exe --validate-ramp-clearance
+build\PyramidGiza.exe --validate-supports
+build\PyramidGiza.exe --validate-grounding
+build\PyramidGiza.exe --validate-stage-dependencies
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -227,6 +234,7 @@ Build output and captures are ignored by Git.
 - [Phase 11 atmospheric effects](docs/PHASE11_ATMOSPHERIC_EFFECTS.md)
 - [Phase 12 cinematic showcase](docs/PHASE12_CINEMATIC_SHOWCASE.md)
 - [Phase 12.5 construction repair](docs/PHASE12_5_CONSTRUCTION_REPAIR.md)
+- [Phase 12.6 grounding and support repair](docs/PHASE12_6_GROUNDING_AND_SUPPORT_REPAIR.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
@@ -241,3 +249,5 @@ tables.
 Phase 12 adds showcase-shot, action, control, and camera-path-validation tables.
 Phase 12.5 updates the ramp, scaffold, and infrastructure-stage records and adds
 timelapse-playback and geometric-clearance validation tables.
+Phase 12.6 adds support-validation and stage-support-dependency tables and updates the
+authoritative ramp/scaffold records.

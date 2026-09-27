@@ -59,15 +59,12 @@ const std::vector<RampDescriptor>& MonumentalSite::ramps()
         {"MainHaulingRamp", {0.0f, 0.35f, 45.0f}, {0.0f, 8.20f, -4.20f},
          scale().mainRampWidth, 0.70f, MaterialId::RampEarth, true,
          0.62f, 0.90f, 1.35f, 0.0f, false, "Hero and upper-middle haul"},
-        {"MainLanding", {0.0f, 8.20f, -4.20f}, {0.0f, 8.20f, -5.25f},
+        {"MainLanding", {0.0f, 8.35f, -4.20f}, {0.0f, 8.35f, -5.25f},
          7.8f, 0.40f, MaterialId::RampEarth, false,
          0.62f, 0.90f, 0.25f, 0.0f, true, "Controlled pyramid-face landing"},
         {"WestAccessRamp", {-63.0f, 0.30f, -25.0f}, {-40.0f, 4.30f, -25.0f},
          4.5f, 0.60f, MaterialId::RampEarth, false,
          0.05f, 0.62f, 1.40f, 0.0f, false, "West worker access"},
-        {"UpperConnector", {42.0f, 8.70f, -8.0f}, {35.5f, 19.20f, -27.5f},
-         3.6f, 0.52f, MaterialId::RampEarth, false,
-         0.62f, 0.985f, 1.50f, 0.0f, false, "Late east-face connector"},
         {"QuarryExitRamp", {-103.0f, -6.2f, -8.0f}, {-91.0f, 0.35f, 9.0f},
          7.5f, 0.65f, MaterialId::RampEarth, false,
          0.0f, 1.01f, 0.40f, -7.5f, false, "Quarry terrace exit"}
@@ -111,12 +108,8 @@ const std::vector<ScaffoldPlacement>& MonumentalSite::scaffolds()
          "Early west-face access", 0.05f, 0.48f},
         {"FrontEast", {12.0f, 0.0f, 2.8f}, 0.0f, 3, 3,
          "Lower-middle east-face access", 0.20f, 0.62f},
-        {"RampTop", {7.5f, 8.55f, -4.8f}, 0.0f, 2, 2,
-         "Hero-ramp landing access", 0.62f, 0.90f},
-        {"MiddleEast", {24.0f, 10.8f, -10.0f}, -24.0f, 2, 2,
-         "Migrating middle-course access", 0.42f, 0.72f},
-        {"SummitEast", {43.5f, 19.25f, -29.0f}, -20.0f, 2, 2,
-         "Late upper-course access", 0.72f, 0.985f}
+        {"RampTop", {7.5f, 0.0f, -4.8f}, 0.0f, 3, 2,
+         "Ground-founded hero-ramp landing access", 0.62f, 0.90f}
     };
     return values;
 }

@@ -213,51 +213,42 @@ FrontierPlacementTransform ConstructionTimelineController::frontierTransform(
     else
         outward = glm::normalize(outward);
 
-    float tilt = 0.0f;
     if (amount < 0.14f)
     {
         result.phase = FrontierPlacementPhase::Queued;
-        result.offset = outward * 7.0f + glm::vec3{0.0f, 0.15f, 0.0f};
-        tilt = 4.0f;
+        result.offset = outward * 0.80f;
     }
     else if (amount < 0.50f)
     {
         result.phase = FrontierPlacementPhase::Approach;
         const float t = easedRange(amount, 0.14f, 0.50f);
-        result.offset = outward * glm::mix(7.0f, 1.8f, t) +
-                        glm::vec3{0.0f, glm::mix(0.15f, 0.40f, t), 0.0f};
-        tilt = glm::mix(4.0f, 3.0f, t);
+        result.offset = outward * glm::mix(0.80f, 0.40f, t);
     }
     else if (amount < 0.72f)
     {
         result.phase = FrontierPlacementPhase::LiftSlide;
         const float t = easedRange(amount, 0.50f, 0.72f);
-        result.offset = outward * glm::mix(1.8f, 0.60f, t) +
-                        glm::vec3{0.0f, glm::mix(0.40f, 2.40f, t), 0.0f};
-        tilt = glm::mix(3.0f, 1.8f, t);
+        result.offset = outward * glm::mix(0.40f, 0.18f, t) +
+                        glm::vec3{0.0f, std::sin(t * 3.14159265f) * 0.04f, 0.0f};
     }
     else if (amount < 0.92f)
     {
         result.phase = FrontierPlacementPhase::Align;
         const float t = easedRange(amount, 0.72f, 0.92f);
-        result.offset = outward * glm::mix(0.60f, 0.0f, t) +
-                        glm::vec3{0.0f, glm::mix(2.40f, 0.55f, t), 0.0f};
-        tilt = glm::mix(1.8f, 0.4f, t);
+        result.offset = outward * glm::mix(0.18f, 0.0f, t) +
+                        glm::vec3{0.0f, glm::mix(0.04f, 0.02f, t), 0.0f};
     }
     else if (amount < 1.0f)
     {
         result.phase = FrontierPlacementPhase::Settle;
         const float t = easedRange(amount, 0.92f, 1.0f);
-        const float settleBounce = std::sin(t * 3.14159265f) * 0.08f;
-        result.offset = {0.0f, glm::mix(0.55f, 0.0f, t) + settleBounce, 0.0f};
-        tilt = glm::mix(0.4f, 0.0f, t);
+        const float settleBounce = std::sin(t * 3.14159265f) * 0.01f;
+        result.offset = {0.0f, glm::mix(0.02f, 0.0f, t) + settleBounce, 0.0f};
     }
     else
         result.phase = FrontierPlacementPhase::Stable;
 
-    result.rotationDegrees =
-        front ? glm::vec3{tilt, 0.0f, 0.0f}
-              : glm::vec3{0.0f, 0.0f, -tilt};
+    result.rotationDegrees = {0.0f, 0.0f, 0.0f};
     return result;
 }
 

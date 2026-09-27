@@ -50,7 +50,7 @@ std::vector<ObjectPart> Scaffold::createModule()
     }
 
     add(parts, "Platform", ScenePrimitive::Cube,
-        {0.0f, levelHeight(), 0.0f}, {},
+        {0.0f, levelHeight() - 0.08f, 0.0f}, {},
         {width() + 0.35f, 0.16f, depth() + 0.35f}, MaterialId::Wood);
     return parts;
 }

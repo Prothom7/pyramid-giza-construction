@@ -41,6 +41,7 @@ add_executable(PyramidGiza
     src/scene/ObjectEnrichment.cpp
     src/scene/SceneIntegrity.cpp
     src/scene/RampValidation.cpp
+    src/scene/SupportSystem.cpp
     src/scene/SceneTypes.cpp
     src/scene/StaticGizaScene.cpp
     src/objects/Worker.cpp
@@ -113,3 +114,6 @@ add_test(NAME Phase12ShowcaseCameraValidation COMMAND PyramidGiza --validate-sho
 add_test(NAME Phase12ShowcaseStateValidation COMMAND PyramidGiza --validate-showcase-state)
 add_test(NAME Phase12_5TimelapseRepairValidation COMMAND PyramidGiza --validate-timelapse-repair)
 add_test(NAME Phase12_5RampClearanceValidation COMMAND PyramidGiza --validate-ramp-clearance)
+add_test(NAME Phase12_6SupportSurfaceValidation COMMAND PyramidGiza --validate-supports)
+add_test(NAME Phase12_6GroundingValidation COMMAND PyramidGiza --validate-grounding)
+add_test(NAME Phase12_6StageDependencyValidation COMMAND PyramidGiza --validate-stage-dependencies)

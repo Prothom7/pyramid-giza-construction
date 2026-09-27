@@ -107,13 +107,13 @@ clip-space/NDC pipeline.
 
 `--validate-enrichment` verifies finite descriptor values, positive/nonzero dimensions,
 rig wheel references, ladder rung counts/spacing, valid boats, deterministic data,
-hero-route clearance, and a 420-draw safety budget. Runtime `addObject()` validates every
-actual model transform and the builder enforces exactly 327 new static primitive
-instances.
+hero-route clearance, and a 420-draw safety budget. Runtime addObject() validates every
+actual model transform. Phase 6.5 originally enforced 327 static primitives; the later
+Phase 12.6 support deck adds 22 load-bearing parts, so the current invariant is 349.
 
-The pass adds 327 static draws and four 17-part support workers: 395 maximum draws in
-total. Maximum scene draws rise from about 9,068 to 9,463 (about 4.4%). Mesh uploads do
-not increase.
+The original pass added 327 static draws and four 17-part support workers. With the
+Phase 12.6 support deck the current contribution is 349 primitives plus those workers,
+or 417 maximum draws, still inside the 420-draw budget. Mesh uploads do not increase.
 
 ## Deliberately deferred
 
