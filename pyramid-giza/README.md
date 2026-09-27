@@ -19,6 +19,7 @@ Course project status:
 - **Phase 12 - Complete:** deterministic synchronized cinematic showcase and final presentation flow
 - **Phase 12.5 - Complete:** post-showcase construction playback and ramp/scaffold clearance repair
 - **Phase 12.6 - Complete:** grounding, support, and construction-stage spatial stability repair
+- **Phase 12.7 - Complete:** deterministic quarry pulley rock-lifting visualization
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -111,6 +112,14 @@ and frontier stones retain lower-course footprint overlap. CPU validation report
 unintended ramp intersections, unsupported samples, excessive support gaps, or
 stage-support visibility violations at 0, 25, 50, 75, and 100 percent.
 
+Phase 12.7 adds a supported quarry gantry, moving trolley, pulley wheel, dynamic
+rope/sling, lifted limestone block, and an independently supported receiving
+platform. Its deterministic 14-second cycle covers Idle, Attach, Tension, Lift,
+UpperHold, GuideToPlatform, Lower, Release, and Complete. This is explicitly a
+speculative/experimental graphics visualization, not archaeological proof of
+Khufu-era pulley machinery. All 33 maximum component instances reuse existing
+cube and cylinder meshes and enter the same visible/shadow frame list.
+
 ## Build and run
 
 ```powershell
@@ -142,6 +151,7 @@ build\PyramidGiza.exe
 - `F5`: start/restart the full synchronized Phase 12 showcase
 - `Shift + F5`: cancel the showcase and return to manual camera control
 - `F6`: pause/resume the showcase presentation clock
+- `F7`: pause/resume the independent quarry pulley cycle
 - `K`: print camera position, yaw, pitch, FOV, and mode
 - `C`: toggle back-face culling; `F`: toggle filled/wireframe
 - `Space`: pause/resume; `N`: next state; `R`: reset; `L`: loop
@@ -193,6 +203,8 @@ build\PyramidGiza.exe --validate-ramp-clearance
 build\PyramidGiza.exe --validate-supports
 build\PyramidGiza.exe --validate-grounding
 build\PyramidGiza.exe --validate-stage-dependencies
+build\PyramidGiza.exe --validate-quarry-pulley
+build\PyramidGiza.exe --validate-quarry-pulley-support
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -235,6 +247,7 @@ Build output and captures are ignored by Git.
 - [Phase 12 cinematic showcase](docs/PHASE12_CINEMATIC_SHOWCASE.md)
 - [Phase 12.5 construction repair](docs/PHASE12_5_CONSTRUCTION_REPAIR.md)
 - [Phase 12.6 grounding and support repair](docs/PHASE12_6_GROUNDING_AND_SUPPORT_REPAIR.md)
+- [Phase 12.7 quarry pulley lift](docs/PHASE12_7_QUARRY_PULLEY_LIFT.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
@@ -251,3 +264,5 @@ Phase 12.5 updates the ramp, scaffold, and infrastructure-stage records and adds
 timelapse-playback and geometric-clearance validation tables.
 Phase 12.6 adds support-validation and stage-support-dependency tables and updates the
 authoritative ramp/scaffold records.
+Phase 12.7 adds quarry-pulley component, animation-state, and validation tables and
+extends the support records with conditional floor/suspension/platform dependencies.

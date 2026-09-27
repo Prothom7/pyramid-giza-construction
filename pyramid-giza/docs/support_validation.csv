@@ -24,3 +24,8 @@ All,QuarryLowerLadder,Ladder,Ground-supported,Quarry floor,-7.450,-7.450,0.000,-
 All,WestAccessWalkway,Walkway,Structure-supported,Ramp plus ground posts,4.595,4.595,0.000,-0.08 to 0.08,PASS,Four explicit posts
 All,HeroRopes,Rope,Intentionally suspended,Worker and sledge endpoints,N/A,N/A,N/A,Documented,PASS,Excluded from grounding failure count
 All,LeverStone,Animated stone,Intentionally suspended,Lever rig,N/A,N/A,N/A,Documented,PASS,Only during deliberate lift
+All,QuarryPulleyFrame,Gantry,Ground-supported,Quarry floor,-7.450,-7.450,0.000,-0.08 to 0.08,PASS,Four post endpoints
+All,QuarryPulleyPlatform,Receiving deck,Structure-supported,Four floor-founded posts,-2.900,-2.900,0.000,-0.08 to 0.08,PASS,Deck bottom equals post tops
+All,QuarryPulleyLoadStart,Limestone block,Ground-supported,Quarry floor,-7.450,-7.450,0.000,-0.02 to 0.02,PASS,Idle Attach and Tension
+All,QuarryPulleyLoadMotion,Limestone block,Intentionally suspended,Rope and gantry,N/A,N/A,N/A,State contract,PASS,Lift UpperHold Guide and Lower
+All,QuarryPulleyLoadEnd,Limestone block,Structure-supported,Receiving platform,-2.600,-2.600,0.000,-0.02 to 0.02,PASS,Release and Complete

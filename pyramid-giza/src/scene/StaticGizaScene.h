@@ -11,6 +11,7 @@
 #include "Shader.h"
 #include "animation/ConstructionAnimation.h"
 #include "animation/ConstructionTimeline.h"
+#include "animation/QuarryPulleyAnimation.h"
 #include "effects/ParticleSystem.h"
 #include "graphics/Frustum.h"
 #include "graphics/InstanceBatch.h"
@@ -44,6 +45,7 @@ struct StaticGizaSceneStats
     std::size_t upperPlatformObjects = 0;
     std::size_t riverLandingObjects = 0;
     std::size_t enrichmentObjects = 0;
+    std::size_t quarryPulleyObjects = 0;
     std::size_t sphinxParts = 0;
     std::size_t environmentalObjects = 0;
     std::size_t workerInstances = 0;
@@ -98,6 +100,13 @@ public:
     void seekPresentationEnvironment(float elapsedTime);
     void cycleDemoPose();
     void resetAnimation();
+    void toggleQuarryPulley() { quarryPulleyController_.togglePaused(); }
+    bool quarryPulleyPaused() const { return quarryPulleyController_.paused(); }
+    const char* quarryPulleyStateName() const
+    {
+        return QuarryPulleyAnimationController::stateName(
+            quarryPulleyController_.snapshot().state);
+    }
     void toggleAutomaticSun();
     void adjustSunTime(float hours);
     void selectMorningSun();
@@ -227,6 +236,7 @@ private:
     void buildRampNetwork();
     void buildScaffolding();
     void buildQuarryAndCutting();
+    void buildQuarryPulleyRig();
     void buildStockpiles();
     void buildTransportLanes();
     void buildTimberAndCamp();
@@ -284,6 +294,7 @@ private:
     std::vector<WorkerInstance> workers_;
     std::vector<ObjectPart> loadedSledgeParts_;
     ConstructionAnimationController animationController_;
+    QuarryPulleyAnimationController quarryPulleyController_;
     ConstructionTimelineController constructionTimeline_;
     SunController sunController_;
     WorkerPose demoPose_ = WorkerPose::Standing;

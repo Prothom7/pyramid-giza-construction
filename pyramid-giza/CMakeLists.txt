@@ -51,6 +51,7 @@ add_executable(PyramidGiza
     src/objects/CompositeValidation.cpp
     src/objects/WorkerHierarchyValidation.cpp
     src/animation/ConstructionAnimation.cpp
+    src/animation/QuarryPulleyAnimation.cpp
     src/animation/AnimationValidation.cpp
     src/animation/ConstructionTimeline.cpp
 )
@@ -117,3 +118,5 @@ add_test(NAME Phase12_5RampClearanceValidation COMMAND PyramidGiza --validate-ra
 add_test(NAME Phase12_6SupportSurfaceValidation COMMAND PyramidGiza --validate-supports)
 add_test(NAME Phase12_6GroundingValidation COMMAND PyramidGiza --validate-grounding)
 add_test(NAME Phase12_6StageDependencyValidation COMMAND PyramidGiza --validate-stage-dependencies)
+add_test(NAME Phase12_7QuarryPulleyAnimationValidation COMMAND PyramidGiza --validate-quarry-pulley)
+add_test(NAME Phase12_7QuarryPulleySupportValidation COMMAND PyramidGiza --validate-quarry-pulley-support)

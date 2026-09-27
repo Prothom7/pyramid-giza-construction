@@ -1,0 +1,10 @@
+Order,State,StartSeconds,DurationSeconds,LoadMotion,CarriageMotion,RopeAttached,SupportCategory
+1,Idle,0.0,1.0,Quarry floor,None,No,Quarry floor
+2,Attach,1.0,1.0,Quarry floor,None,No,Quarry floor
+3,Tension,2.0,0.8,Quarry floor,None,Yes,Quarry floor
+4,Lift,2.8,4.0,Vertical -6.65 to -0.50,None,Yes,Intentionally suspended
+5,UpperHold,6.8,0.8,Hold at y=-0.50,None,Yes,Intentionally suspended
+6,GuideToPlatform,7.6,2.0,Horizontal x=-120.50 to -111.00,Matches load,Yes,Intentionally suspended
+7,Lower,9.6,2.0,Vertical -0.50 to -1.80,Holds x=-111.00,Yes,Intentionally suspended
+8,Release,11.6,1.0,Supported on platform,None,No,Destination platform
+9,Complete,12.6,1.4,Supported on platform,None,No,Destination platform

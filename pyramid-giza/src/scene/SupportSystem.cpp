@@ -188,6 +188,18 @@ const std::vector<StageSupportDependency>& dependencies()
          0.00f, 1.01f, 0.00f, 1.01f, "Endpoint-driven rope visualization"},
         {"PulleyRopes", "PulleyFrames", SupportCategory::IntentionallySuspended,
          0.00f, 1.01f, 0.00f, 1.01f, "Speculative static rope redirection"},
+        {"QuarryPulleyFrame", "QuarryFloor", SupportCategory::GroundSupported,
+         0.00f, 1.01f, 0.00f, 1.01f, "Four floor-founded gantry posts"},
+        {"QuarryPulleyPlatform", "QuarryPulleyPlatformPosts",
+         SupportCategory::StructureSupported,
+         0.00f, 1.01f, 0.00f, 1.01f, "Four floor-founded receiving posts"},
+        {"QuarryPulleyTrolley", "QuarryPulleyFrame",
+         SupportCategory::StructureSupported,
+         0.00f, 1.01f, 0.00f, 1.01f, "Carriage rides on twin top rails"},
+        {"QuarryPulleyLoad", "ConditionalFloorRopePlatform",
+         SupportCategory::IntentionallySuspended,
+         0.00f, 0.90f, 0.00f, 1.01f,
+         "Floor -> rope suspension -> destination platform"},
         {"LeverStone", "LeverRig", SupportCategory::IntentionallySuspended,
          0.00f, 1.01f, 0.00f, 1.01f, "Deliberate animated lifting interval"}
     };

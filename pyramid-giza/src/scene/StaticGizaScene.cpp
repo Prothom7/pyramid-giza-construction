@@ -64,6 +64,7 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
     buildRampNetwork();
     buildScaffolding();
     buildQuarryAndCutting();
+    buildQuarryPulleyRig();
     buildStockpiles();
     buildTimberAndCamp();
     buildNileAndContext();
@@ -90,13 +91,13 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
         }
     }
 
-    // Maximum draw count includes the dynamic loaded sledge, two ropes,
-    // the hand-attached mallet, and the three-part animated lever.
+    // Maximum draw count includes the quarry pulley dynamics, loaded sledge,
+    // two hero ropes, the hand-attached mallet, and the animated lever.
     stats_.totalDrawCalls = objects_.size() + stagedObjects_.size() +
                             dynamicPulleyWheels_.size() +
                             pyramidInstanceGroups_.size() + frontierBatches_.size() +
                             stats_.workerParts +
-                            (loadedSledgeParts_.size() - 1) + 2 + 2 + 3;
+                            (loadedSledgeParts_.size() - 1) + 2 + 2 + 3 + 9;
     stats_.shadowDepthDrawCalls = stats_.totalDrawCalls;
     stats_.combinedDrawCalls = stats_.totalDrawCalls + stats_.shadowDepthDrawCalls;
 
@@ -120,7 +121,9 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
               << "Industrial context: " << stats_.quarryObjects << " quarry objects, "
               << stats_.repositoryBlocks << " repository stones, "
               << stats_.treeInstances << " trees, " << stats_.liftingRigs
-              << " rope/lifting rigs, " << stats_.sphinxParts << " Sphinx-context parts\n"
+              << " rope/lifting rigs, " << stats_.quarryPulleyObjects
+              << " quarry-pulley component draws, " << stats_.sphinxParts
+              << " Sphinx-context parts\n"
               << "Object enrichment: " << stats_.enrichmentObjects << " primitive instances, "
               << stats_.anchorPosts << " anchors, " << stats_.ladders << " ladders, "
               << stats_.boats << " boats, 1 workshop and 1 sledge-repair station\n";
@@ -591,6 +594,82 @@ void StaticGizaScene::buildQuarryAndCutting()
               MaterialId::DarkWood);
     stats_.quarryObjects = objects_.size() - start;
     stats_.quarryBlocks = stats_.quarryObjects;
+}
+
+void StaticGizaScene::buildQuarryPulleyRig()
+{
+    // Speculative graphics visualization, not archaeological proof of a
+    // Khufu-era pulley. The frame is fully founded on the quarry floor and
+    // the raised receiving platform has its own posts.
+    const std::size_t start = objects_.size();
+    constexpr float floorY = -7.45f;
+    constexpr float frameTopY = 2.0f;
+    constexpr float leftX = -123.5f;
+    constexpr float rightX = -108.0f;
+    constexpr float centerX = 0.5f * (leftX + rightX);
+    constexpr float centerZ = -10.0f;
+    constexpr float sideOffset = 3.2f;
+
+    const auto addBeam = [&](const glm::vec3& from, const glm::vec3& to,
+                             float diameter, MaterialId material) {
+        addObject(ScenePrimitive::Cylinder,
+                  ConstructionAnimationController::cylinderBetween(
+                      from, to, diameter),
+                  material);
+    };
+
+    for (float x : {leftX, rightX})
+        for (float z : {centerZ - sideOffset, centerZ + sideOffset})
+            addBeam({x, floorY, z}, {x, frameTopY, z}, 0.48f,
+                    MaterialId::DarkWood);
+
+    for (float z : {centerZ - sideOffset, centerZ + sideOffset})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({centerX, frameTopY, z}, {},
+                                {rightX - leftX + 0.50f, 0.36f, 0.42f}),
+                  MaterialId::DarkWood);
+    for (float x : {leftX, centerX, rightX})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({x, frameTopY, centerZ}, {},
+                                {0.42f, 0.36f, sideOffset * 2.0f + 0.50f}),
+                  MaterialId::Wood);
+
+    for (float z : {centerZ - sideOffset, centerZ + sideOffset})
+    {
+        addBeam({leftX, floorY + 0.10f, z},
+                {leftX + 2.7f, -1.0f, z}, 0.30f, MaterialId::Wood);
+        addBeam({rightX, floorY + 0.10f, z},
+                {rightX - 2.7f, -1.0f, z}, 0.30f, MaterialId::Wood);
+    }
+
+    constexpr glm::vec3 deckCenter{-111.0f, -2.75f, centerZ};
+    addObject(ScenePrimitive::Cube,
+              makeTransform(deckCenter, {}, {5.6f, 0.30f, 5.2f}),
+              MaterialId::DarkWood);
+    const float deckBottom = deckCenter.y - 0.15f;
+    const float postHeight = deckBottom - floorY;
+    for (float x : {deckCenter.x - 2.2f, deckCenter.x + 2.2f})
+        for (float z : {deckCenter.z - 2.0f, deckCenter.z + 2.0f})
+            addObject(ScenePrimitive::Cube,
+                      makeTransform({x, floorY + 0.5f * postHeight, z}, {},
+                                    {0.34f, postHeight, 0.34f}),
+                      MaterialId::DarkWood);
+    for (float z : {deckCenter.z - 2.0f, deckCenter.z + 2.0f})
+    {
+        addBeam({deckCenter.x - 2.2f, floorY + 0.25f, z},
+                {deckCenter.x + 2.2f, deckBottom - 0.25f, z},
+                0.22f, MaterialId::Wood);
+        addBeam({deckCenter.x + 2.2f, floorY + 0.25f, z},
+                {deckCenter.x - 2.2f, deckBottom - 0.25f, z},
+                0.22f, MaterialId::Wood);
+    }
+
+    // Heavy rope anchors make both working sides readable.
+    for (float z : {centerZ - 4.3f, centerZ + 4.3f})
+        addBeam({-124.7f, floorY, z}, {-124.7f, -3.4f, z}, 0.58f,
+                MaterialId::DarkWood);
+
+    stats_.quarryPulleyObjects = objects_.size() - start + 9u;
 }
 
 void StaticGizaScene::buildStockpiles()
@@ -1544,6 +1623,8 @@ void StaticGizaScene::update(float deltaTime)
     const glm::vec3 previousSledge = previousSledgePosition_;
     sunController_.update(deltaTime);
     constructionTimeline_.update(deltaTime);
+    if (constructionTimeline_.progress() <= 0.85f)
+        quarryPulleyController_.update(deltaTime);
     if (coordinatedAnimationEnabled_)
         animationController_.update(deltaTime);
     else if (articulationPreviewEnabled_ && std::isfinite(deltaTime) && deltaTime > 0.0f)
@@ -1784,6 +1865,10 @@ void StaticGizaScene::seekPresentationEnvironment(float elapsedTime)
     if (!std::isfinite(elapsedTime))
         return;
     environmentTime_ = std::fmod(std::max(0.0f, elapsedTime), 400.0f);
+    // The quarry shots begin at five seconds. Seeking the presentation must
+    // therefore also seek this independent cycle rather than accumulating
+    // hidden history from earlier runs.
+    quarryPulleyController_.seek(std::max(0.0f, elapsedTime - 5.0f), true);
     particles_.clear();
     sledgeEmissionAccumulator_ = 0.0f;
     ambientEmissionAccumulator_ = 0.0f;
@@ -1801,6 +1886,7 @@ void StaticGizaScene::cycleDemoPose()
 void StaticGizaScene::resetAnimation()
 {
     animationController_.reset();
+    quarryPulleyController_.reset();
     demoPose_ = WorkerPose::Standing;
     articulationTime_ = 0.0f;
     particles_.clear();
@@ -2058,6 +2144,74 @@ void StaticGizaScene::collectFrameObjects()
         model = glm::rotate(model, glm::radians(spin), {0.0f, 1.0f, 0.0f});
         model = glm::scale(model, wheel.scale);
         frameObjects_.push_back({ScenePrimitive::Cylinder, model, MaterialId::Wood});
+    }
+
+    const QuarryPulleySnapshot quarryPulley =
+        constructionProgress <= 0.85f
+            ? quarryPulleyController_.snapshot()
+            : QuarryPulleyAnimationController::snapshotAt(0.0f);
+    const auto appendPulleyPart = [&](ScenePrimitive primitive,
+                                      const glm::mat4& model,
+                                      MaterialId material) {
+        frameObjects_.push_back({primitive, model, material});
+    };
+
+    // Trolley blocks inherit only the carriage position. Wheel spin is tied
+    // to measured rope/carriage travel in the CPU controller.
+    for (float zOffset : {-1.25f, 1.25f})
+        appendPulleyPart(
+            ScenePrimitive::Cube,
+            makeTransform({quarryPulley.carriagePosition.x, 1.72f,
+                           quarryPulley.carriagePosition.z + zOffset},
+                          {}, {0.90f, 0.42f, 0.55f}),
+            MaterialId::ToolMetal);
+    glm::mat4 wheelModel = glm::translate(
+        glm::mat4{1.0f}, quarryPulley.carriagePosition);
+    wheelModel = glm::rotate(wheelModel, glm::radians(90.0f),
+                             {1.0f, 0.0f, 0.0f});
+    wheelModel = glm::rotate(
+        wheelModel, glm::radians(quarryPulley.wheelRotationDegrees),
+        {0.0f, 1.0f, 0.0f});
+    wheelModel = glm::scale(wheelModel, {0.75f, 0.25f, 0.75f});
+    appendPulleyPart(ScenePrimitive::Cylinder, wheelModel, MaterialId::Wood);
+    appendPulleyPart(
+        ScenePrimitive::Cylinder,
+        ConstructionAnimationController::cylinderBetween(
+            quarryPulley.carriagePosition + glm::vec3{0.0f, 0.0f, -1.55f},
+            quarryPulley.carriagePosition + glm::vec3{0.0f, 0.0f, 1.55f},
+            0.18f),
+        MaterialId::ToolMetal);
+
+    appendPulleyPart(ScenePrimitive::Cylinder,
+                     ConstructionAnimationController::cylinderBetween(
+                         quarryPulley.pulleyPoint, quarryPulley.ropeEnd, 0.11f),
+                     MaterialId::Rope);
+    appendPulleyPart(
+        ScenePrimitive::Cylinder,
+        ConstructionAnimationController::cylinderBetween(
+            quarryPulley.pulleyPoint, {-124.7f, -3.4f, -14.3f}, 0.10f),
+        MaterialId::Rope);
+    appendPulleyPart(ScenePrimitive::Cube,
+                     makeTransform(quarryPulley.loadPosition,
+                                   {0.0f, 5.0f, 0.0f},
+                                   {2.6f, 1.6f, 2.4f}),
+                     MaterialId::LimestoneVariation);
+    if (quarryPulley.ropeAttached)
+    {
+        const glm::vec3 topLeft =
+            quarryPulley.loadPosition + glm::vec3{-0.85f, 0.80f, 0.0f};
+        const glm::vec3 topRight =
+            quarryPulley.loadPosition + glm::vec3{0.85f, 0.80f, 0.0f};
+        appendPulleyPart(
+            ScenePrimitive::Cylinder,
+            ConstructionAnimationController::cylinderBetween(
+                quarryPulley.loadAttachmentPoint, topLeft, 0.09f),
+            MaterialId::Rope);
+        appendPulleyPart(
+            ScenePrimitive::Cylinder,
+            ConstructionAnimationController::cylinderBetween(
+                quarryPulley.loadAttachmentPoint, topRight, 0.09f),
+            MaterialId::Rope);
     }
 
     updateFrontierBatches();

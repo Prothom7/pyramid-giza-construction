@@ -18,3 +18,7 @@ FrontierBlocks,PreviousPyramidCourse,Structure-supported,0.00,1.01,0.00,1.01,Obj
 HeroRopes,HeroSledgeAndWorkers,Intentionally suspended,0.00,1.01,0.00,1.01,Endpoints imply suspension,PASS
 PulleyRopes,PulleyFrames,Intentionally suspended,0.00,1.01,0.00,1.01,Frame implies suspension,PASS
 LeverStone,LeverRig,Intentionally suspended,0.00,1.01,0.00,1.01,Rig implies suspension,PASS
+QuarryPulleyFrame,QuarryFloor,Ground-supported,0.00,1.01,0.00,1.01,Object implies support,PASS
+QuarryPulleyPlatform,QuarryPulleyPlatformPosts,Structure-supported,0.00,1.01,0.00,1.01,Object implies support,PASS
+QuarryPulleyTrolley,QuarryPulleyFrame,Structure-supported,0.00,1.01,0.00,1.01,Object implies support,PASS
+QuarryPulleyLoad,ConditionalFloorRopePlatform,Intentionally suspended,0.00,0.90,0.00,1.01,Controller state selects support,PASS

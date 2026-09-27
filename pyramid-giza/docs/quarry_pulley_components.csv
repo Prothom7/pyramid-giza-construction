@@ -1,0 +1,16 @@
+ComponentGroup,Component,Count,Primitive,Support,Material,Notes
+Frame,Gantry posts,4,Cylinder,Quarry floor,Dark wood,Vertical posts bottom exactly at y=-7.45
+Frame,Top rails,2,Cube,Gantry posts,Dark wood,Twin longitudinal trolley rails
+Frame,Crossbeams,3,Cube,Top rails,Wood,Maintain frame spacing
+Frame,Diagonal braces,4,Cylinder,Quarry floor and posts,Wood,Prevent visually unsupported frame
+Platform,Receiving deck,1,Cube,Platform posts,Dark wood,Top surface y=-2.60
+Platform,Platform posts,4,Cube,Quarry floor,Dark wood,Independent destination support
+Platform,Cross braces,4,Cylinder,Platform posts,Wood,Triangulated visual bracing
+Rope system,Heavy anchor posts,2,Cylinder,Quarry floor,Dark wood,Static rope anchoring
+Trolley,Carriage blocks,2,Cube,Top rails,Tool metal,Translate with guide state
+Trolley,Pulley wheel,1,Cylinder,Carriage axle,Wood,Rotation derived from rope and carriage travel
+Trolley,Axle,1,Cylinder,Carriage blocks,Tool metal,Shared cylinder mesh
+Rope system,Vertical lift rope,1,Cylinder,Pulley wheel,Rope,Endpoint follows attachment or released hook
+Rope system,Operator rope,1,Cylinder,Pulley and anchor,Rope,Static endpoint with moving carriage endpoint
+Load,Limestone block,1,Cube,Conditional,Limestone variation,Floor then suspended then platform
+Load,Two-leg sling,2,Cylinder,Load and lift rope,Rope,Visible only while attached

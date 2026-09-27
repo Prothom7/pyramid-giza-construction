@@ -15,6 +15,7 @@
 
 #include "animation/AnimationValidation.h"
 #include "animation/ConstructionTimeline.h"
+#include "animation/QuarryPulleyAnimation.h"
 #include "camera/CameraController.h"
 #include "camera/CameraValidation.h"
 #include "graphics/GeometryValidation.h"
@@ -270,6 +271,13 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
     {
         state->scene->resetAnimation();
         std::cout << "Animation reset to Idle.\n";
+    }
+    else if (key == GLFW_KEY_F7 && state->scene != nullptr)
+    {
+        state->scene->toggleQuarryPulley();
+        std::cout << "Quarry pulley: "
+                  << (state->scene->quarryPulleyPaused() ? "PAUSED" : "PLAYING")
+                  << ", state " << state->scene->quarryPulleyStateName() << ".\n";
     }
     else if (key == GLFW_KEY_N && state->scene != nullptr)
     {
@@ -560,6 +568,8 @@ int main(int argc, char** argv)
     bool supportValidationOnly = false;
     bool groundingValidationOnly = false;
     bool stageDependencyValidationOnly = false;
+    bool quarryPulleyValidationOnly = false;
+    bool quarryPulleySupportValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -650,6 +660,10 @@ int main(int argc, char** argv)
             groundingValidationOnly = true;
         else if (option == "--validate-stage-dependencies")
             stageDependencyValidationOnly = true;
+        else if (option == "--validate-quarry-pulley")
+            quarryPulleyValidationOnly = true;
+        else if (option == "--validate-quarry-pulley-support")
+            quarryPulleySupportValidationOnly = true;
         else if (option == "--showcase")
             startShowcasePresentation = true;
         else if (option == "--showcase-time" && argument + 1 < argc)
@@ -961,6 +975,10 @@ int main(int argc, char** argv)
         return validatePhase12_6Grounding(std::cout) ? 0 : 1;
     if (stageDependencyValidationOnly)
         return validatePhase12_6StageDependencies(std::cout) ? 0 : 1;
+    if (quarryPulleyValidationOnly)
+        return validateQuarryPulleyAnimation(std::cout) ? 0 : 1;
+    if (quarryPulleySupportValidationOnly)
+        return validateQuarryPulleySupport(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
@@ -983,7 +1001,9 @@ int main(int argc, char** argv)
         !validatePhase12_5RampClearance(std::cout) ||
         !validatePhase12_6Supports(std::cout) ||
         !validatePhase12_6Grounding(std::cout) ||
-        !validatePhase12_6StageDependencies(std::cout))
+        !validatePhase12_6StageDependencies(std::cout) ||
+        !validateQuarryPulleyAnimation(std::cout) ||
+        !validateQuarryPulleySupport(std::cout))
         return 1;
 
     if (benchmarkRender && smokeDurationSeconds <= 0.0f)
@@ -1046,7 +1066,8 @@ int main(int argc, char** argv)
                      "X textures, B timelapse, ,/. timelapse speed, Home/End 0/100%, "
                      "Y frustum culling, I render stats, F4 effects, Shift+F4 effect stats, "
                      "C culling, F wireframe, Space pause, R animation reset, N next state, "
-                     "L loop, M animation mode, +/- speed, P debug pose, ESC exits.\n";
+                     "L loop, M animation mode, +/- speed, P debug pose, "
+                     "F7 quarry pulley pause, ESC exits.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
 
