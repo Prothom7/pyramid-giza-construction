@@ -124,3 +124,4 @@ add_test(NAME Phase12_7QuarryPulleySupportValidation COMMAND PyramidGiza --valid
 add_test(NAME Phase12_8InteriorGeometryValidation COMMAND PyramidGiza --validate-interior-geometry)
 add_test(NAME Phase12_8InteriorConnectivityValidation COMMAND PyramidGiza --validate-interior-connectivity)
 add_test(NAME Phase12_8InteriorNavigationValidation COMMAND PyramidGiza --validate-interior-navigation)
+add_test(NAME Phase12_8_1EntranceFacadeValidation COMMAND PyramidGiza --validate-entrance)

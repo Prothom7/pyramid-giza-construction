@@ -593,6 +593,7 @@ int main(int argc, char** argv)
     bool interiorConnectivityValidationOnly = false;
     bool interiorNavigationValidationOnly = false;
     bool interiorValidationOnly = false;
+    bool entranceValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -621,6 +622,7 @@ int main(int argc, char** argv)
     ShadowDebugMode initialShadowDebugMode = ShadowDebugMode::Normal;
     std::string capturePath;
     std::string initialCameraMode = "free";
+    std::string entranceView;
     for (int argument = 1; argument < argc; ++argument)
     {
         const std::string option = argv[argument];
@@ -696,6 +698,19 @@ int main(int argc, char** argv)
             interiorNavigationValidationOnly = true;
         else if (option == "--validate-interior")
             interiorValidationOnly = true;
+        else if (option == "--validate-entrance")
+            entranceValidationOnly = true;
+        else if (option == "--entrance-view" && argument + 1 < argc)
+        {
+            entranceView = argv[++argument];
+            if (entranceView != "front" && entranceView != "left" &&
+                entranceView != "right" && entranceView != "low" &&
+                entranceView != "high")
+            {
+                std::cerr << "Entrance view must be front, left, right, low, or high.\n";
+                return 2;
+            }
+        }
         else if (option == "--cutaway")
             startCutaway = true;
         else if (option == "--showcase")
@@ -1022,6 +1037,8 @@ int main(int argc, char** argv)
         return validatePyramidInteriorNavigation(std::cout) ? 0 : 1;
     if (interiorValidationOnly)
         return validatePyramidInterior(std::cout) ? 0 : 1;
+    if (entranceValidationOnly)
+        return validatePyramidEntranceFacade(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
@@ -1047,7 +1064,8 @@ int main(int argc, char** argv)
         !validatePhase12_6StageDependencies(std::cout) ||
         !validateQuarryPulleyAnimation(std::cout) ||
         !validateQuarryPulleySupport(std::cout) ||
-        !validatePyramidInterior(std::cout))
+        !validatePyramidInterior(std::cout) ||
+        !validatePyramidEntranceFacade(std::cout))
         return 1;
 
     if (benchmarkRender && smokeDurationSeconds <= 0.0f)
@@ -1178,6 +1196,23 @@ int main(int argc, char** argv)
             state.cameraController.toggleGuidedDemo();
         else if (initialCameraMode == "interior")
             state.cameraController.toggleInteriorInspection();
+        if (!entranceView.empty())
+        {
+            const PyramidEntranceDescriptor& portal = PyramidInterior::entrance();
+            const glm::vec3 target{portal.center.x, portal.center.y,
+                                   portal.upperFacadeZ + 0.8f};
+            glm::vec3 position{0.0f, portal.center.y, portal.upperFacadeZ - 13.0f};
+            if (entranceView == "left")
+                position += glm::vec3{-8.0f, 1.0f, 3.0f};
+            else if (entranceView == "right")
+                position += glm::vec3{8.0f, 1.0f, 3.0f};
+            else if (entranceView == "low")
+                position += glm::vec3{0.0f, -3.2f, 3.0f};
+            else if (entranceView == "high")
+                position += glm::vec3{0.0f, 5.0f, -1.0f};
+            state.cameraController.setPose(
+                CameraController::lookAtPose(position, target, 44.0f));
+        }
         scene.setInteriorInspectionActive(
             state.cameraController.mode() == CameraMode::InteriorWalk);
         if (initialCameraMode != "free")

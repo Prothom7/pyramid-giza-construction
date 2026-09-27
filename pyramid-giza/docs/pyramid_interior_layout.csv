@@ -1,5 +1,5 @@
 RegionID,Type,StartOrCenterX,StartOrCenterY,StartOrCenterZ,EndX,EndY,EndZ,Width,Height,DepthOrLength,CarvingMargin,Purpose
-EntryDescending,Passage,0,7,-83,0,4.5,-67,2.2,2.6,16.194,0.24,North entrance and descending entry
+EntryDescending,Passage,0,7,-76.68,0,4.5,-67,2.2,2.6,9.998,0.24,Recessed north entrance and descending entry
 AscendingPassage,Passage,0,4.5,-67,0,11,-55,2.2,2.7,13.647,0.24,Inclined transition toward gallery
 GrandGallery,Gallery,0,11,-55,0,16,-43,3.6,6,13,0.24,Taller gallery-like corridor
 AntechamberConnector,Passage,0,16,-43,0,16,-39.5,3,3.5,3.5,0.24,Level doorway into antechamber

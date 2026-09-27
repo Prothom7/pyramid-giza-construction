@@ -8,14 +8,15 @@ pyramid without replacing the GPU-instanced construction system. The north
 (back) entrance is deliberately away from the main south-side construction
 ramp.
 
-The interior is a stylized historically inspired graphics reconstruction
+Phase 12.8.1 subsequently refined the entrance facade without changing the
+remaining route. The interior is a stylized historically inspired graphics reconstruction
 adapted to this project's scaled 28-level pyramid geometry. It is not presented
 as an exact archaeological survey.
 
 ## Layout
 
 ```text
-North entrance (z = -83)
+North facade (z = -76.98), passage start (z = -76.68)
         |
 EntryDescending
         |
@@ -31,7 +32,7 @@ TombChamber + open stone sarcophagus
 ```
 
 Four passage volumes form one continuous route. The first descends from
-`(0, 7, -83)` to `(0, 4.5, -67)`; the second rises to
+`(0, 7, -76.68)` to `(0, 4.5, -67)`; the second rises to
 `(0, 11, -55)`; the taller gallery rises to `(0, 16, -43)`; and a
 level connector ends at `(0, 16, -39.5)`. The antechamber is 5 x 4 x 5.6
 units. The tomb chamber is 10 x 6 x 15 units.
@@ -56,13 +57,13 @@ The conceptual construction schedule remains 7,714 generated blocks:
 | Quantity | Count |
 |---|---:|
 | Generated blocks | 7,714 |
-| Interior-excluded blocks | 259 |
-| Rendered structural blocks at completion | 7,455 |
+| Interior-excluded blocks | 255 |
+| Rendered structural blocks at completion | 7,459 |
 
 The 0/25/50/75/100 percent schedule still means
 70/4,734/6,964/7,561/7,714 scheduled blocks. Interior-designated blocks are
 filtered rather than constructed and later removed. The corresponding rendered
-structural counts are 70/4,640/6,705/7,302/7,455.
+structural counts are 70/4,644/6,709/7,306/7,459.
 
 ## Instance and shadow integration
 
@@ -80,8 +81,8 @@ invisible shadow caster. No per-block VAO/VBO/EBO was introduced.
 
 ## Architectural surfaces and tomb
 
-Thirty-three staged cube instances provide thin floors, walls, ceilings, the
-entrance jamb/lintel, room shells, and an open sarcophagus. They all reuse the
+Thirty-six staged cube instances provide thin floors, walls, ceilings, the
+stepped entrance reveal, room shells, and an open sarcophagus. They all reuse the
 existing indexed cube mesh and Limestone, LimestoneVariation, QuarryStone, or
 PreparedStone materials. The sarcophagus uses one base plus four sides; its
 base rests on the tomb floor at y=16.
@@ -123,13 +124,15 @@ materials, textures, and directional shadow map; it has no extra shadow pass.
 
 CPU validation checks 7,714 generated blocks, exclusion arithmetic at all five
 construction checkpoints, 764 sampled
-clearance points, one shell-reaching entry region, sarcophagus support,
+clearance points, one shell-reaching entry region containing three deliberately
+removed blocks, sarcophagus support,
 passage/room connectivity, 14 representative camera positions, a deterministic
 small-step entrance-to-tomb traversal, confinement,
-and finite light settings. Five excluded blocks touch the shell, all in the
-entry region. Phase 12.8 adds 33 normal indexed draws per visible/shadow pass
-while removing 259 completed-pyramid instances. The net completed-pyramid
-instance change is -226 in each pass, with no new mesh upload.
+and finite light settings. Phase 12.8.1 adds three entrance draws over the
+original implementation: six portal parts replace the old three. Across the
+complete interior there are 36 normal indexed draws per visible/shadow pass
+while 255 completed-pyramid instances are removed. The net completed-pyramid
+instance change is -219 in each pass, with no new mesh upload.
 
 The project still uses CCW outward-facing indexed triangles, shared
 VAO/VBO/EBO resources, model/view/projection, inverse-transpose normal matrices,

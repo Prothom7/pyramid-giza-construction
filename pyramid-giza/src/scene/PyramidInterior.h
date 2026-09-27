@@ -48,6 +48,21 @@ struct InteriorPart
     float minimumConstructionProgress = 0.0f;
 };
 
+struct PyramidEntranceDescriptor
+{
+    glm::vec3 center{0.0f};
+    float openingWidth = 0.0f;
+    float openingHeight = 0.0f;
+    float floorY = 0.0f;
+    float lowerFacadeZ = 0.0f;
+    float upperFacadeZ = 0.0f;
+    float recessDepth = 0.0f;
+    float revealDepth = 0.0f;
+    float facadeTolerance = 0.0f;
+    unsigned int lowerLevel = 0;
+    unsigned int facadeLevel = 0;
+};
+
 struct InteriorExclusionStats
 {
     std::size_t total = 0;
@@ -73,7 +88,11 @@ public:
 
     static const std::array<PassageSegment, 4>& passages();
     static const std::array<InteriorRoom, 2>& rooms();
+    static const PyramidEntranceDescriptor& entrance();
     static const std::vector<InteriorPart>& architecturalParts();
+    static float northFaceZ(const PyramidLayoutConfig& config,
+                            unsigned int level);
+    static bool isEntranceOpeningBlock(const PyramidBlockPlacement& block);
 
     static bool blockIntersectsVoid(const PyramidBlockPlacement& block,
                                     std::size_t* regionIndex = nullptr);
@@ -94,4 +113,5 @@ public:
 bool validatePyramidInteriorGeometry(std::ostream& output);
 bool validatePyramidInteriorConnectivity(std::ostream& output);
 bool validatePyramidInteriorNavigation(std::ostream& output);
+bool validatePyramidEntranceFacade(std::ostream& output);
 bool validatePyramidInterior(std::ostream& output);

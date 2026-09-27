@@ -6,6 +6,7 @@
 #include <cmath>
 #include <limits>
 #include <ostream>
+#include <string>
 
 namespace
 {
@@ -129,19 +130,108 @@ bool roomCameraPosition(const InteriorRoom& room, const glm::vec3& candidate,
     return constrained.y < room.center.y + room.halfExtents.y - 0.30f;
 }
 
+bool entranceCameraPosition(const glm::vec3& candidate,
+                            glm::vec3& constrained)
+{
+    const PyramidEntranceDescriptor& portal = PyramidInterior::entrance();
+    const float halfWalkableWidth = 0.5f * portal.openingWidth - 0.30f;
+    const float outsideLimit = portal.lowerFacadeZ - 0.25f;
+    const float insideLimit = PyramidInterior::passages()[0].start.z + 0.20f;
+    if (std::abs(candidate.x - portal.center.x) > halfWalkableWidth ||
+        candidate.z < outsideLimit || candidate.z > insideLimit)
+        return false;
+    constrained = {candidate.x, portal.floorY + PyramidInterior::eyeHeight,
+                   candidate.z};
+    return true;
+}
+
 float pyramidHalfExtentAt(float y)
 {
     constexpr float baseHalfExtent = 40.82f;
     constexpr float inwardPerWorldY = 1.46f / 2.0f;
     return baseHalfExtent - std::max(0.0f, y) * inwardPerWorldY;
 }
+
+bool isNorthShellBlock(const PyramidBlockPlacement& block)
+{
+    return block.gridZ == 0u;
+}
+
+bool entrancePart(const InteriorPart& part)
+{
+    return std::string(part.id).find("Entrance") == 0u;
+}
+
+float modelMinimumZ(const glm::mat4& model)
+{
+    return model[3].z - 0.5f *
+        (std::abs(model[0].z) + std::abs(model[1].z) +
+         std::abs(model[2].z));
+}
 } // namespace
+
+const PyramidEntranceDescriptor& PyramidInterior::entrance()
+{
+    static const PyramidEntranceDescriptor value = [] {
+        const PyramidLayoutConfig config;
+        PyramidEntranceDescriptor descriptor;
+        descriptor.openingWidth = 2.60f;
+        descriptor.openingHeight = 3.00f;
+        descriptor.floorY = 7.00f;
+        descriptor.lowerLevel = 3u;
+        descriptor.facadeLevel = 4u;
+        descriptor.lowerFacadeZ = northFaceZ(config, descriptor.lowerLevel);
+        descriptor.upperFacadeZ = northFaceZ(config, descriptor.facadeLevel);
+        descriptor.recessDepth = 0.30f;
+        descriptor.revealDepth = 0.75f;
+        descriptor.facadeTolerance = 0.06f;
+        descriptor.center = {config.origin.x,
+                             descriptor.floorY + 0.5f * descriptor.openingHeight,
+                             descriptor.upperFacadeZ};
+        return descriptor;
+    }();
+    return value;
+}
+
+float PyramidInterior::northFaceZ(const PyramidLayoutConfig& config,
+                                  unsigned int level)
+{
+    if (level >= config.baseBlocksPerSide)
+        return config.origin.z;
+    const unsigned int side = config.baseBlocksPerSide - level;
+    const float zStep = config.blockDepth + config.horizontalSpacing;
+    const float northCenter =
+        config.origin.z - 0.5f * static_cast<float>(side - 1u) * zStep;
+    return northCenter - 0.5f * config.blockDepth;
+}
+
+bool PyramidInterior::isEntranceOpeningBlock(
+    const PyramidBlockPlacement& block)
+{
+    const PyramidEntranceDescriptor& descriptor = entrance();
+    static const PyramidLayoutConfig config;
+    if (!isNorthShellBlock(block))
+        return false;
+    if (block.level >= config.baseBlocksPerSide)
+        return false;
+    const unsigned int side = config.baseBlocksPerSide - block.level;
+    if (block.level == descriptor.lowerLevel)
+        return block.gridX == side / 2u;
+    if (block.level == descriptor.facadeLevel)
+        return block.gridX == side / 2u - 1u ||
+               block.gridX == side / 2u;
+    return false;
+}
 
 const std::array<PassageSegment, 4>& PyramidInterior::passages()
 {
-    static const std::array<PassageSegment, 4> values{{
+    static const std::array<PassageSegment, 4> values = [] {
+        const PyramidEntranceDescriptor& portal = entrance();
+        return std::array<PassageSegment, 4>{{
         {"EntryDescending", InteriorSpaceType::Passage,
-         {0.0f, 7.0f, -83.0f}, {0.0f, 4.5f, -67.0f},
+         {portal.center.x, portal.floorY,
+          portal.upperFacadeZ + portal.recessDepth},
+         {0.0f, 4.5f, -67.0f},
          2.2f, 2.6f, 0.24f, "North entrance and descending entry"},
         {"AscendingPassage", InteriorSpaceType::Passage,
          {0.0f, 4.5f, -67.0f}, {0.0f, 11.0f, -55.0f},
@@ -152,7 +242,8 @@ const std::array<PassageSegment, 4>& PyramidInterior::passages()
         {"AntechamberConnector", InteriorSpaceType::Passage,
          {0.0f, 16.0f, -43.0f}, {0.0f, 16.0f, -39.5f},
          3.0f, 3.5f, 0.24f, "Level doorway into antechamber"}
-    }};
+        }};
+    }();
     return values;
 }
 
@@ -234,17 +325,58 @@ const std::vector<InteriorPart>& PyramidInterior::architecturalParts()
         addRoomShell(rooms()[0], 0.62f, false);
         addRoomShell(rooms()[1], 0.70f, true);
 
-        // A simple lintel and jamb pair makes the one intentional exterior
-        // opening readable without covering the carved block opening.
-        result.push_back({"EntranceLeftJamb",
-            makeTransform({-1.35f, 8.30f, -81.30f}, {}, {0.35f, 3.0f, 0.50f}),
-            MaterialId::PreparedStone, 0.20f});
-        result.push_back({"EntranceRightJamb",
-            makeTransform({1.35f, 8.30f, -81.30f}, {}, {0.35f, 3.0f, 0.50f}),
-            MaterialId::PreparedStone, 0.20f});
-        result.push_back({"EntranceLintel",
-            makeTransform({0.0f, 9.88f, -81.30f}, {}, {3.05f, 0.35f, 0.50f}),
-            MaterialId::PreparedStone, 0.20f});
+        // The portal follows two actual stepped courses. Its front surfaces
+        // sit 0.05 units inside the corresponding exposed block faces.
+        const PyramidEntranceDescriptor& portal = entrance();
+        constexpr float facadeInset = 0.05f;
+        constexpr float surfaceThickness = 0.14f;
+        const float lowerFront = portal.lowerFacadeZ + facadeInset;
+        const float upperFront = portal.upperFacadeZ + facadeInset;
+        const float lowerGapWidth = 2.80f;
+        const float upperGapWidth = 5.72f;
+        const float lowerRevealWidth =
+            0.5f * (lowerGapWidth - portal.openingWidth);
+        const float upperRevealWidth =
+            0.5f * (upperGapWidth - portal.openingWidth);
+
+        const float thresholdBack =
+            passages()[0].start.z + 0.20f;
+        const float thresholdDepth = thresholdBack - lowerFront;
+        result.push_back({"EntranceThreshold",
+            makeTransform({portal.center.x, portal.floorY - 0.5f * surfaceThickness,
+                           lowerFront + 0.5f * thresholdDepth}, {},
+                          {portal.openingWidth, surfaceThickness, thresholdDepth}),
+            MaterialId::LimestoneVariation, 0.20f});
+
+        for (float sign : {-1.0f, 1.0f})
+        {
+            result.push_back({sign < 0.0f ? "EntranceLowerLeftReveal"
+                                         : "EntranceLowerRightReveal",
+                makeTransform({portal.center.x + sign *
+                                   (0.5f * portal.openingWidth +
+                                    0.5f * lowerRevealWidth),
+                               7.50f,
+                               lowerFront + 0.5f * portal.revealDepth}, {},
+                              {lowerRevealWidth, 1.0f, portal.revealDepth}),
+                MaterialId::LimestoneVariation, 0.20f});
+            result.push_back({sign < 0.0f ? "EntranceUpperLeftReveal"
+                                         : "EntranceUpperRightReveal",
+                makeTransform({portal.center.x + sign *
+                                   (0.5f * portal.openingWidth +
+                                    0.5f * upperRevealWidth),
+                               9.0f,
+                               upperFront + 0.5f * portal.revealDepth}, {},
+                              {upperRevealWidth, 2.0f, portal.revealDepth}),
+                MaterialId::LimestoneVariation, 0.20f});
+        }
+        result.push_back({"EntranceTopReveal",
+            makeTransform({portal.center.x,
+                           portal.floorY + portal.openingHeight -
+                               0.5f * surfaceThickness,
+                           upperFront + 0.5f * portal.revealDepth}, {},
+                          {portal.openingWidth, surfaceThickness,
+                           portal.revealDepth}),
+            MaterialId::LimestoneVariation, 0.20f});
 
         // Open stone sarcophagus: base plus four walls, all supported by the
         // tomb floor at y=16.0.
@@ -269,9 +401,16 @@ const std::vector<InteriorPart>& PyramidInterior::architecturalParts()
 bool PyramidInterior::blockIntersectsVoid(const PyramidBlockPlacement& block,
                                           std::size_t* regionIndex)
 {
+    if (isEntranceOpeningBlock(block))
+    {
+        if (regionIndex != nullptr) *regionIndex = 0u;
+        return true;
+    }
     for (std::size_t index = 0; index < passages().size(); ++index)
         if (intersectsPassage(block, passages()[index]))
         {
+            if (index == 0u && isNorthShellBlock(block))
+                continue;
             if (regionIndex != nullptr) *regionIndex = index;
             return true;
         }
@@ -320,7 +459,8 @@ InteriorExclusionStats PyramidInterior::exclusionStats(
 glm::vec3 PyramidInterior::cameraStartPosition()
 {
     glm::vec3 constrained;
-    const glm::vec3 candidate{0.0f, 0.0f, -80.0f};
+    const glm::vec3 candidate =
+        passages()[0].start + glm::vec3{0.0f, 0.0f, 0.45f};
     passageCameraPosition(passages()[0], candidate, constrained);
     return constrained;
 }
@@ -328,6 +468,9 @@ glm::vec3 PyramidInterior::cameraStartPosition()
 bool PyramidInterior::isWalkableCameraPosition(const glm::vec3& position)
 {
     glm::vec3 constrained;
+    if (entranceCameraPosition(position, constrained) &&
+        std::abs(position.y - constrained.y) <= 0.40f)
+        return true;
     for (const PassageSegment& passage : passages())
         if (passageCameraPosition(passage, position, constrained) &&
             std::abs(position.y - constrained.y) <= 0.40f)
@@ -343,6 +486,8 @@ glm::vec3 PyramidInterior::constrainCamera(const glm::vec3& previous,
                                            const glm::vec3& candidate)
 {
     glm::vec3 constrained;
+    if (entranceCameraPosition(candidate, constrained))
+        return constrained;
     for (const PassageSegment& passage : passages())
         if (passageCameraPosition(passage, candidate, constrained))
             return constrained;
@@ -627,6 +772,119 @@ bool validatePyramidInteriorNavigation(std::ostream& output)
            << (lightValid ? " PASS\n" : " FAIL\n")
            << (valid ? "Interior navigation checks passed.\n"
                      : "Interior navigation checks failed.\n");
+    return valid;
+}
+
+bool validatePyramidEntranceFacade(std::ostream& output)
+{
+    const PyramidLayoutConfig config;
+    const PyramidEntranceDescriptor& portal = PyramidInterior::entrance();
+    const float derivedLowerFace =
+        PyramidInterior::northFaceZ(config, portal.lowerLevel);
+    const float derivedUpperFace =
+        PyramidInterior::northFaceZ(config, portal.facadeLevel);
+
+    float leftOffset = 0.0f;
+    float rightOffset = 0.0f;
+    float topOffset = 0.0f;
+    float maximumProtrusion = 0.0f;
+    std::size_t entranceDraws = 0;
+    std::size_t protrudingParts = 0;
+    for (const InteriorPart& part : PyramidInterior::architecturalParts())
+    {
+        if (!entrancePart(part))
+            continue;
+        ++entranceDraws;
+        const std::string id = part.id;
+        const bool lowerCourse = id.find("Lower") != std::string::npos ||
+                                 id.find("Threshold") != std::string::npos;
+        const float face = lowerCourse ? portal.lowerFacadeZ
+                                       : portal.upperFacadeZ;
+        const float offset = modelMinimumZ(part.model) - face;
+        maximumProtrusion = std::max(maximumProtrusion,
+                                     std::max(0.0f, -offset));
+        if (offset < -portal.facadeTolerance)
+            ++protrudingParts;
+        if (id.find("Left") != std::string::npos)
+            leftOffset = std::max(leftOffset, std::abs(offset));
+        if (id.find("Right") != std::string::npos)
+            rightOffset = std::max(rightOffset, std::abs(offset));
+        if (id.find("Top") != std::string::npos)
+            topOffset = std::abs(offset);
+    }
+
+    const std::vector<PyramidBlockPlacement> blocks =
+        PyramidLayout::generateComplete(config);
+    std::size_t exteriorExcluded = 0;
+    std::size_t unintendedBreaches = 0;
+    for (const PyramidBlockPlacement& block : blocks)
+    {
+        if (!isNorthShellBlock(block) ||
+            !PyramidInterior::blockIntersectsVoid(block))
+            continue;
+        ++exteriorExcluded;
+        if (!PyramidInterior::isEntranceOpeningBlock(block))
+            ++unintendedBreaches;
+    }
+
+    const float recess = PyramidInterior::passages()[0].start.z -
+                         portal.upperFacadeZ;
+    const bool faceDerived =
+        std::abs(derivedLowerFace - portal.lowerFacadeZ) < 1.0e-5f &&
+        std::abs(derivedUpperFace - portal.upperFacadeZ) < 1.0e-5f;
+    const bool flush = leftOffset <= portal.facadeTolerance &&
+                       rightOffset <= portal.facadeTolerance &&
+                       topOffset <= portal.facadeTolerance;
+    const bool recessValid = std::abs(recess - portal.recessDepth) < 1.0e-5f &&
+                             recess >= 0.15f && recess <= 0.50f;
+    const bool clearance = portal.openingWidth >= 2.40f &&
+                           portal.openingHeight >= 2.80f &&
+                           portal.openingHeight - PyramidInterior::eyeHeight >=
+                               1.0f;
+    const bool breachValid = exteriorExcluded == 3u &&
+                             unintendedBreaches == 0u;
+
+    glm::vec3 walked{portal.center.x, portal.floorY + PyramidInterior::eyeHeight,
+                     portal.lowerFacadeZ - 0.20f};
+    bool connection = PyramidInterior::isWalkableCameraPosition(walked);
+    for (int step = 0; step < 80 && connection; ++step)
+    {
+        const glm::vec3 next = PyramidInterior::constrainCamera(
+            walked, walked + glm::vec3{0.0f, 0.0f, 0.05f});
+        connection = finite(next) && glm::length(next - walked) > 0.001f;
+        walked = next;
+        if (walked.z >= PyramidInterior::passages()[0].start.z + 0.60f)
+            break;
+    }
+    connection = connection &&
+                 walked.z >= PyramidInterior::passages()[0].start.z + 0.55f;
+
+    const bool valid = faceDerived && entranceDraws == 6u && flush &&
+                       protrudingParts == 0u && recessValid && clearance &&
+                       breachValid && connection;
+    output << "Phase 12.8.1 entrance facade validation\n"
+           << "  lower/upper derived face Z: " << portal.lowerFacadeZ
+           << " / " << portal.upperFacadeZ
+           << (faceDerived ? " PASS\n" : " FAIL\n")
+           << "  left/right/top facade offsets: " << leftOffset << " / "
+           << rightOffset << " / " << topOffset << " (tolerance "
+           << portal.facadeTolerance << ")"
+           << (flush ? " PASS\n" : " FAIL\n")
+           << "  maximum outward protrusion: " << maximumProtrusion
+           << ", unintended protruding parts: " << protrudingParts
+           << (protrudingParts == 0u ? " PASS\n" : " FAIL\n")
+           << "  passage recess: " << recess
+           << (recessValid ? " PASS\n" : " FAIL\n")
+           << "  opening width/height: " << portal.openingWidth << " / "
+           << portal.openingHeight << (clearance ? " PASS\n" : " FAIL\n")
+           << "  entrance architectural draws: " << entranceDraws << '\n'
+           << "  exterior excluded shell blocks: " << exteriorExcluded
+           << ", unintended breaches: " << unintendedBreaches
+           << (breachValid ? " PASS\n" : " FAIL\n")
+           << "  outside-to-passage traversal: "
+           << (connection ? "PASS\n" : "FAIL\n")
+           << (valid ? "Entrance facade checks passed.\n"
+                     : "Entrance facade checks failed.\n");
     return valid;
 }
 
