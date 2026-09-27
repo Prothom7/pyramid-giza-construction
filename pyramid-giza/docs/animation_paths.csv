@@ -2,7 +2,7 @@ Path,Point,Progress,X,Y,Z,GenerationRule,Notes
 LoadedSledge,Start,0.00,10.0,0.0,40.0,Fixed start point,Loaded stone inherits this root
 LoadedSledge,GroundTurn,0.35,0.0,0.0,47.0,Smooth interpolation,Approach curve turns toward monumental ramp
 LoadedSledge,RampEntry,0.45,0.0,0.695,45.0,Y equals main-ramp surface height,Pitch blends from 0 to 9.77 degrees
-LoadedSledge,RampTop,1.00,0.0,8.545,-0.6,Y equals main-ramp surface height,Final transport point at active face
+LoadedSledge,RampTop,1.00,0.0,8.546,-4.145,Y and Z include the main-ramp top-surface offset,Phase 12.5 controlled landing outside visible blocks
 PullerLeft,Derived,0.00-1.00,Derived,Derived,Derived,Sledge position plus direction*3.7 minus side*0.48,Ground or ramp height follows current section
 PullerRight,Derived,0.00-1.00,Derived,Derived,Derived,Sledge position plus direction*3.7 plus side*0.48,Ground or ramp height follows current section
 RopeLeft,Derived,0.00-1.00,Derived,Derived,Derived,Cylinder between left hand joint and left tow point,Visible PullReady through Arrival

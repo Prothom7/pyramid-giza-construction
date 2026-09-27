@@ -75,10 +75,18 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
 
     for (std::size_t index = heroWorkerCount; index < workers_.size(); ++index)
     {
-        workers_[index].minimumConstructionProgress =
-            0.04f + 0.06f * static_cast<float>(index % 5u);
-        workers_[index].maximumConstructionProgress =
-            index % 4u == 0u ? 0.90f : 1.01f;
+        if (workers_[index].constructionCrew)
+        {
+            workers_[index].minimumConstructionProgress = 0.0f;
+            workers_[index].maximumConstructionProgress = 1.01f;
+        }
+        else
+        {
+            workers_[index].minimumConstructionProgress =
+                0.04f + 0.06f * static_cast<float>(index % 5u);
+            workers_[index].maximumConstructionProgress =
+                index % 4u == 0u ? 0.90f : 1.01f;
+        }
     }
 
     // Maximum draw count includes the dynamic loaded sledge, two ropes,
@@ -153,9 +161,12 @@ void StaticGizaScene::addWorker(const glm::vec3& position, float rotationY,
                                 bool secondary, bool demoWorker, float phase)
 {
     const WorkerStyle style{clothing, MaterialId::Headwear};
+    const bool constructionCrew =
+        position.y > 2.0f && position.x > -40.0f && position.z > -40.0f;
     workers_.push_back({
         makeTransform(position, {0.0f, rotationY, 0.0f}, {1.0f, 1.0f, 1.0f}),
-        pose, Worker::poseAngles(pose), style, hero, secondary, demoWorker, phase});
+        pose, Worker::poseAngles(pose), style, hero, secondary, demoWorker,
+        constructionCrew, phase});
     ++stats_.workerInstances;
     stats_.workerParts += Worker::partCount();
     if (hero)
@@ -311,116 +322,106 @@ void StaticGizaScene::buildTransportLanes()
 
 void StaticGizaScene::buildRampNetwork()
 {
-    const std::size_t start = objects_.size();
+    const std::size_t start = stagedObjects_.size();
+    const auto addStaged = [this](ScenePrimitive primitive, const glm::mat4& model,
+                                  MaterialId material, const RampDescriptor& ramp)
+    {
+        if (!isFiniteNonSingularTransform(model))
+            throw std::runtime_error("Ramp network contains an invalid transform");
+        stagedObjects_.push_back(
+            {{primitive, model, material}, ramp.minimumProgress,
+             ramp.maximumProgress});
+    };
+
     for (const RampDescriptor& ramp : MonumentalSite::ramps())
     {
-        addObject(ScenePrimitive::Cube, MonumentalSite::rampModel(ramp), ramp.material);
+        const RampFrame frame = MonumentalSite::rampFrame(ramp);
+        addStaged(ScenePrimitive::Cube, MonumentalSite::rampModel(ramp),
+                  ramp.material, ramp);
 
-        const glm::vec3 side = rampSide(ramp);
         for (float sign : {-1.0f, 1.0f})
         {
             RampDescriptor rail = ramp;
-            const glm::vec3 offset = side * sign * (0.5f * ramp.width + 0.12f);
+            const glm::vec3 offset =
+                frame.right * sign * (0.5f * ramp.width + ramp.sideClearance);
             rail.base += offset;
             rail.top += offset;
             rail.width = 0.20f;
             rail.thickness = 0.24f;
-            addObject(ScenePrimitive::Cube, MonumentalSite::rampModel(rail),
-                      MaterialId::DarkWood);
+            addStaged(ScenePrimitive::Cube, MonumentalSite::rampModel(rail),
+                      MaterialId::DarkWood, ramp);
         }
-    }
 
-    const RampDescriptor& main = MonumentalSite::mainRamp();
-    for (int sample = 1; sample < 14; ++sample)
-    {
-        const float t = static_cast<float>(sample) / 14.0f;
-        const glm::vec3 point = MonumentalSite::rampSurfacePoint(main, t);
-        addObject(ScenePrimitive::Cylinder,
-                  makeTransform(point + glm::vec3{0.0f, 0.18f, 0.0f},
-                                {0.0f, 0.0f, 90.0f},
-                                {0.24f, main.width - 0.45f, 0.24f}),
-                  MaterialId::Wood);
-    }
-
-    for (float t : {0.25f, 0.50f, 0.75f})
-    {
-        const glm::vec3 surface = MonumentalSite::rampSurfacePoint(main, t);
-        const float supportHeight = surface.y - 0.10f;
-        for (float x : {-2.75f, 2.75f})
-            addObject(ScenePrimitive::Cylinder,
-                      makeTransform({x, supportHeight * 0.5f, surface.z}, {},
-                                    {0.28f, supportHeight, 0.28f}),
-                      MaterialId::Wood);
-        addObject(ScenePrimitive::Cube,
-                  makeTransform({0.0f, supportHeight, surface.z}, {},
-                                {6.4f, 0.22f, 0.32f}),
-                  MaterialId::DarkWood);
-    }
-
-    // Side stairs and rope-guide posts give workers a route separate from the load.
-    for (int step = 0; step < 20; ++step)
-    {
-        const float t = (static_cast<float>(step) + 0.5f) / 20.0f;
-        const glm::vec3 surface = MonumentalSite::rampSurfacePoint(main, t);
-        addObject(ScenePrimitive::Cube,
-                  makeTransform({5.0f, surface.y - 0.10f, surface.z}, {},
-                                {1.45f, 0.20f, 2.20f}),
-                  MaterialId::DarkWood);
-        if (step % 3 == 0)
-            for (float x : {-4.25f, 4.25f})
-                addObject(ScenePrimitive::Cylinder,
-                          makeTransform({x, surface.y + 1.35f, surface.z}, {},
-                                        {0.18f, 2.7f, 0.18f}),
-                          MaterialId::Wood);
-    }
-
-    const glm::vec3 restPoint = MonumentalSite::rampSurfacePoint(main, 0.52f);
-    addObject(ScenePrimitive::Cube,
-              makeTransform({0.0f, restPoint.y - 0.28f, restPoint.z}, {},
-                            {14.0f, 0.34f, 5.2f}),
-              MaterialId::Wood);
-    for (float x : {-6.4f, 6.4f})
-        addObject(ScenePrimitive::Cylinder,
-                  makeTransform({x, restPoint.y + 1.2f, restPoint.z}, {},
-                                {0.20f, 2.8f, 0.20f}),
-                  MaterialId::Wood);
-
-    const RampDescriptor* quarryRamp = nullptr;
-    for (const RampDescriptor& ramp : MonumentalSite::ramps())
-        if (std::string(ramp.id) == "QuarryExitRamp")
-            quarryRamp = &ramp;
-    if (quarryRamp != nullptr)
-    {
-        const glm::vec3 stairSide = rampSide(*quarryRamp);
-        for (int step = 0; step < 15; ++step)
+        const std::string id = ramp.id;
+        const bool hauling = id.find("MainHauling") == 0;
+        if (hauling)
         {
-            const float t = (static_cast<float>(step) + 0.5f) / 15.0f;
-            const glm::vec3 surface = MonumentalSite::rampSurfacePoint(*quarryRamp, t);
-            for (float sign : {-1.0f, 1.0f})
-                addObject(ScenePrimitive::Cube,
-                          makeTransform(surface + stairSide * sign * 5.0f +
-                                            glm::vec3{0.0f, -0.12f, 0.0f},
-                                        {}, {1.25f, 0.22f, 1.40f}),
-                          MaterialId::DarkWood);
-            if (step % 3 == 0)
+            for (int sample = 1; sample < 11; ++sample)
+            {
+                const float t = static_cast<float>(sample) / 11.0f;
+                const glm::vec3 point = MonumentalSite::rampSurfacePoint(ramp, t);
+                addStaged(
+                    ScenePrimitive::Cylinder,
+                    ConstructionAnimationController::cylinderBetween(
+                        point - frame.right * (0.5f * ramp.width - 0.35f),
+                        point + frame.right * (0.5f * ramp.width - 0.35f), 0.22f),
+                    MaterialId::Wood, ramp);
+            }
+        }
+
+        const bool needsSupports = id != "QuarryExitRamp" &&
+                                   id != "MainLanding";
+        if (needsSupports)
+            for (float t : {0.25f, 0.50f, 0.75f})
+            {
+                const glm::vec3 surface = MonumentalSite::rampSurfacePoint(ramp, t);
+                const float height = surface.y - ramp.supportSurfaceY;
+                if (height <= 0.15f)
+                    continue;
                 for (float sign : {-1.0f, 1.0f})
-                    addObject(ScenePrimitive::Cylinder,
-                              makeTransform(surface + stairSide * sign * 3.9f +
-                                                glm::vec3{0.0f, 1.15f, 0.0f},
-                                            {}, {0.18f, 2.3f, 0.18f}),
-                              MaterialId::Wood);
+                {
+                    const glm::vec3 point =
+                        surface + frame.right * sign *
+                                      (0.5f * ramp.width - 0.48f);
+                    addStaged(ScenePrimitive::Cylinder,
+                              makeTransform({point.x,
+                                             ramp.supportSurfaceY + 0.5f * height,
+                                             point.z}, {},
+                                            {0.28f, height, 0.28f}),
+                              MaterialId::Wood, ramp);
+                }
+                addStaged(
+                    ScenePrimitive::Cylinder,
+                    ConstructionAnimationController::cylinderBetween(
+                        surface - frame.right * (0.5f * ramp.width - 0.30f),
+                        surface + frame.right * (0.5f * ramp.width - 0.30f), 0.22f),
+                    MaterialId::DarkWood, ramp);
+            }
+
+        // Worker stairs remain beyond the rails, leaving a clear sledge corridor.
+        if (hauling || id == "QuarryExitRamp")
+        {
+            const int steps = hauling ? 14 : 15;
+            const float sideDistance = 0.5f * ramp.width +
+                                       ramp.sideClearance + 0.85f;
+            const float yaw = glm::degrees(std::atan2(frame.forward.x,
+                                                       frame.forward.z));
+            for (int step = 0; step < steps; ++step)
+            {
+                const float t = (static_cast<float>(step) + 0.5f) /
+                                static_cast<float>(steps);
+                const glm::vec3 surface = MonumentalSite::rampSurfacePoint(ramp, t);
+                addStaged(ScenePrimitive::Cube,
+                          makeTransform(surface + frame.right * sideDistance -
+                                            frame.up * 0.14f,
+                                        {0.0f, yaw, 0.0f},
+                                        {1.35f, 0.20f, 1.55f}),
+                          MaterialId::DarkWood, ramp);
+            }
         }
     }
 
-    // Work platforms bridge the main ramp, active face, and upper connector.
-    addObject(ScenePrimitive::Cube,
-              makeTransform({0.0f, 8.55f, -0.8f}, {}, {10.0f, 0.34f, 3.0f}),
-              MaterialId::Wood);
-    addObject(ScenePrimitive::Cube,
-              makeTransform({16.0f, 13.35f, -9.0f}, {0.0f, -35.0f, 0.0f},
-                            {7.5f, 0.32f, 4.2f}),
-              MaterialId::Wood);
-    stats_.rampComponents = objects_.size() - start;
+    stats_.rampComponents = stagedObjects_.size() - start;
 }
 
 void StaticGizaScene::buildScaffolding()
@@ -437,7 +438,15 @@ void StaticGizaScene::buildScaffolding()
                     glm::mat4{1.0f},
                     {static_cast<float>(bay) * Scaffold::width(),
                      static_cast<float>(level) * Scaffold::levelHeight(), 0.0f});
-                addComposite(groupRoot * local, module);
+                for (const ObjectPart& part : module)
+                {
+                    const glm::mat4 model = groupRoot * local * part.localTransform;
+                    if (!isFiniteNonSingularTransform(model))
+                        throw std::runtime_error("Scaffold has an invalid transform");
+                    stagedObjects_.push_back(
+                        {{part.primitive, model, part.material},
+                         group.minimumProgress, group.maximumProgress});
+                }
                 ++stats_.scaffoldModules;
             }
     }
@@ -837,12 +846,15 @@ void StaticGizaScene::buildHeavyLiftingRig()
 void StaticGizaScene::buildObjectEnrichment()
 {
     const std::size_t start = objects_.size();
+    const std::size_t stagedStart = stagedObjects_.size();
     buildRopeInfrastructure();
     buildScaffoldAccess();
     buildWorkshopRepairAndInspection();
     buildRiverLanding();
     buildUpperPlatformDetails();
-    stats_.enrichmentObjects = objects_.size() - start + dynamicPulleyWheels_.size();
+    stats_.enrichmentObjects = objects_.size() - start +
+                               stagedObjects_.size() - stagedStart +
+                               dynamicPulleyWheels_.size();
     if (stats_.enrichmentObjects != ObjectEnrichment::expectedStaticInstances)
         throw std::runtime_error("Object-enrichment instance count changed unexpectedly");
 }
@@ -857,35 +869,28 @@ void StaticGizaScene::buildConstructionStages()
         stagedObjects_.push_back({{primitive, model, material}, minimum, maximum});
     };
 
-    // Temporary access ramps migrate upward and are removed as the summit closes.
-    addStaged(ScenePrimitive::Cube,
-              makeTransform({-34.0f, 2.0f, -9.0f}, {0.0f, 0.0f, -7.0f},
-                            {18.0f, 0.65f, 4.0f}),
-              MaterialId::RampEarth, 0.05f, 0.48f);
-    addStaged(ScenePrimitive::Cube,
-              makeTransform({25.0f, 10.0f, -17.0f}, {0.0f, -24.0f, -10.0f},
-                            {15.0f, 0.58f, 3.6f}),
-              MaterialId::RampEarth, 0.38f, 0.82f);
-    addStaged(ScenePrimitive::Cube,
-              makeTransform({8.0f, 19.0f, -33.0f}, {0.0f, -18.0f, -12.0f},
-                            {11.0f, 0.50f, 3.1f}),
-              MaterialId::RampEarth, 0.70f, 0.985f);
-
-    const std::vector<ObjectPart> scaffold = Scaffold::createModule();
-    const struct StageScaffold
+    // A small prepared-stone queue follows each active access route. The queue
+    // makes construction state legible without placing stones inside the monument.
+    for (const RampDescriptor& ramp : MonumentalSite::ramps())
     {
-        glm::vec3 position;
-        float minimum;
-        float maximum;
-    } scaffolds[]{{{-30.0f, 5.4f, -5.5f}, 0.12f, 0.58f},
-                  {{22.0f, 10.8f, -12.0f}, 0.42f, 0.86f},
-                  {{7.0f, 18.9f, -31.0f}, 0.70f, 0.995f}};
-    for (const StageScaffold& placement : scaffolds)
-        for (const ObjectPart& part : scaffold)
-            addStaged(part.primitive,
-                      makeTransform(placement.position, {}, {1.0f, 1.0f, 1.0f}) *
-                          part.localTransform,
-                      part.material, placement.minimum, placement.maximum);
+        const std::string id = ramp.id;
+        if (id.find("MainHauling") != 0 && id != "UpperConnector")
+            continue;
+        const RampFrame frame = MonumentalSite::rampFrame(ramp);
+        for (int queued = 0; queued < 3; ++queued)
+        {
+            const float t = 0.72f + 0.08f * static_cast<float>(queued);
+            const glm::vec3 surface = MonumentalSite::rampSurfacePoint(ramp, t);
+            const float sign = queued % 2 == 0 ? -1.0f : 1.0f;
+            const glm::vec3 position =
+                surface + frame.right * sign * (0.5f * ramp.width + 2.15f) +
+                frame.up * 0.78f;
+            addStaged(ScenePrimitive::Cube,
+                      makeTransform(position, {}, {2.45f, 1.35f, 2.30f}),
+                      MaterialId::PreparedStone, ramp.minimumProgress,
+                      ramp.maximumProgress);
+        }
+    }
 
     for (int block = 0; block < 12; ++block)
     {
@@ -1029,21 +1034,40 @@ void StaticGizaScene::buildScaffoldAccess()
 {
     for (const LadderDescriptor& ladder : ObjectEnrichment::ladders())
     {
+        float minimum = 0.0f;
+        float maximum = 1.01f;
+        for (const ScaffoldPlacement& scaffold : MonumentalSite::scaffolds())
+            if (std::string(scaffold.id) == ladder.id)
+            {
+                minimum = scaffold.minimumProgress;
+                maximum = scaffold.maximumProgress;
+            }
+        if (std::string(ladder.id) == "WestAccess")
+        {
+            const RampDescriptor* ramp = MonumentalSite::findRamp("WestAccessRamp");
+            minimum = ramp->minimumProgress;
+            maximum = ramp->maximumProgress;
+        }
+        const auto addPart = [this, minimum, maximum](ScenePrimitive primitive,
+                                                       const glm::mat4& model,
+                                                       MaterialId material) {
+            stagedObjects_.push_back({{primitive, model, material}, minimum, maximum});
+        };
         const glm::mat4 root = makeTransform(
             ladder.base, {0.0f, ladder.yawDegrees, ladder.leanDegrees},
             {1.0f, 1.0f, 1.0f});
         for (float sign : {-1.0f, 1.0f})
-            addObject(ScenePrimitive::Cube,
-                      root * makeTransform({sign * 0.5f * ladder.width,
-                                            0.5f * ladder.height, 0.0f}, {},
-                                           {0.16f, ladder.height, 0.18f}),
-                      MaterialId::DarkWood);
+            addPart(ScenePrimitive::Cube,
+                    root * makeTransform({sign * 0.5f * ladder.width,
+                                          0.5f * ladder.height, 0.0f}, {},
+                                         {0.16f, ladder.height, 0.18f}),
+                    MaterialId::DarkWood);
         const float spacing = ladder.height / static_cast<float>(ladder.rungCount + 1);
         for (unsigned int rung = 1; rung <= ladder.rungCount; ++rung)
-            addObject(ScenePrimitive::Cube,
-                      root * makeTransform({0.0f, spacing * static_cast<float>(rung), 0.0f}, {},
-                                           {ladder.width + 0.18f, 0.12f, 0.16f}),
-                      MaterialId::Wood);
+            addPart(ScenePrimitive::Cube,
+                    root * makeTransform({0.0f, spacing * static_cast<float>(rung), 0.0f}, {},
+                                         {ladder.width + 0.18f, 0.12f, 0.16f}),
+                    MaterialId::Wood);
     }
 
     struct Walkway
@@ -1051,24 +1075,28 @@ void StaticGizaScene::buildScaffoldAccess()
         glm::vec3 center;
         glm::vec3 scale;
         float yaw;
+        float minimum;
+        float maximum;
     };
     const Walkway walkways[]{
-        {{-17.0f, 5.55f, 2.1f}, {8.0f, 0.22f, 1.35f}, 0.0f},
-        {{18.0f, 5.55f, 2.1f}, {8.0f, 0.22f, 1.35f}, 0.0f},
-        {{-1.0f, 11.35f, -1.0f}, {7.0f, 0.22f, 1.30f}, 0.0f},
-        {{-40.0f, 5.35f, -25.0f}, {6.0f, 0.22f, 1.25f}, 0.0f}
+        {{-17.0f, 5.55f, 2.8f}, {8.0f, 0.22f, 1.35f}, 0.0f, 0.05f, 0.48f},
+        {{18.0f, 5.55f, 2.8f}, {8.0f, 0.22f, 1.35f}, 0.0f, 0.20f, 0.62f},
+        {{9.0f, 11.35f, -4.8f}, {7.0f, 0.22f, 1.30f}, 0.0f, 0.62f, 0.90f},
+        {{-40.0f, 5.35f, -25.0f}, {6.0f, 0.22f, 1.25f}, 0.0f, 0.05f, 0.62f}
     };
     for (const Walkway& walkway : walkways)
     {
         const glm::mat4 root = makeTransform(
             walkway.center, {0.0f, walkway.yaw, 0.0f}, {1.0f, 1.0f, 1.0f});
-        addObject(ScenePrimitive::Cube,
-                  root * makeTransform({}, {}, walkway.scale), MaterialId::Wood);
+        stagedObjects_.push_back(
+            {{ScenePrimitive::Cube, root * makeTransform({}, {}, walkway.scale),
+              MaterialId::Wood}, walkway.minimum, walkway.maximum});
         for (float z : {-0.72f, 0.72f})
-            addObject(ScenePrimitive::Cube,
-                      root * makeTransform({0.0f, 0.80f, z}, {},
-                                           {walkway.scale.x, 0.14f, 0.14f}),
-                      MaterialId::DarkWood);
+            stagedObjects_.push_back(
+                {{ScenePrimitive::Cube,
+                  root * makeTransform({0.0f, 0.80f, z}, {},
+                                       {walkway.scale.x, 0.14f, 0.14f}),
+                  MaterialId::DarkWood}, walkway.minimum, walkway.maximum});
     }
     stats_.ladders = ObjectEnrichment::ladders().size();
     stats_.scaffoldAccessObjects = stats_.ladders + ObjectEnrichment::accessWalkways;
@@ -1580,7 +1608,8 @@ void StaticGizaScene::emitPlacementDust(float previousProgress,
     std::size_t eventCount = 0;
     for (const PyramidBlockPlacement& block : pyramidBlocks_)
     {
-        if (!ConstructionTimelineController::isFrontierCandidate(block))
+        if (!ConstructionTimelineController::isFrontierCandidate(
+                block, pyramidConfig_))
             continue;
         const float threshold = ConstructionTimelineController::stableThreshold(
             block, pyramidConfig_);
@@ -1909,17 +1938,18 @@ void StaticGizaScene::updateFrontierBatches()
             constructionTimeline_.blockState(block, pyramidConfig_);
         if (!state.frontier)
             continue;
-        glm::vec3 position = block.position;
-        const float remaining = 1.0f - state.placementAmount;
-        position += glm::vec3{remaining * 2.0f, remaining * 4.0f,
-                              remaining * 1.2f};
+        const FrontierPlacementTransform placement =
+            ConstructionTimelineController::frontierTransform(
+                block, pyramidConfig_, state.placementAmount);
+        const glm::vec3 position = block.position + placement.offset;
         const bool variation = block.level % 4 == 1 || block.level % 4 == 2;
         const std::size_t materialIndex = variation ? 1u : 0u;
         const MaterialId materialId = variation
                                           ? MaterialId::LimestoneVariation
                                           : MaterialId::Limestone;
         const Material& material = materialDefinition(materialId);
-        const glm::mat4 model = makeTransform(position, {}, block.scale);
+        const glm::mat4 model =
+            makeTransform(position, placement.rotationDegrees, block.scale);
         frontierInstances_[materialIndex].push_back(
             makeInstanceData(model, material.textureScale, material.textureOffset));
         minimum[materialIndex] = glm::min(
@@ -1965,13 +1995,15 @@ void StaticGizaScene::collectFrameObjects()
     const float constructionProgress = constructionTimeline_.progress();
     for (const StagedSceneObject& staged : stagedObjects_)
         if (constructionProgress >= staged.minimumProgress &&
-            constructionProgress <= staged.maximumProgress)
+            (constructionProgress < staged.maximumProgress ||
+             (constructionProgress >= 1.0f && staged.maximumProgress > 1.0f)))
             frameObjects_.push_back(staged.object);
 
     for (const DynamicPulleyWheel& wheel : dynamicPulleyWheels_)
     {
         if (constructionProgress < wheel.minimumProgress ||
-            constructionProgress > wheel.maximumProgress)
+            (constructionProgress >= wheel.maximumProgress &&
+             !(constructionProgress >= 1.0f && wheel.maximumProgress > 1.0f)))
             continue;
         const float spin = wheel.phase + constructionProgress * 1440.0f +
                            animationController_.elapsedTime() * 35.0f;
@@ -1999,6 +2031,34 @@ void StaticGizaScene::collectFrameObjects()
             continue;
         glm::mat4 root = worker.root;
         WorkerJointAngles angles = worker.jointAngles;
+        if (worker.constructionCrew)
+        {
+            const std::size_t lane = index % 4u;
+            const RampDescriptor* activeRamp = nullptr;
+            if (constructionProgress < 0.30f)
+                activeRamp = MonumentalSite::findRamp("MainHaulingLow");
+            else if (constructionProgress < 0.62f)
+                activeRamp = MonumentalSite::findRamp("MainHaulingMiddle");
+            else if (constructionProgress < 0.90f)
+                activeRamp = lane == 3u
+                                 ? MonumentalSite::findRamp("UpperConnector")
+                                 : MonumentalSite::findRamp("MainHaulingRamp");
+
+            glm::vec3 position;
+            if (activeRamp != nullptr)
+            {
+                const RampFrame frame = MonumentalSite::rampFrame(*activeRamp);
+                const float t = 0.32f + 0.14f * static_cast<float>(lane);
+                position = MonumentalSite::rampSurfacePoint(*activeRamp, t) +
+                           frame.right * (0.5f * activeRamp->width +
+                                          1.15f + 0.45f * (lane % 2u)) +
+                           frame.up * 0.10f;
+            }
+            else
+                position = {43.0f + 2.4f * static_cast<float>(lane),
+                            0.0f, -13.0f - 2.0f * static_cast<float>(lane)};
+            root[3] = glm::vec4{position, 1.0f};
+        }
         if (coordinatedAnimationEnabled_ && worker.isHero && index < heroWorkerCount)
         {
             root = animation.workers[index].root;

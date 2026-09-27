@@ -1,0 +1,6 @@
+Progress,VisibleBlocks,ActiveRamps,ActiveScaffolds,UnexpectedPyramidContacts,AllowedPyramidContacts,UnexpectedRampContacts,AllowedRampJunctions,ScaffoldConflicts,CorridorObstructions,UnsupportedSamples,Result
+0.00,70,2,0,0,0,0,0,0,0,0,PASS
+0.25,4734,3,2,0,0,0,0,0,0,0,PASS
+0.50,6964,3,2,0,0,0,0,0,0,0,PASS
+0.75,7561,4,2,0,0,0,1,0,0,0,PASS
+1.00,7714,1,0,0,0,0,0,0,0,0,PASS

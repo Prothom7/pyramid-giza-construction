@@ -155,7 +155,8 @@ The state machine, 28.5-second duration, hierarchy, joint limits, prop attachmen
 logic, and lever logic remain unchanged. Only scale-dependent world coordinates changed.
 
 The hero sledge now starts at (10, 0, 40), turns at (0, 0, 47), enters the main ramp at
-Z=45, and arrives at the active face near Z=-0.6 and Y=8.545. Puller roots are still
+Z=45, and after the Phase 12.5 clearance repair arrives at the controlled landing near
+Z=-4.145 and Y=8.546. Puller roots are still
 derived from the same transport frame, ropes still join evaluated hands to tow points,
 and the stone remains a local child of the sledge. The sequence represents one focused
 transport stage, not the entire quarry-to-pyramid journey.

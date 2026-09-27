@@ -77,6 +77,12 @@ the existing `ConstructionTimelineController` is set to 18 percent and runs at
 existing 90-second progression. The near-complete and reveal shots hold 100 percent.
 No second block layout or building algorithm exists.
 
+The Phase 12.5 repair confirms that this is an entry-time synchronization followed by
+normal per-frame `ConstructionTimelineController::update`, not repeated per-frame seek.
+The controller now distributes blocks more finely inside the same legacy wave intervals
+and exposes a small exterior placement frontier, while preserving every documented
+checkpoint count and all Phase 12 shot timing.
+
 The final state retains the validated complete layout of 7,714 blocks and 28 levels.
 Existing ramp, scaffold, repository, worker, frontier, and placement-dust staging
 therefore remain authoritative.

@@ -37,6 +37,21 @@ struct RampDescriptor
     float thickness;
     MaterialId material;
     bool animatedRoute;
+    float minimumProgress = 0.0f;
+    float maximumProgress = 1.01f;
+    float sideClearance = 0.75f;
+    float supportSurfaceY = 0.0f;
+    bool intentionalPyramidContact = false;
+    const char* purpose = "";
+};
+
+struct RampFrame
+{
+    glm::vec3 forward{0.0f};
+    glm::vec3 right{0.0f};
+    glm::vec3 up{0.0f};
+    float length = 0.0f;
+    float slopeDegrees = 0.0f;
 };
 
 struct ScaffoldPlacement
@@ -47,6 +62,8 @@ struct ScaffoldPlacement
     unsigned int levels;
     unsigned int bays;
     const char* purpose;
+    float minimumProgress = 0.0f;
+    float maximumProgress = 1.01f;
 };
 
 struct SiteZoneDescriptor
@@ -63,6 +80,9 @@ public:
     static const WorldScale& scale();
     static const std::vector<RampDescriptor>& ramps();
     static const RampDescriptor& mainRamp();
+    static const RampDescriptor* findRamp(const char* id);
+    static RampFrame rampFrame(const RampDescriptor& ramp);
+    static bool rampActive(const RampDescriptor& ramp, float progress);
     static const std::vector<ScaffoldPlacement>& scaffolds();
     static const std::vector<SiteZoneDescriptor>& zones();
 

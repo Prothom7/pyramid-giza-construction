@@ -1,0 +1,14 @@
+Check,Value,Expected,Result,Notes
+Checkpoint0VisibleBlocks,70,70,PASS,Exact legacy membership preserved
+Checkpoint25VisibleBlocks,4734,4734,PASS,Exact legacy membership preserved
+Checkpoint50VisibleBlocks,6964,6964,PASS,Exact legacy membership preserved
+Checkpoint75VisibleBlocks,7561,7561,PASS,Exact Phase 5.6 checkpoint preserved
+Checkpoint100VisibleBlocks,7714,7714,PASS,Complete 28-level monument
+NaturalPlaybackStart,0.18,0.18,PASS,Phase 12 BuildTimelapse entry state
+NaturalPlaybackEnd,1.00,1.00,PASS,Update-driven completion without repeated seek
+NaturalPlaybackFrames,1440,1440,PASS,24 seconds at 60 Hz and 3.075x
+ActiveFrontierFrames,1317,GreaterThan864,PASS,Visible placement activity across most of the shot
+MaximumSimultaneousFrontier,12,4To16,PASS,Restrained readable active frontier
+SettlementEvents,184,GreaterThan0,PASS,Exterior frontier threshold crossings drive event eligibility
+PlacementPhases,6,6,PASS,Queued Approach LiftSlide Align Settle Stable
+DirectSeekPlaying,False,False,PASS,Direct checkpoint seek remains quiet and paused

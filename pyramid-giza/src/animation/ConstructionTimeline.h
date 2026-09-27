@@ -24,6 +24,23 @@ struct ConstructionBlockState
     float threshold = 0.0f;
 };
 
+enum class FrontierPlacementPhase
+{
+    Queued,
+    Approach,
+    LiftSlide,
+    Align,
+    Settle,
+    Stable
+};
+
+struct FrontierPlacementTransform
+{
+    FrontierPlacementPhase phase = FrontierPlacementPhase::Stable;
+    glm::vec3 offset{0.0f};
+    glm::vec3 rotationDegrees{0.0f};
+};
+
 class ConstructionTimelineController
 {
 public:
@@ -55,9 +72,14 @@ public:
 
     static float blockThreshold(const PyramidBlockPlacement& block,
                                 const PyramidLayoutConfig& config);
-    static bool isFrontierCandidate(const PyramidBlockPlacement& block);
+    static bool isFrontierCandidate(const PyramidBlockPlacement& block,
+                                    const PyramidLayoutConfig& config);
     static float stableThreshold(const PyramidBlockPlacement& block,
                                  const PyramidLayoutConfig& config);
+    static FrontierPlacementTransform frontierTransform(
+        const PyramidBlockPlacement& block, const PyramidLayoutConfig& config,
+        float placementAmount);
+    static const char* frontierPhaseName(FrontierPlacementPhase phase);
     static const char* stageName(ConstructionStage stage);
 
 private:
@@ -68,3 +90,4 @@ private:
 };
 
 bool validateConstructionTimeline(std::ostream& output);
+bool validateTimelapsePlaybackRepair(std::ostream& output);

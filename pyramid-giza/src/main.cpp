@@ -27,6 +27,7 @@
 #include "objects/WorkerHierarchyValidation.h"
 #include "presentation/ShowcaseController.h"
 #include "scene/PyramidLayout.h"
+#include "scene/RampValidation.h"
 #include "scene/IndustrialLandscape.h"
 #include "scene/MonumentalSite.h"
 #include "scene/ObjectEnrichment.h"
@@ -105,6 +106,8 @@ void synchronizeShowcase(AppState& state, bool synchronizeSimulation)
 
     state.scene->setSunAutomatic(false);
     state.scene->setSunTime(frame.sunTime);
+    // Simulation synchronization is deliberately entry/seek-only. During a shot,
+    // StaticGizaScene::update advances the construction controller naturally.
     if (!synchronizeSimulation)
         return;
 
@@ -551,6 +554,8 @@ int main(int argc, char** argv)
     bool showcaseCameraValidationOnly = false;
     bool showcaseStateValidationOnly = false;
     bool showcaseValidationOnly = false;
+    bool timelapseRepairValidationOnly = false;
+    bool rampClearanceValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -631,6 +636,10 @@ int main(int argc, char** argv)
             showcaseStateValidationOnly = true;
         else if (option == "--validate-showcase")
             showcaseValidationOnly = true;
+        else if (option == "--validate-timelapse-repair")
+            timelapseRepairValidationOnly = true;
+        else if (option == "--validate-ramp-clearance")
+            rampClearanceValidationOnly = true;
         else if (option == "--showcase")
             startShowcasePresentation = true;
         else if (option == "--showcase-time" && argument + 1 < argc)
@@ -932,6 +941,10 @@ int main(int argc, char** argv)
                        validatePhase12ShowcaseState(std::cout)
                    ? 0
                    : 1;
+    if (timelapseRepairValidationOnly)
+        return validateTimelapsePlaybackRepair(std::cout) ? 0 : 1;
+    if (rampClearanceValidationOnly)
+        return validatePhase12_5RampClearance(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
@@ -949,7 +962,9 @@ int main(int argc, char** argv)
         !validatePhase11EnvironmentMotion(std::cout) ||
         !validatePhase12ShowcaseTimeline(std::cout) ||
         !validatePhase12ShowcaseCamera(std::cout) ||
-        !validatePhase12ShowcaseState(std::cout))
+        !validatePhase12ShowcaseState(std::cout) ||
+        !validateTimelapsePlaybackRepair(std::cout) ||
+        !validatePhase12_5RampClearance(std::cout))
         return 1;
 
     if (benchmarkRender && smokeDurationSeconds <= 0.0f)

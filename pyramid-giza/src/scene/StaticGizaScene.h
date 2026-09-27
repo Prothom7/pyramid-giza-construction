@@ -175,6 +175,7 @@ private:
         bool isHero = false;
         bool isSecondary = false;
         bool isDemoWorker = false;
+        bool constructionCrew = false;
         float animationPhase = 0.0f;
         float minimumConstructionProgress = 0.0f;
         float maximumConstructionProgress = 1.01f;

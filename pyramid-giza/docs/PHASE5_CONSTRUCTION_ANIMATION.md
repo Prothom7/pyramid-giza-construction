@@ -63,7 +63,7 @@ ground turn (0, 0, 47)
         |
 ramp entry (0, rampHeight, 45)
         |
-ramp top (0, rampHeight, -0.6)
+ramp top (0, rampHeight, -4.2) after the Phase 12.5 clearance repair
 ```
 
 Ground pulling uses progress 0.00-0.35, the turn/ramp approach uses 0.35-0.45, and ramp

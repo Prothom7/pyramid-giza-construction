@@ -4,6 +4,7 @@
 #include <cmath>
 #include <ostream>
 #include <stdexcept>
+#include <string>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -19,7 +20,7 @@ bool finiteVector(const glm::vec3& value)
 
 glm::vec3 rampForward(const RampDescriptor& ramp)
 {
-    const glm::vec3 direction = ramp.base - ramp.top;
+    const glm::vec3 direction = ramp.top - ramp.base;
     const float length = glm::length(direction);
     if (!std::isfinite(length) || length <= 1.0e-5f)
         throw std::invalid_argument("Ramp endpoints must define a positive length");
@@ -49,29 +50,73 @@ const WorldScale& MonumentalSite::scale()
 const std::vector<RampDescriptor>& MonumentalSite::ramps()
 {
     static const std::vector<RampDescriptor> values{
-        {"MainHaulingRamp", {0.0f, 0.35f, 45.0f}, {0.0f, 8.20f, -0.60f},
-         scale().mainRampWidth, 0.70f, MaterialId::RampEarth, true},
-        {"WestAccessRamp", {-63.0f, 0.30f, -25.0f}, {-41.6f, 5.30f, -25.0f},
-         4.5f, 0.60f, MaterialId::RampEarth, false},
-        {"UpperConnector", {9.0f, 8.40f, 0.20f}, {20.0f, 13.20f, -11.0f},
-         3.6f, 0.52f, MaterialId::RampEarth, false},
+        {"MainHaulingLow", {0.0f, 0.30f, 45.0f}, {0.0f, 2.35f, 0.80f},
+         scale().mainRampWidth, 0.65f, MaterialId::RampEarth, false,
+         0.0f, 0.30f, 1.45f, 0.0f, false, "Early low-course haul"},
+        {"MainHaulingMiddle", {0.0f, 0.32f, 45.0f}, {0.0f, 5.25f, -1.70f},
+         scale().mainRampWidth, 0.68f, MaterialId::RampEarth, false,
+         0.30f, 0.62f, 1.45f, 0.0f, false, "Lower-middle haul"},
+        {"MainHaulingRamp", {0.0f, 0.35f, 45.0f}, {0.0f, 8.20f, -4.20f},
+         scale().mainRampWidth, 0.70f, MaterialId::RampEarth, true,
+         0.62f, 0.90f, 1.35f, 0.0f, false, "Hero and upper-middle haul"},
+        {"MainLanding", {0.0f, 8.20f, -4.20f}, {0.0f, 8.20f, -5.25f},
+         7.8f, 0.40f, MaterialId::RampEarth, false,
+         0.62f, 0.90f, 0.25f, 0.0f, true, "Controlled pyramid-face landing"},
+        {"WestAccessRamp", {-63.0f, 0.30f, -25.0f}, {-40.0f, 4.30f, -25.0f},
+         4.5f, 0.60f, MaterialId::RampEarth, false,
+         0.05f, 0.62f, 1.40f, 0.0f, false, "West worker access"},
+        {"UpperConnector", {42.0f, 8.70f, -8.0f}, {35.5f, 19.20f, -27.5f},
+         3.6f, 0.52f, MaterialId::RampEarth, false,
+         0.62f, 0.985f, 1.50f, 0.0f, false, "Late east-face connector"},
         {"QuarryExitRamp", {-103.0f, -6.2f, -8.0f}, {-91.0f, 0.35f, 9.0f},
-         7.5f, 0.65f, MaterialId::RampEarth, false}
+         7.5f, 0.65f, MaterialId::RampEarth, false,
+         0.0f, 1.01f, 0.40f, -7.5f, false, "Quarry terrace exit"}
     };
     return values;
 }
 
 const RampDescriptor& MonumentalSite::mainRamp()
 {
-    return ramps().front();
+    return *findRamp("MainHaulingRamp");
+}
+
+const RampDescriptor* MonumentalSite::findRamp(const char* id)
+{
+    for (const RampDescriptor& ramp : ramps())
+        if (std::string(ramp.id) == id)
+            return &ramp;
+    return nullptr;
+}
+
+RampFrame MonumentalSite::rampFrame(const RampDescriptor& ramp)
+{
+    const glm::vec3 delta = ramp.top - ramp.base;
+    const float horizontal = glm::length(glm::vec2{delta.x, delta.z});
+    return {rampForward(ramp), rampRight(ramp), rampUp(ramp),
+            glm::length(delta), glm::degrees(std::atan2(delta.y, horizontal))};
+}
+
+bool MonumentalSite::rampActive(const RampDescriptor& ramp, float progress)
+{
+    const float value = std::clamp(progress, 0.0f, 1.0f);
+    return value >= ramp.minimumProgress &&
+           (value < ramp.maximumProgress ||
+            (value >= 1.0f && ramp.maximumProgress > 1.0f));
 }
 
 const std::vector<ScaffoldPlacement>& MonumentalSite::scaffolds()
 {
     static const std::vector<ScaffoldPlacement> values{
-        {"FrontWest", {-24.0f, 0.0f, 1.6f}, 0.0f, 3, 3, "Lower active face"},
-        {"FrontEast", {12.0f, 0.0f, 1.6f}, 0.0f, 3, 3, "Lower active face"},
-        {"RampTop", {-5.0f, 8.55f, -0.2f}, 0.0f, 2, 2, "Ramp-top staging"}
+        {"FrontWest", {-24.0f, 0.0f, 2.8f}, 0.0f, 3, 3,
+         "Early west-face access", 0.05f, 0.48f},
+        {"FrontEast", {12.0f, 0.0f, 2.8f}, 0.0f, 3, 3,
+         "Lower-middle east-face access", 0.20f, 0.62f},
+        {"RampTop", {7.5f, 8.55f, -4.8f}, 0.0f, 2, 2,
+         "Hero-ramp landing access", 0.62f, 0.90f},
+        {"MiddleEast", {24.0f, 10.8f, -10.0f}, -24.0f, 2, 2,
+         "Migrating middle-course access", 0.42f, 0.72f},
+        {"SummitEast", {43.5f, 19.25f, -29.0f}, -20.0f, 2, 2,
+         "Late upper-course access", 0.72f, 0.985f}
     };
     return values;
 }
@@ -101,14 +146,11 @@ glm::mat4 MonumentalSite::rampModel(const RampDescriptor& ramp)
     if (ramp.width <= 0.0f || ramp.thickness <= 0.0f)
         throw std::invalid_argument("Ramp width and thickness must be positive");
 
-    const glm::vec3 forward = rampForward(ramp);
-    const glm::vec3 right = rampRight(ramp);
-    const glm::vec3 up = rampUp(ramp);
-    const float length = glm::distance(ramp.base, ramp.top);
+    const RampFrame frame = rampFrame(ramp);
     glm::mat4 model{1.0f};
-    model[0] = glm::vec4{right * ramp.width, 0.0f};
-    model[1] = glm::vec4{up * ramp.thickness, 0.0f};
-    model[2] = glm::vec4{forward * length, 0.0f};
+    model[0] = glm::vec4{frame.right * ramp.width, 0.0f};
+    model[1] = glm::vec4{frame.up * ramp.thickness, 0.0f};
+    model[2] = glm::vec4{frame.forward * frame.length, 0.0f};
     model[3] = glm::vec4{0.5f * (ramp.base + ramp.top), 1.0f};
     return model;
 }
@@ -116,7 +158,8 @@ glm::mat4 MonumentalSite::rampModel(const RampDescriptor& ramp)
 glm::vec3 MonumentalSite::rampSurfacePoint(const RampDescriptor& ramp, float progress)
 {
     const float t = std::clamp(progress, 0.0f, 1.0f);
-    return glm::mix(ramp.base, ramp.top, t) + rampUp(ramp) * (0.5f * ramp.thickness);
+    return glm::mix(ramp.base, ramp.top, t) +
+           rampFrame(ramp).up * (0.5f * ramp.thickness);
 }
 
 float MonumentalSite::mainRampSurfaceHeight(float z)

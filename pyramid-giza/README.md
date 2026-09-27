@@ -17,6 +17,7 @@ Course project status:
 - **Phase 10 - Complete:** indexed GPU instancing, construction-aware batching, conservative frustum culling, and render statistics
 - **Phase 11 - Complete:** instanced construction dust, animated Nile UVs, and subtle vegetation motion
 - **Phase 12 - Complete:** deterministic synchronized cinematic showcase and final presentation flow
+- **Phase 12.5 - Complete:** post-showcase construction playback and ramp/scaffold clearance repair
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -92,6 +93,19 @@ a render pass or owning their simulation logic. The narrative covers the site, q
 extraction, repositories, loading, transport, ramp, upper work, accelerated build,
 completed 7,714-block pyramid, Nile/Sphinx context, and a six-second golden-hour final
 hold. Direct time seek and 0.25x-4x playback support repeatable testing and recording.
+
+Phase 12.5 repairs the visible build sequence without replacing the Phase 12
+coordinator. Shot entry and direct seek still synchronize once, while ordinary frames
+advance `ConstructionTimelineController::update`. Fine deterministic thresholds spread
+each legacy 12-wave batch inside its original interval; 4-12 exterior frontier blocks
+then pass through queued, approach, lift/slide, alignment, and settlement transforms.
+The exact 70/4,734/6,964/7,561/7,714 checkpoint counts remain unchanged.
+
+The same repair replaces overlapping permanent access slabs with low, middle, hero,
+landing, west-access, upper-connector, and quarry ramp descriptors. Ramp bodies, rails,
+rollers, supports, side stairs, scaffolds, queued stones, and elevated crews now follow
+construction-stage intervals. CPU OBB checks report no unintended ramp/pyramid,
+ramp/ramp, or ramp/scaffold intersection at 0, 25, 50, 75, and 100 percent.
 
 ## Build and run
 
@@ -170,6 +184,8 @@ build\PyramidGiza.exe --validate-effect-events
 build\PyramidGiza.exe --validate-environment-motion
 build\PyramidGiza.exe --validate-effects
 build\PyramidGiza.exe --validate-showcase
+build\PyramidGiza.exe --validate-timelapse-repair
+build\PyramidGiza.exe --validate-ramp-clearance
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -210,6 +226,7 @@ Build output and captures are ignored by Git.
 - [Phase 10 renderer optimization](docs/PHASE10_RENDERER_OPTIMIZATION.md)
 - [Phase 11 atmospheric effects](docs/PHASE11_ATMOSPHERIC_EFFECTS.md)
 - [Phase 12 cinematic showcase](docs/PHASE12_CINEMATIC_SHOWCASE.md)
+- [Phase 12.5 construction repair](docs/PHASE12_5_CONSTRUCTION_REPAIR.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
@@ -222,3 +239,5 @@ render-performance tables.
 Phase 11 adds particle-system, effect-control, environmental-motion, and effect-performance
 tables.
 Phase 12 adds showcase-shot, action, control, and camera-path-validation tables.
+Phase 12.5 updates the ramp, scaffold, and infrastructure-stage records and adds
+timelapse-playback and geometric-clearance validation tables.

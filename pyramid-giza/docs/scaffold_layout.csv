@@ -1,4 +1,6 @@
-ScaffoldID,ModuleType,WorldX,WorldY,WorldZ,RotationY,Levels,Bays,ModuleWidth,ModuleCount,Purpose,Notes
-FrontWest,RigidPrimitiveModule,-24,0,1.6,0,3,3,4.6,9,Lower active face,Three levels across three bays
-FrontEast,RigidPrimitiveModule,12,0,1.6,0,3,3,4.6,9,Lower active face,Frames main hauling ramp
-RampTop,RigidPrimitiveModule,-5,8.55,-0.2,0,2,2,4.6,4,Ramp-top staging,Supports upper work platform
+ScaffoldID,ModuleType,WorldX,WorldY,WorldZ,RotationY,Levels,Bays,ModuleWidth,ModuleCount,MinProgress,MaxProgress,Purpose,Notes
+FrontWest,RigidPrimitiveModule,-24,0,2.8,0,3,3,4.6,9,0.05,0.48,Early west-face access,Removed before middle courses overtake it
+FrontEast,RigidPrimitiveModule,12,0,2.8,0,3,3,4.6,9,0.20,0.62,Lower-middle east-face access,Stage-aware shared modules
+RampTop,RigidPrimitiveModule,7.5,8.55,-4.8,0,2,2,4.6,4,0.62,0.90,Hero-ramp landing access,Outside the load corridor
+MiddleEast,RigidPrimitiveModule,24,10.8,-10,-24,2,2,4.6,4,0.42,0.72,Migrating middle-course access,Removed before upper closure
+SummitEast,RigidPrimitiveModule,43.5,19.25,-29,-20,2,2,4.6,4,0.72,0.985,Late upper-course access,Outside completed pyramid envelope and absent at completion
