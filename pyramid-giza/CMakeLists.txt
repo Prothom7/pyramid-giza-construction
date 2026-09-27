@@ -36,6 +36,7 @@ add_executable(PyramidGiza
     src/effects/ParticleSystem.cpp
     src/presentation/ShowcaseController.cpp
     src/scene/PyramidLayout.cpp
+    src/scene/PyramidInterior.cpp
     src/scene/MonumentalSite.cpp
     src/scene/IndustrialLandscape.cpp
     src/scene/ObjectEnrichment.cpp
@@ -120,3 +121,6 @@ add_test(NAME Phase12_6GroundingValidation COMMAND PyramidGiza --validate-ground
 add_test(NAME Phase12_6StageDependencyValidation COMMAND PyramidGiza --validate-stage-dependencies)
 add_test(NAME Phase12_7QuarryPulleyAnimationValidation COMMAND PyramidGiza --validate-quarry-pulley)
 add_test(NAME Phase12_7QuarryPulleySupportValidation COMMAND PyramidGiza --validate-quarry-pulley-support)
+add_test(NAME Phase12_8InteriorGeometryValidation COMMAND PyramidGiza --validate-interior-geometry)
+add_test(NAME Phase12_8InteriorConnectivityValidation COMMAND PyramidGiza --validate-interior-connectivity)
+add_test(NAME Phase12_8InteriorNavigationValidation COMMAND PyramidGiza --validate-interior-navigation)

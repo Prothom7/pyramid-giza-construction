@@ -1,0 +1,7 @@
+From,To,Connection,Walkable,Validation
+NorthExterior,EntryDescending,Physical carved entrance,YES,PASS
+EntryDescending,AscendingPassage,Shared endpoint at 0 4.5 -67,YES,PASS
+AscendingPassage,GrandGallery,Shared endpoint at 0 11 -55,YES,PASS
+GrandGallery,AntechamberConnector,Shared endpoint at 0 16 -43,YES,PASS
+AntechamberConnector,Antechamber,Connector endpoint inside room bounds,YES,PASS
+Antechamber,TombChamber,Room volumes overlap at doorway zone,YES,PASS

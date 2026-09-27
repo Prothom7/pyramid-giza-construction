@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include "Camera.h"
+#include "scene/PyramidInterior.h"
 
 enum class CameraMode
 {
@@ -13,7 +14,8 @@ enum class CameraMode
     PresetTransition,
     OrbitPyramid,
     FollowTransport,
-    GuidedDemo
+    GuidedDemo,
+    InteriorWalk
 };
 
 enum class CameraSpeedMode
@@ -62,6 +64,7 @@ public:
     static constexpr float transitionDuration = 1.0f;
     static constexpr float minimumOrbitRadius = 55.0f;
     static constexpr float maximumOrbitRadius = 180.0f;
+    static constexpr float interiorSpeed = 3.2f;
 
     CameraController();
 
@@ -88,6 +91,7 @@ public:
     void togglePyramidOrbit();
     void toggleTransportFollow(const glm::vec3& transportTarget);
     void toggleGuidedDemo();
+    void toggleInteriorInspection();
 
     static const std::array<CameraPose, 9>& presets();
     static const std::array<DemoShot, 7>& demoShots();
@@ -122,4 +126,6 @@ private:
     std::size_t demoShotIndex_ = 0;
     float demoShotElapsed_ = 0.0f;
     CameraPose demoShotStart_;
+    CameraPose exteriorPose_;
+    bool exteriorPoseSaved_ = false;
 };

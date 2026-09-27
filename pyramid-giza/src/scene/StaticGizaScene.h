@@ -21,11 +21,16 @@
 #include "lighting/SunController.h"
 #include "objects/Worker.h"
 #include "scene/PyramidLayout.h"
+#include "scene/PyramidInterior.h"
 #include "scene/SceneTypes.h"
 
 struct StaticGizaSceneStats
 {
     std::size_t pyramidBlocks = 0;
+    std::size_t pyramidGeneratedBlocks = 0;
+    std::size_t pyramidInteriorExcludedBlocks = 0;
+    std::size_t pyramidRenderedStructuralBlocks = 0;
+    std::size_t interiorDraws = 0;
     std::size_t rampComponents = 0;
     std::size_t scaffoldModules = 0;
     std::size_t quarryBlocks = 0;
@@ -107,6 +112,10 @@ public:
         return QuarryPulleyAnimationController::stateName(
             quarryPulleyController_.snapshot().state);
     }
+    void setInteriorInspectionActive(bool active) { interiorInspectionActive_ = active; }
+    bool interiorInspectionActive() const { return interiorInspectionActive_; }
+    void togglePyramidCutaway();
+    bool pyramidCutawayEnabled() const { return pyramidCutawayEnabled_; }
     void toggleAutomaticSun();
     void adjustSunTime(float hours);
     void selectMorningSun();
@@ -233,6 +242,7 @@ private:
     void buildGround();
     void buildPyramid();
     void buildPyramidInstanceBatches();
+    void buildPyramidInterior();
     void buildRampNetwork();
     void buildScaffolding();
     void buildQuarryAndCutting();
@@ -311,6 +321,8 @@ private:
     bool texturesEnabled_ = true;
     bool frustumCullingEnabled_ = true;
     bool effectsEnabled_ = true;
+    bool interiorInspectionActive_ = false;
+    bool pyramidCutawayEnabled_ = false;
     ShadowDebugMode shadowDebugMode_ = ShadowDebugMode::Normal;
     StaticGizaSceneStats stats_;
     RenderStats renderStats_;

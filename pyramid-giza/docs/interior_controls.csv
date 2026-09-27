@@ -1,0 +1,9 @@
+Key,Action,Mode,Notes
+F8,Toggle interior inspection,InteriorWalk,Stores/restores exterior pose and enables local inspection light
+F9,Toggle pyramid cutaway,Any,Filters the positive-X structural section from visible and shadow batches
+W/S,Forward/backward,InteriorWalk,Follows sloped floor automatically
+A/D,Strafe left/right,InteriorWalk,Rejected at walkable-volume walls
+Mouse,Look,InteriorWalk,Pitch remains clamped by Camera
+Shift+movement,Fast interior movement,InteriorWalk,5.6 units per second
+Ctrl+movement,Precision interior movement,InteriorWalk,1.44 units per second
+Mouse wheel,Adjust FOV,InteriorWalk,Uses existing 30-75 degree clamp

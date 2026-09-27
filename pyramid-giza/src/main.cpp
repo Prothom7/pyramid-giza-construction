@@ -28,6 +28,7 @@
 #include "objects/WorkerHierarchyValidation.h"
 #include "presentation/ShowcaseController.h"
 #include "scene/PyramidLayout.h"
+#include "scene/PyramidInterior.h"
 #include "scene/RampValidation.h"
 #include "scene/IndustrialLandscape.h"
 #include "scene/MonumentalSite.h"
@@ -278,6 +279,24 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
         std::cout << "Quarry pulley: "
                   << (state->scene->quarryPulleyPaused() ? "PAUSED" : "PLAYING")
                   << ", state " << state->scene->quarryPulleyStateName() << ".\n";
+    }
+    else if (key == GLFW_KEY_F8 && state->scene != nullptr)
+    {
+        cancelShowcaseForManualInput(*state, window, "interior inspection command");
+        state->cameraController.toggleInteriorInspection();
+        state->scene->setInteriorInspectionActive(
+            state->cameraController.mode() == CameraMode::InteriorWalk);
+        state->firstMouse = true;
+        std::cout << "Pyramid interior inspection: "
+                  << (state->scene->interiorInspectionActive() ? "ON" : "OFF")
+                  << ".\n";
+    }
+    else if (key == GLFW_KEY_F9 && state->scene != nullptr)
+    {
+        state->scene->togglePyramidCutaway();
+        std::cout << "Pyramid cutaway: "
+                  << (state->scene->pyramidCutawayEnabled() ? "ON" : "OFF")
+                  << ".\n";
     }
     else if (key == GLFW_KEY_N && state->scene != nullptr)
     {
@@ -570,6 +589,10 @@ int main(int argc, char** argv)
     bool stageDependencyValidationOnly = false;
     bool quarryPulleyValidationOnly = false;
     bool quarryPulleySupportValidationOnly = false;
+    bool interiorGeometryValidationOnly = false;
+    bool interiorConnectivityValidationOnly = false;
+    bool interiorNavigationValidationOnly = false;
+    bool interiorValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -586,6 +609,7 @@ int main(int argc, char** argv)
     bool startWithFrustumCulling = true;
     bool startWithEffects = true;
     bool startShowcasePresentation = false;
+    bool startCutaway = false;
     float initialShowcaseTime = 0.0f;
     float initialShowcaseSpeed = 1.0f;
     bool startTimelapse = false;
@@ -664,6 +688,16 @@ int main(int argc, char** argv)
             quarryPulleyValidationOnly = true;
         else if (option == "--validate-quarry-pulley-support")
             quarryPulleySupportValidationOnly = true;
+        else if (option == "--validate-interior-geometry")
+            interiorGeometryValidationOnly = true;
+        else if (option == "--validate-interior-connectivity")
+            interiorConnectivityValidationOnly = true;
+        else if (option == "--validate-interior-navigation")
+            interiorNavigationValidationOnly = true;
+        else if (option == "--validate-interior")
+            interiorValidationOnly = true;
+        else if (option == "--cutaway")
+            startCutaway = true;
         else if (option == "--showcase")
             startShowcasePresentation = true;
         else if (option == "--showcase-time" && argument + 1 < argc)
@@ -781,9 +815,10 @@ int main(int argc, char** argv)
         {
             initialCameraMode = argv[++argument];
             if (initialCameraMode != "free" && initialCameraMode != "orbit" &&
-                initialCameraMode != "follow" && initialCameraMode != "demo")
+                initialCameraMode != "follow" && initialCameraMode != "demo" &&
+                initialCameraMode != "interior")
             {
-                std::cerr << "Camera mode must be free, orbit, follow, or demo.\n";
+                std::cerr << "Camera mode must be free, orbit, follow, demo, or interior.\n";
                 return 2;
             }
         }
@@ -979,6 +1014,14 @@ int main(int argc, char** argv)
         return validateQuarryPulleyAnimation(std::cout) ? 0 : 1;
     if (quarryPulleySupportValidationOnly)
         return validateQuarryPulleySupport(std::cout) ? 0 : 1;
+    if (interiorGeometryValidationOnly)
+        return validatePyramidInteriorGeometry(std::cout) ? 0 : 1;
+    if (interiorConnectivityValidationOnly)
+        return validatePyramidInteriorConnectivity(std::cout) ? 0 : 1;
+    if (interiorNavigationValidationOnly)
+        return validatePyramidInteriorNavigation(std::cout) ? 0 : 1;
+    if (interiorValidationOnly)
+        return validatePyramidInterior(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
@@ -1003,7 +1046,8 @@ int main(int argc, char** argv)
         !validatePhase12_6Grounding(std::cout) ||
         !validatePhase12_6StageDependencies(std::cout) ||
         !validateQuarryPulleyAnimation(std::cout) ||
-        !validateQuarryPulleySupport(std::cout))
+        !validateQuarryPulleySupport(std::cout) ||
+        !validatePyramidInterior(std::cout))
         return 1;
 
     if (benchmarkRender && smokeDurationSeconds <= 0.0f)
@@ -1067,7 +1111,8 @@ int main(int argc, char** argv)
                      "Y frustum culling, I render stats, F4 effects, Shift+F4 effect stats, "
                      "C culling, F wireframe, Space pause, R animation reset, N next state, "
                      "L loop, M animation mode, +/- speed, P debug pose, "
-                     "F7 quarry pulley pause, ESC exits.\n";
+                     "F7 quarry pulley pause, F8 interior walk, F9 pyramid cutaway, "
+                     "ESC exits.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
 
@@ -1107,6 +1152,8 @@ int main(int argc, char** argv)
         scene.setConstructionProgress(initialConstructionProgress);
         scene.setConstructionSpeed(initialConstructionSpeed);
         scene.setConstructionPlaying(startTimelapse);
+        if (startCutaway)
+            scene.togglePyramidCutaway();
         printSunState(scene, "Initial sun");
         std::cout << "Lighting debug mode: " << scene.lightingDebugModeName() << '\n';
         std::cout << "Directional shadows: " << (scene.shadowsEnabled() ? "ON" : "OFF")
@@ -1129,6 +1176,10 @@ int main(int argc, char** argv)
             state.cameraController.toggleTransportFollow(scene.transportTarget());
         else if (initialCameraMode == "demo")
             state.cameraController.toggleGuidedDemo();
+        else if (initialCameraMode == "interior")
+            state.cameraController.toggleInteriorInspection();
+        scene.setInteriorInspectionActive(
+            state.cameraController.mode() == CameraMode::InteriorWalk);
         if (initialCameraMode != "free")
         {
             state.cameraController.update(1.0f, scene.transportTarget());
@@ -1203,6 +1254,8 @@ int main(int argc, char** argv)
                 static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight),
                 CameraController::nearPlane, CameraController::farPlane);
             const Camera& activeCamera = state.cameraController.camera();
+            scene.setInteriorInspectionActive(
+                state.cameraController.mode() == CameraMode::InteriorWalk);
             scene.render(activeCamera.GetViewMatrix(), projection, activeCamera.Position,
                          framebufferWidth, framebufferHeight);
 

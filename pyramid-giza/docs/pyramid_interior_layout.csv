@@ -1,0 +1,7 @@
+RegionID,Type,StartOrCenterX,StartOrCenterY,StartOrCenterZ,EndX,EndY,EndZ,Width,Height,DepthOrLength,CarvingMargin,Purpose
+EntryDescending,Passage,0,7,-83,0,4.5,-67,2.2,2.6,16.194,0.24,North entrance and descending entry
+AscendingPassage,Passage,0,4.5,-67,0,11,-55,2.2,2.7,13.647,0.24,Inclined transition toward gallery
+GrandGallery,Gallery,0,11,-55,0,16,-43,3.6,6,13,0.24,Taller gallery-like corridor
+AntechamberConnector,Passage,0,16,-43,0,16,-39.5,3,3.5,3.5,0.24,Level doorway into antechamber
+Antechamber,Room,0,18,-38,,,,5,4,5.6,0.24,Transition room before tomb
+TombChamber,Room,0,19,-29.5,,,,10,6,15,0.24,Main burial chamber and sarcophagus

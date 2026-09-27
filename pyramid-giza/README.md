@@ -20,6 +20,7 @@ Course project status:
 - **Phase 12.5 - Complete:** post-showcase construction playback and ramp/scaffold clearance repair
 - **Phase 12.6 - Complete:** grounding, support, and construction-stage spatial stability repair
 - **Phase 12.7 - Complete:** deterministic quarry pulley rock-lifting visualization
+- **Phase 12.8 - Complete:** carved pyramid passage network, tomb chamber, interior navigation, and cutaway inspection
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -120,6 +121,16 @@ speculative/experimental graphics visualization, not archaeological proof of
 Khufu-era pulley machinery. All 33 maximum component instances reuse existing
 cube and cylinder meshes and enter the same visible/shadow frame list.
 
+Phase 12.8 carves a real north-face passage void through the GPU-instanced
+pyramid. One authoritative classifier removes 259 of the conceptual 7,714
+blocks from both stable and animated-frontier batches, leaving 7,455 structural
+instances at completion. Four connected passage volumes lead through a gallery
+and antechamber to a plain tomb chamber with an open stone sarcophagus. F8
+provides slope-following confined interior walking and a short-range inspection
+light; F9 exposes the route with a deterministic visible/shadow-consistent
+cutaway. The interior is a stylized historically inspired reconstruction, not
+an exact archaeological survey.
+
 ## Build and run
 
 ```powershell
@@ -152,6 +163,8 @@ build\PyramidGiza.exe
 - `Shift + F5`: cancel the showcase and return to manual camera control
 - `F6`: pause/resume the showcase presentation clock
 - `F7`: pause/resume the independent quarry pulley cycle
+- `F8`: toggle confined pyramid-interior inspection mode
+- `F9`: toggle pyramid cutaway inspection
 - `K`: print camera position, yaw, pitch, FOV, and mode
 - `C`: toggle back-face culling; `F`: toggle filled/wireframe
 - `Space`: pause/resume; `N`: next state; `R`: reset; `L`: loop
@@ -205,11 +218,13 @@ build\PyramidGiza.exe --validate-grounding
 build\PyramidGiza.exe --validate-stage-dependencies
 build\PyramidGiza.exe --validate-quarry-pulley
 build\PyramidGiza.exe --validate-quarry-pulley-support
+build\PyramidGiza.exe --validate-interior
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
 `--wireframe`, `--no-cull`, `--animation-time SECONDS`, `--camera-mode
-free|orbit|follow|demo`, and `--capture output.ppm` support deterministic runtime checks.
+free|orbit|follow|demo|interior`, `--cutaway`, and `--capture output.ppm`
+support deterministic runtime checks.
 `--sun-time HOURS`, `--auto-sun`, `--static-sun`, and `--lighting-mode
 normal|diffuse|specular|normals|unlit` support deterministic lighting checks.
 `--shadows`, `--no-shadows`, `--shadow-debug-factor`, and
@@ -248,6 +263,7 @@ Build output and captures are ignored by Git.
 - [Phase 12.5 construction repair](docs/PHASE12_5_CONSTRUCTION_REPAIR.md)
 - [Phase 12.6 grounding and support repair](docs/PHASE12_6_GROUNDING_AND_SUPPORT_REPAIR.md)
 - [Phase 12.7 quarry pulley lift](docs/PHASE12_7_QUARRY_PULLEY_LIFT.md)
+- [Phase 12.8 pyramid interior](docs/PHASE12_8_PYRAMID_INTERIOR.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,

@@ -31,6 +31,11 @@ uniform int shadowDebugMode;
 uniform float shadowMinimumBias;
 uniform float shadowSlopeBias;
 uniform float shadowStrength;
+uniform int inspectionLightEnabled;
+uniform vec3 inspectionLightPosition;
+uniform vec3 inspectionLightColor;
+uniform float inspectionLightRange;
+uniform float inspectionLightIntensity;
 
 float calculateShadow(vec3 normal, vec3 toLight)
 {
@@ -87,6 +92,25 @@ void main()
     float shadow = calculateShadow(normal, toLight);
     float visibility = 1.0 - shadow * shadowStrength;
 
+    vec3 inspection = vec3(0.0);
+    if (inspectionLightEnabled != 0)
+    {
+        vec3 lightDelta = inspectionLightPosition - WorldPosition;
+        float distanceToInspectionLight = length(lightDelta);
+        if (distanceToInspectionLight < inspectionLightRange &&
+            distanceToInspectionLight > 0.001)
+        {
+            vec3 localLightDirection = lightDelta / distanceToInspectionLight;
+            float localDiffuse = max(dot(normal, localLightDirection), 0.0);
+            float normalizedDistance = distanceToInspectionLight / inspectionLightRange;
+            float attenuation = 1.0 /
+                (1.0 + 2.0 * normalizedDistance + 5.0 * normalizedDistance * normalizedDistance);
+            inspection = inspectionLightIntensity * attenuation *
+                (0.18 + materialDiffuse * localDiffuse) * surfaceColor *
+                inspectionLightColor;
+        }
+    }
+
     vec3 result;
     if (shadowDebugMode == 1)
         result = vec3(visibility);
@@ -99,6 +123,6 @@ void main()
     else if (lightingDebugMode == 4)
         result = surfaceColor;
     else
-        result = ambient + visibility * (diffuse + specular);
+        result = ambient + visibility * (diffuse + specular) + inspection;
     FragColor = vec4(result, 1.0);
 }

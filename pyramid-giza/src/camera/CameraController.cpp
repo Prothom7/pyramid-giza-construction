@@ -160,6 +160,7 @@ const char* CameraController::modeName(CameraMode mode)
     case CameraMode::OrbitPyramid: return "OrbitPyramid";
     case CameraMode::FollowTransport: return "FollowTransport";
     case CameraMode::GuidedDemo: return "GuidedDemo";
+    case CameraMode::InteriorWalk: return "InteriorWalk";
     case CameraMode::Free:
     default: return "Free";
     }
@@ -225,6 +226,7 @@ void CameraController::update(float deltaTime, const glm::vec3& transportTarget)
     case CameraMode::OrbitPyramid: updateOrbitPose(); break;
     case CameraMode::FollowTransport: updateFollow(deltaTime, transportTarget); break;
     case CameraMode::GuidedDemo: updateGuidedDemo(deltaTime); break;
+    case CameraMode::InteriorWalk: break;
     case CameraMode::Free: break;
     }
     constrainToWorld();
@@ -235,10 +237,18 @@ void CameraController::move(CameraMovement direction, float deltaTime,
 {
     if (!std::isfinite(deltaTime) || deltaTime <= 0.0f)
         return;
-    cancelForManualInput();
+    const bool interior = mode_ == CameraMode::InteriorWalk;
+    if (!interior)
+        cancelForManualInput();
     speedMode_ = speedMode;
-    camera_.MovementSpeed = speedFor(speedMode_);
+    camera_.MovementSpeed = interior
+                                ? interiorSpeed * (speedMode == CameraSpeedMode::Fast ? 1.75f :
+                                                   speedMode == CameraSpeedMode::Slow ? 0.45f : 1.0f)
+                                : speedFor(speedMode_);
+    const glm::vec3 previous = camera_.Position;
     camera_.ProcessKeyboard(direction, deltaTime);
+    if (interior)
+        camera_.Position = PyramidInterior::constrainCamera(previous, camera_.Position);
     constrainToWorld();
 }
 
@@ -253,7 +263,8 @@ void CameraController::handleMouseDelta(float xOffset, float yOffset)
         updateOrbitPose();
         return;
     }
-    cancelForManualInput();
+    if (mode_ != CameraMode::InteriorWalk)
+        cancelForManualInput();
     camera_.ProcessMouseMovement(xOffset, yOffset);
 }
 
@@ -268,7 +279,8 @@ void CameraController::handleScroll(float yOffset)
         updateOrbitPose();
         return;
     }
-    cancelForManualInput();
+    if (mode_ != CameraMode::InteriorWalk)
+        cancelForManualInput();
     fovDegrees_ = std::clamp(fovDegrees_ - yOffset * 2.0f, minimumFov, maximumFov);
 }
 
@@ -337,6 +349,27 @@ void CameraController::toggleGuidedDemo()
     demoShotElapsed_ = 0.0f;
     demoShotStart_ = currentPose();
     mode_ = CameraMode::GuidedDemo;
+}
+
+void CameraController::toggleInteriorInspection()
+{
+    transition_.active = false;
+    if (mode_ == CameraMode::InteriorWalk)
+    {
+        mode_ = CameraMode::Free;
+        if (exteriorPoseSaved_)
+            applyPose(exteriorPose_);
+        exteriorPoseSaved_ = false;
+        constrainToWorld();
+        return;
+    }
+    exteriorPose_ = currentPose();
+    exteriorPoseSaved_ = true;
+    applyPose({PyramidInterior::cameraStartPosition(),
+               PyramidInterior::cameraStartYaw(),
+               PyramidInterior::cameraStartPitch(), 58.0f,
+               "Pyramid Interior", "Walk from the north entrance to the tomb"});
+    mode_ = CameraMode::InteriorWalk;
 }
 
 void CameraController::updateTransition(float deltaTime)

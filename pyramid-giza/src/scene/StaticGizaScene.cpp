@@ -60,6 +60,7 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
     workers_.reserve(44);
     buildGround();
     buildPyramid();
+    buildPyramidInterior();
     buildTransportLanes();
     buildRampNetwork();
     buildScaffolding();
@@ -131,6 +132,11 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
               << "% = " << stats_.pyramidBlocks << " visible blocks, final "
               << pyramidBlocks_.size() << " blocks; procedural textures use approximately "
               << textures_.memoryBytes() / 1024u << " KiB\n";
+    std::cout << "Phase 12.8 interior: " << stats_.pyramidGeneratedBlocks
+              << " generated, " << stats_.pyramidInteriorExcludedBlocks
+              << " permanently excluded, " << stats_.pyramidRenderedStructuralBlocks
+              << " structural blocks, " << stats_.interiorDraws
+              << " shared-cube architectural draws\n";
     std::cout << "Directional shadow framebuffer complete: " << shadowMap_.width() << " x "
               << shadowMap_.height() << " D24, " << stats_.shadowDepthDrawCalls
               << " depth draws, " << stats_.combinedDrawCalls
@@ -221,9 +227,34 @@ void StaticGizaScene::buildGround()
 void StaticGizaScene::buildPyramid()
 {
     pyramidBlocks_ = PyramidLayout::generateComplete(pyramidConfig_);
+    const InteriorExclusionStats interiorStats =
+        PyramidInterior::exclusionStats(pyramidBlocks_);
+    stats_.pyramidGeneratedBlocks = pyramidBlocks_.size();
+    stats_.pyramidInteriorExcludedBlocks = interiorStats.total;
+    stats_.pyramidRenderedStructuralBlocks =
+        pyramidBlocks_.size() - interiorStats.total;
     stats_.pyramidBlocks =
         constructionTimeline_.visibleBlockCount(pyramidBlocks_, pyramidConfig_);
     buildPyramidInstanceBatches();
+}
+
+void StaticGizaScene::buildPyramidInterior()
+{
+    for (const InteriorPart& part : PyramidInterior::architecturalParts())
+    {
+        if (!isFiniteNonSingularTransform(part.model))
+            throw std::runtime_error("Pyramid interior contains an invalid transform");
+        stagedObjects_.push_back({{ScenePrimitive::Cube, part.model, part.material},
+                                  part.minimumConstructionProgress, 1.01f});
+        ++stats_.interiorDraws;
+    }
+}
+
+void StaticGizaScene::togglePyramidCutaway()
+{
+    pyramidCutawayEnabled_ = !pyramidCutawayEnabled_;
+    buildPyramidInstanceBatches();
+    updateFrontierBatches();
 }
 
 void StaticGizaScene::buildPyramidInstanceBatches()
@@ -241,6 +272,9 @@ void StaticGizaScene::buildPyramidInstanceBatches()
     std::array<std::vector<ScheduledInstance>, 8> scheduled;
     for (const PyramidBlockPlacement& block : pyramidBlocks_)
     {
+        if (PyramidInterior::blockIntersectsVoid(block) ||
+            (pyramidCutawayEnabled_ && PyramidInterior::isCutawayBlock(block)))
+            continue;
         const bool variation = block.level % 4 == 1 || block.level % 4 == 2;
         const MaterialId materialId = variation
                                           ? MaterialId::LimestoneVariation
@@ -1735,6 +1769,8 @@ void StaticGizaScene::emitPlacementDust(float previousProgress,
     std::size_t eventCount = 0;
     for (const PyramidBlockPlacement& block : pyramidBlocks_)
     {
+        if (PyramidInterior::blockIntersectsVoid(block))
+            continue;
         if (!ConstructionTimelineController::isFrontierCandidate(
                 block, pyramidConfig_))
             continue;
@@ -2066,6 +2102,9 @@ void StaticGizaScene::updateFrontierBatches()
 
     for (const PyramidBlockPlacement& block : pyramidBlocks_)
     {
+        if (PyramidInterior::blockIntersectsVoid(block) ||
+            (pyramidCutawayEnabled_ && PyramidInterior::isCutawayBlock(block)))
+            continue;
         const ConstructionBlockState state =
             constructionTimeline_.blockState(block, pyramidConfig_);
         if (!state.frontier)
@@ -2463,6 +2502,12 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         program.setInt("shadowMap", 0);
         program.setInt("materialTexture", 1);
         program.setInt("texturesEnabled", texturesEnabled_ ? 1 : 0);
+        program.setInt("inspectionLightEnabled", interiorInspectionActive_ ? 1 : 0);
+        program.setVec3("inspectionLightPosition", cameraPosition);
+        program.setVec3("inspectionLightColor", {1.0f, 0.82f, 0.60f});
+        program.setFloat("inspectionLightRange", PyramidInterior::inspectionLightRange);
+        program.setFloat("inspectionLightIntensity",
+                         PyramidInterior::inspectionLightIntensity);
     };
     shadowMap_.bindDepthTexture(0);
     TextureId currentTexture = TextureId::Count;

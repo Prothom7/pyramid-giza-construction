@@ -1,0 +1,8 @@
+RegionID,ExcludedBlocks,MinimumLevel,MaximumLevel,Rule,Notes
+EntryDescending,21,2,4,Passage OBB plus 0.24 margin,Only region allowed to reach exterior shell
+AscendingPassage,24,1,7,Passage OBB plus 0.24 margin,Interior only
+GrandGallery,63,5,11,Passage OBB plus 0.24 margin,Interior only
+AntechamberConnector,11,7,9,Passage OBB plus 0.24 margin,Interior only
+Antechamber,16,7,10,Room AABB plus 0.24 margin,Interior only
+TombChamber,124,7,11,Room AABB plus 0.24 margin,Interior only
+TOTAL,259,1,11,Authoritative PyramidInterior block predicate,7714 generated minus 259 equals 7455 structural

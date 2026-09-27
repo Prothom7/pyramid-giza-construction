@@ -1,0 +1,17 @@
+Check,Expected,Actual,Result
+Generated pyramid blocks,7714,7714,PASS
+Interior-excluded blocks,Positive and under 400,259,PASS
+Rendered structural blocks,Generated minus excluded,7455,PASS
+Walkable void samples clear,764,764,PASS
+Shell-reaching regions,Entry only,Entry only with 5 blocks,PASS
+Passage chain connections,3 shared endpoints,3,PASS
+Connector to antechamber,Connected,Connected,PASS
+Antechamber to tomb,Connected,Connected,PASS
+Representative navigation positions,14 valid,14 valid,PASS
+Wall confinement,Reject outside union,Rejected,PASS
+Eye height,1.6 to 1.8,1.70,PASS
+Inspection light range,8 to 15,12,PASS
+Sarcophagus support,Tomb floor y=16,Base bottom y=16,PASS
+Construction checkpoint filtering,70/4640/6705/7302/7455,70/4640/6705/7302/7455,PASS
+Entrance-to-tomb traversal,Continuous small-step route,Reached tomb chamber,PASS
+CTest suite,More than 30 tests,33 of 33,PASS
