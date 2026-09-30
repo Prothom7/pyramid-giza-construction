@@ -71,9 +71,13 @@ struct ObjectPart
 
 struct SceneObject
 {
-    ScenePrimitive primitive;
+    ScenePrimitive primitive = ScenePrimitive::Cube;
     glm::mat4 model{1.0f};
     MaterialId material = MaterialId::Wood;
+
+    SceneObject() = default;
+    SceneObject(ScenePrimitive p, const glm::mat4& m, MaterialId mat = MaterialId::Wood)
+        : primitive(p), model(m), material(mat) {}
 };
 
 const Material& materialDefinition(MaterialId id);

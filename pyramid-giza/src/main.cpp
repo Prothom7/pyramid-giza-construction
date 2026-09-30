@@ -36,18 +36,26 @@
 #include "scene/SceneIntegrity.h"
 #include "scene/StaticGizaScene.h"
 #include "scene/SupportSystem.h"
+#include "camera/CursorController.h"
+#include "presentation/SimulationHUD.h"
+#include "scene/ConstructionLogistics.h"
+#include "scene/QuarrySystem.h"
+#include "scene/SandSimulation.h"
+#include "scene/SphinxMonument.h"
+#include "scene/WaterSimulation.h"
 
 namespace
 {
 constexpr int initialWidth = 1280;
 constexpr int initialHeight = 720;
 constexpr const char* defaultWindowTitle =
-    "Pyramid at Giza - Phase 12 Final Showcase";
+    "Pyramid at Giza - Construction Site Simulation";
 
 struct AppState
 {
     CameraController cameraController;
     ShowcaseController showcaseController;
+    CursorController cursorController;
     float lastMouseX = initialWidth * 0.5f;
     float lastMouseY = initialHeight * 0.5f;
     float deltaTime = 0.0f;
@@ -178,29 +186,41 @@ void framebufferSizeCallback(GLFWwindow*, int width, int height)
     glViewport(0, 0, width, height);
 }
 
+void cursorEnterCallback(GLFWwindow* window, int entered)
+{
+    auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if (state != nullptr)
+        state->cursorController.onCursorEnter(entered == GLFW_TRUE, window);
+}
+
+void windowFocusCallback(GLFWwindow* window, int focused)
+{
+    auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if (state != nullptr)
+        state->cursorController.onWindowFocus(focused == GLFW_TRUE, window);
+}
+
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int)
+{
+    auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if (state != nullptr)
+        state->cursorController.onMouseButton(button, action, window);
+}
+
 void mouseCallback(GLFWwindow* window, double xPosition, double yPosition)
 {
     auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
     if (state == nullptr)
         return;
 
-    const float x = static_cast<float>(xPosition);
-    const float y = static_cast<float>(yPosition);
-    if (state->firstMouse)
-    {
-        state->lastMouseX = x;
-        state->lastMouseY = y;
-        state->firstMouse = false;
+    float deltaX = 0.0f;
+    float deltaY = 0.0f;
+    if (!state->cursorController.handleCursorPos(xPosition, yPosition, deltaX, deltaY))
         return;
-    }
 
-    if (std::abs(x - state->lastMouseX) > 0.01f ||
-        std::abs(y - state->lastMouseY) > 0.01f)
+    if (std::abs(deltaX) > 0.01f || std::abs(deltaY) > 0.01f)
         cancelShowcaseForManualInput(*state, window, "mouse look");
-    state->cameraController.handleMouseDelta(x - state->lastMouseX,
-                                             state->lastMouseY - y);
-    state->lastMouseX = x;
-    state->lastMouseY = y;
+    state->cameraController.handleMouseDelta(deltaX, deltaY);
 }
 
 void scrollCallback(GLFWwindow* window, double, double yOffset)
@@ -221,6 +241,15 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
     auto* state = static_cast<AppState*>(glfwGetWindowUserPointer(window));
     if (state == nullptr)
         return;
+
+    if (state->cursorController.handleKey(key, action, window))
+        return;
+
+    if (key == GLFW_KEY_ESCAPE)
+    {
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+        return;
+    }
 
     if (key == GLFW_KEY_F5)
     {
@@ -484,13 +513,27 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
         cancelShowcaseForManualInput(*state, window, "camera preset");
         setCameraPreset(*state, key - GLFW_KEY_0, (mods & GLFW_MOD_SHIFT) != 0);
     }
+    else if (key == GLFW_KEY_F10 && state->scene != nullptr)
+    {
+        state->scene->toggleSimulationDebug();
+        std::cout << "Simulation debug overlay: "
+                  << (state->scene->simulationDebugEnabled() ? "ON" : "OFF") << '\n';
+    }
+    else if (key == GLFW_KEY_F11 && state->scene != nullptr)
+    {
+        state->scene->toggleHUD();
+        std::cout << "Simulation HUD: "
+                  << (state->scene->hudVisible() ? "ON" : "OFF") << '\n';
+    }
+    else if (key == GLFW_KEY_TAB && state->scene != nullptr)
+    {
+        state->scene->toggleHUDHelp();
+        std::cout << "HUD help panel toggled.\n";
+    }
 }
 
 void processInput(GLFWwindow* window, AppState& state)
 {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-
     CameraSpeedMode speedMode = CameraSpeedMode::Normal;
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
         glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS)
@@ -594,6 +637,13 @@ int main(int argc, char** argv)
     bool interiorNavigationValidationOnly = false;
     bool interiorValidationOnly = false;
     bool entranceValidationOnly = false;
+    bool quarryValidationOnly = false;
+    bool logisticsValidationOnly = false;
+    bool sandValidationOnly = false;
+    bool waterValidationOnly = false;
+    bool sphinxValidationOnly = false;
+    bool inputValidationOnly = false;
+    bool hudValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -700,6 +750,20 @@ int main(int argc, char** argv)
             interiorValidationOnly = true;
         else if (option == "--validate-entrance")
             entranceValidationOnly = true;
+        else if (option == "--validate-quarry")
+            quarryValidationOnly = true;
+        else if (option == "--validate-logistics")
+            logisticsValidationOnly = true;
+        else if (option == "--validate-sand")
+            sandValidationOnly = true;
+        else if (option == "--validate-water")
+            waterValidationOnly = true;
+        else if (option == "--validate-sphinx")
+            sphinxValidationOnly = true;
+        else if (option == "--validate-input")
+            inputValidationOnly = true;
+        else if (option == "--validate-simulation-hud")
+            hudValidationOnly = true;
         else if (option == "--entrance-view" && argument + 1 < argc)
         {
             entranceView = argv[++argument];
@@ -1039,6 +1103,20 @@ int main(int argc, char** argv)
         return validatePyramidInterior(std::cout) ? 0 : 1;
     if (entranceValidationOnly)
         return validatePyramidEntranceFacade(std::cout) ? 0 : 1;
+    if (quarryValidationOnly)
+        return QuarrySystem::validateQuarry(std::cout) ? 0 : 1;
+    if (logisticsValidationOnly)
+        return ConstructionLogistics::validateConstructionLogistics(std::cout) ? 0 : 1;
+    if (sandValidationOnly)
+        return SandSimulation::validateSandSimulation(std::cout) ? 0 : 1;
+    if (waterValidationOnly)
+        return WaterSimulation::validateWaterSimulation(std::cout) ? 0 : 1;
+    if (sphinxValidationOnly)
+        return SphinxMonument::validateSphinxMonument(std::cout) ? 0 : 1;
+    if (inputValidationOnly)
+        return CursorController::validateCursorController(std::cout) ? 0 : 1;
+    if (hudValidationOnly)
+        return SimulationHUD::validateSimulationHUD(std::cout) ? 0 : 1;
     if (!validatePrimitiveFoundation(std::cout) || !validatePyramidLayout(std::cout) ||
         !validateCompositeObjects(std::cout) || !validateWorkerHierarchy(std::cout) ||
         !validateConstructionAnimation(std::cout) || !validateMonumentalSite(std::cout) ||
@@ -1065,7 +1143,14 @@ int main(int argc, char** argv)
         !validateQuarryPulleyAnimation(std::cout) ||
         !validateQuarryPulleySupport(std::cout) ||
         !validatePyramidInterior(std::cout) ||
-        !validatePyramidEntranceFacade(std::cout))
+        !validatePyramidEntranceFacade(std::cout) ||
+        !QuarrySystem::validateQuarry(std::cout) ||
+        !ConstructionLogistics::validateConstructionLogistics(std::cout) ||
+        !SandSimulation::validateSandSimulation(std::cout) ||
+        !WaterSimulation::validateWaterSimulation(std::cout) ||
+        !SphinxMonument::validateSphinxMonument(std::cout) ||
+        !CursorController::validateCursorController(std::cout) ||
+        !SimulationHUD::validateSimulationHUD(std::cout))
         return 1;
 
     if (benchmarkRender && smokeDurationSeconds <= 0.0f)
@@ -1115,10 +1200,13 @@ int main(int argc, char** argv)
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     glfwSetKeyCallback(window, keyCallback);
     glfwSetScrollCallback(window, scrollCallback);
+    glfwSetCursorEnterCallback(window, cursorEnterCallback);
+    glfwSetWindowFocusCallback(window, windowFocusCallback);
+    glfwSetMouseButtonCallback(window, mouseButtonCallback);
+    glfwSetCursorPosCallback(window, mouseCallback);
     if (!smokeTest)
     {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        glfwSetCursorPosCallback(window, mouseCallback);
+        state.cursorController.setCaptured(true, window);
         std::cout << "Controls: W/A/S/D/Q/E move, Shift fast, Ctrl precision, mouse looks, "
                      "wheel zoom/orbit radius, 1-9 smooth views, Shift+1-9 instant, "
                      "0 camera reset, O orbit, T transport follow, G guided demo, K camera info, "
@@ -1130,7 +1218,8 @@ int main(int argc, char** argv)
                      "C culling, F wireframe, Space pause, R animation reset, N next state, "
                      "L loop, M animation mode, +/- speed, P debug pose, "
                      "F7 quarry pulley pause, F8 interior walk, F9 pyramid cutaway, "
-                     "ESC exits.\n";
+                     "F10 simulation debug, F11 HUD toggle, Tab help panel, "
+                     "ESC release cursor capture / exit.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
 

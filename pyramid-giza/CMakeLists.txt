@@ -55,6 +55,13 @@ add_executable(PyramidGiza
     src/animation/QuarryPulleyAnimation.cpp
     src/animation/AnimationValidation.cpp
     src/animation/ConstructionTimeline.cpp
+    src/camera/CursorController.cpp
+    src/presentation/SimulationHUD.cpp
+    src/scene/QuarrySystem.cpp
+    src/scene/ConstructionLogistics.cpp
+    src/scene/SandSimulation.cpp
+    src/scene/WaterSimulation.cpp
+    src/scene/SphinxMonument.cpp
 )
 
 target_include_directories(PyramidGiza PRIVATE
@@ -125,3 +132,10 @@ add_test(NAME Phase12_8InteriorGeometryValidation COMMAND PyramidGiza --validate
 add_test(NAME Phase12_8InteriorConnectivityValidation COMMAND PyramidGiza --validate-interior-connectivity)
 add_test(NAME Phase12_8InteriorNavigationValidation COMMAND PyramidGiza --validate-interior-navigation)
 add_test(NAME Phase12_8_1EntranceFacadeValidation COMMAND PyramidGiza --validate-entrance)
+add_test(NAME Phase13QuarryValidation COMMAND PyramidGiza --validate-quarry)
+add_test(NAME Phase13LogisticsValidation COMMAND PyramidGiza --validate-logistics)
+add_test(NAME Phase13SandValidation COMMAND PyramidGiza --validate-sand)
+add_test(NAME Phase13WaterValidation COMMAND PyramidGiza --validate-water)
+add_test(NAME Phase13SphinxValidation COMMAND PyramidGiza --validate-sphinx)
+add_test(NAME Phase13InputValidation COMMAND PyramidGiza --validate-input)
+add_test(NAME Phase13SimulationHUDValidation COMMAND PyramidGiza --validate-simulation-hud)

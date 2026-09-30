@@ -1,0 +1,90 @@
+#pragma once
+
+#include <cstddef>
+#include <iosfwd>
+#include <string>
+#include <vector>
+
+#include <glm/glm.hpp>
+
+#include "animation/ConstructionTimeline.h"
+#include "animation/QuarryPulleyAnimation.h"
+#include "scene/QuarrySystem.h"
+#include "scene/SceneTypes.h"
+
+enum class LogisticsState
+{
+    QuarryReady,
+    Extracting,
+    Staged,
+    SledgeLoading,
+    Hauling,
+    RampApproach,
+    RampAscent,
+    LiftPrep,
+    Lifting,
+    UpperStaging,
+    Placement,
+    Settled
+};
+
+struct LogisticsSnapshot
+{
+    LogisticsState state = LogisticsState::QuarryReady;
+    int blockIndex = 1;
+    float stateProgress = 0.0f;
+    glm::vec3 blockPosition{0.0f};
+    glm::vec3 blockRotation{0.0f};
+    glm::vec3 sledgePosition{0.0f};
+    float sledgeHeading = 0.0f;
+    bool ropeTaut = false;
+    int activeWorkers = 0;
+    float liftHeight = 0.0f;
+    bool blockSettled = false;
+    const char* routeDescription = "";
+};
+
+class ConstructionLogistics
+{
+public:
+    ConstructionLogistics();
+
+    void update(float deltaTime, QuarrySystem& quarry,
+                ConstructionTimelineController& timeline,
+                QuarryPulleyAnimationController& pulley);
+    void reset();
+
+    LogisticsSnapshot snapshot() const;
+    LogisticsState state() const { return state_; }
+    float stateProgress() const { return stateProgress_; }
+    int activeBlockNumber() const { return activeBlockNumber_; }
+    const char* routeDescription() const;
+
+    // Visual rendering of the active in-transit block, sledge lashings, and props
+    void collectSceneObjects(std::vector<SceneObject>& objects) const;
+
+    static const char* stateName(LogisticsState state);
+    static bool validateConstructionLogistics(std::ostream& output);
+
+private:
+    void advanceState(QuarrySystem& quarry, ConstructionTimelineController& timeline,
+                      QuarryPulleyAnimationController& pulley);
+    glm::vec3 computeHaulPosition(float progress) const;
+    glm::vec3 computeRampPosition(float progress) const;
+    glm::vec3 computeLiftPosition(float progress) const;
+    glm::vec3 computePlacementPosition(float progress) const;
+
+    LogisticsState state_ = LogisticsState::QuarryReady;
+    int activeBlockNumber_ = 101;
+    float stateProgress_ = 0.0f;
+    float stateTimer_ = 0.0f;
+    glm::vec3 blockPosition_{-108.0f, -6.2f, -5.0f};
+    glm::vec3 blockRotation_{0.0f};
+    glm::vec3 sledgePosition_{-108.0f, -6.2f, -5.0f};
+    float sledgeHeading_ = 0.0f;
+    bool ropeTaut_ = false;
+    int activeWorkers_ = 6;
+    float liftHeight_ = 0.0f;
+    bool justSettled_ = false;
+    float settledFlashTimer_ = 0.0f;
+};

@@ -67,7 +67,7 @@ class ShowcaseController
 public:
     static constexpr float minimumSpeed = 0.25f;
     static constexpr float maximumSpeed = 4.0f;
-    static constexpr std::size_t shotCount = 14;
+    static constexpr std::size_t shotCount = 15;
 
     void start(float time = 0.0f);
     void cancel();

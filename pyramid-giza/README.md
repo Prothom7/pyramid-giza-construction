@@ -22,6 +22,7 @@ Course project status:
 - **Phase 12.7 - Complete:** deterministic quarry pulley rock-lifting visualization
 - **Phase 12.8 - Complete:** carved pyramid passage network, tomb chamber, interior navigation, and cutaway inspection
 - **Phase 12.8.1 - Complete:** flush recessed north entrance integrated into stepped masonry
+- **Phase 13 - Complete:** realistic functional construction site expansion (functional quarry extraction, rock shaping & staging, connected sledge transport & ramp hauling, pulley integration & block settlement into pyramid, deterministic sand physics & repose simulation, Nile water flow & boat dynamics, procedural anatomical Sphinx monument, OpenGL 3.3 in-window HUD, GLFW cursor-enter/focus management, and 15-shot cinematic showcase)
 
 The application is now a full ancient industrial landscape. A 7,561-block unfinished
 pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
@@ -228,6 +229,13 @@ build\PyramidGiza.exe --validate-quarry-pulley
 build\PyramidGiza.exe --validate-quarry-pulley-support
 build\PyramidGiza.exe --validate-interior
 build\PyramidGiza.exe --validate-entrance
+build\PyramidGiza.exe --validate-quarry
+build\PyramidGiza.exe --validate-logistics
+build\PyramidGiza.exe --validate-sand
+build\PyramidGiza.exe --validate-water
+build\PyramidGiza.exe --validate-sphinx
+build\PyramidGiza.exe --validate-input
+build\PyramidGiza.exe --validate-simulation-hud
 build\PyramidGiza.exe --smoke-test --preset 1
 ```
 
@@ -252,6 +260,8 @@ hidden benchmark, and `--no-frustum-culling` for a visibility-control comparison
 `--showcase-time 0..101` seeks its coordinated state directly, and
 `--showcase-speed 0.25..4` accelerates or slows its independent presentation clock.
 The older `G` mode remains a camera-only guided tour; F5 is the synchronized showcase.
+`F10` toggles the simulation debug overlay, `F11` toggles the in-window simulation HUD, and `Tab` toggles the HUD help panel.
+`ESC` cleanly releases cursor capture to normal OS mode without closing; pressing `ESC` while already released exits the application. Clicking into the viewport re-captures the mouse.
 Build output and captures are ignored by Git.
 
 ## Documentation
@@ -276,6 +286,7 @@ Build output and captures are ignored by Git.
 - [Phase 12.7 quarry pulley lift](docs/PHASE12_7_QUARRY_PULLEY_LIFT.md)
 - [Phase 12.8 pyramid interior](docs/PHASE12_8_PYRAMID_INTERIOR.md)
 - [Phase 12.8.1 entrance facade repair](docs/PHASE12_8_1_ENTRANCE_FACADE_REPAIR.md)
+- [Phase 13 functional construction site expansion](docs/PHASE13_FUNCTIONAL_CONSTRUCTION_EXPANSION.md)
 
 Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
 repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,

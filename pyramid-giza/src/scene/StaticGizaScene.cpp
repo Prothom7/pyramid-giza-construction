@@ -902,27 +902,9 @@ void StaticGizaScene::buildNileAndContext()
     }
     stats_.treeInstances = trees.size();
 
-    // A deliberately stylized, distant Giza-context landmark made only of primitives.
-    const glm::vec3 sphinx = context.sphinxCenter;
+    // Procedural anatomical Sphinx monument.
     const std::size_t sphinxStart = objects_.size();
-    addObject(ScenePrimitive::Cube,
-              makeTransform(sphinx + glm::vec3{0.0f, 2.0f, 0.0f}, {}, {13.0f, 4.0f, 5.8f}),
-              MaterialId::LimestoneVariation);
-    addObject(ScenePrimitive::Cube,
-              makeTransform(sphinx + glm::vec3{0.0f, 3.4f, -3.7f}, {}, {5.8f, 5.0f, 4.0f}),
-              MaterialId::LimestoneVariation);
-    addObject(ScenePrimitive::Sphere,
-              makeTransform(sphinx + glm::vec3{0.0f, 6.7f, -4.1f}, {}, {3.1f, 3.5f, 2.7f}),
-              MaterialId::Limestone);
-    for (float x : {-3.5f, 3.5f})
-        addObject(ScenePrimitive::Cube,
-                  makeTransform(sphinx + glm::vec3{x, 0.75f, -5.1f}, {}, {2.8f, 1.5f, 8.5f}),
-                  MaterialId::Limestone);
-    for (float x : {-2.35f, 2.35f})
-        addObject(ScenePrimitive::Cube,
-                  makeTransform(sphinx + glm::vec3{x, 7.1f, -4.0f}, {0.0f, 0.0f, x * 3.0f},
-                                {1.5f, 4.1f, 3.2f}),
-                  MaterialId::PreparedStone);
+    sphinx_.collectSceneObjects(objects_);
     stats_.sphinxParts = objects_.size() - sphinxStart;
     stats_.environmentalObjects = objects_.size() - start;
 }
@@ -1665,6 +1647,13 @@ void StaticGizaScene::update(float deltaTime)
         articulationTime_ += deltaTime * articulationSpeed_;
 
     particles_.update(deltaTime);
+    quarry_.update(deltaTime);
+    logistics_.update(deltaTime, quarry_, constructionTimeline_, quarryPulleyController_);
+    sand_.update(deltaTime, logistics_.snapshot().sledgePosition);
+    water_.update(deltaTime);
+    if (deltaTime > 1.0e-5f)
+        currentFps_ = 0.9f * currentFps_ + 0.1f * (1.0f / deltaTime);
+
     if (effectsEnabled_ && std::isfinite(deltaTime) && deltaTime > 0.0f)
     {
         environmentTime_ = std::fmod(environmentTime_ + deltaTime, 400.0f);
@@ -1923,6 +1912,10 @@ void StaticGizaScene::resetAnimation()
 {
     animationController_.reset();
     quarryPulleyController_.reset();
+    quarry_.reset();
+    logistics_.reset();
+    sand_.reset();
+    water_.reset();
     demoPose_ = WorkerPose::Standing;
     articulationTime_ = 0.0f;
     particles_.clear();
@@ -2381,6 +2374,11 @@ void StaticGizaScene::collectFrameObjects()
     drawPart(ScenePrimitive::Cube,
              ConstructionAnimationController::leverStoneModel(liftOffset),
              MaterialId::PreparedStone);
+
+    quarry_.collectSceneObjects(frameObjects_);
+    logistics_.collectSceneObjects(frameObjects_);
+    sand_.collectSceneObjects(frameObjects_);
+    water_.collectSceneObjects(frameObjects_);
 }
 
 void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
@@ -2631,6 +2629,34 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
     renderStats_.cpuSubmissionMilliseconds =
         std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - submissionStart).count();
+
+    // Render in-window OpenGL HUD overlay
+    SimulationHUDState hudState;
+    hudState.constructionProgress = constructionTimeline_.progress();
+    hudState.constructionStage = ConstructionTimelineController::stageName(constructionTimeline_.stage());
+    hudState.activeBlockNumber = logistics_.activeBlockNumber();
+    hudState.logisticsState = ConstructionLogistics::stateName(logistics_.state());
+    hudState.routeDescription = logistics_.routeDescription();
+    hudState.activeWorkers = logistics_.snapshot().activeWorkers;
+    hudState.sandSimEnabled = sand_.enabled();
+    hudState.waterSimEnabled = water_.enabled();
+    hudState.effectsEnabled = effectsEnabled_;
+    hudState.fps = currentFps_;
+    hudState.quarryRockId = quarry_.activeDepositId();
+    const QuarryDeposit* dep = quarry_.activeDeposit();
+    hudState.quarryState = dep ? QuarrySystem::stateName(dep->state) : "None";
+    hudState.quarryWorkers = 4;
+    hudState.quarryProgress = dep ? (dep->state == QuarryDepositState::Cutting ? dep->extractionProgress * 100.0f : dep->shapingProgress * 100.0f) : 0.0f;
+    hudState.pulleyState = QuarryPulleyAnimationController::stateName(quarryPulleyController_.snapshot().state);
+    hudState.pulleyHeight = quarryPulleyController_.snapshot().loadPosition.y;
+    hudState.activeLevel = constructionTimeline_.activeLevel(pyramidConfig_);
+    hudState.frontierPhase = ConstructionTimelineController::frontierPhaseName(
+        ConstructionTimelineController::frontierTransform(
+            pyramidBlocks_.empty() ? PyramidBlockPlacement{} : pyramidBlocks_[0],
+            pyramidConfig_, 0.5f).phase);
+    hudState.debugOverlay = simulationDebugEnabled_;
+
+    hud_.render(viewportWidth, viewportHeight, hudState);
 }
 
 void StaticGizaScene::printRenderStats(std::ostream& output) const

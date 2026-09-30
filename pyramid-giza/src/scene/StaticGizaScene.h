@@ -20,9 +20,15 @@
 #include "lighting/ShadowMap.h"
 #include "lighting/SunController.h"
 #include "objects/Worker.h"
+#include "presentation/SimulationHUD.h"
+#include "scene/ConstructionLogistics.h"
 #include "scene/PyramidLayout.h"
 #include "scene/PyramidInterior.h"
+#include "scene/QuarrySystem.h"
+#include "scene/SandSimulation.h"
 #include "scene/SceneTypes.h"
+#include "scene/SphinxMonument.h"
+#include "scene/WaterSimulation.h"
 
 struct StaticGizaSceneStats
 {
@@ -183,6 +189,26 @@ public:
     const StaticGizaSceneStats& stats() const { return stats_; }
     const PyramidLayoutConfig& pyramidConfig() const { return pyramidConfig_; }
 
+    const QuarrySystem& quarrySystem() const { return quarry_; }
+    QuarrySystem& quarrySystem() { return quarry_; }
+    const ConstructionLogistics& logistics() const { return logistics_; }
+    ConstructionLogistics& logistics() { return logistics_; }
+    const SandSimulation& sandSimulation() const { return sand_; }
+    SandSimulation& sandSimulation() { return sand_; }
+    const WaterSimulation& waterSimulation() const { return water_; }
+    WaterSimulation& waterSimulation() { return water_; }
+    const SphinxMonument& sphinxMonument() const { return sphinx_; }
+    const SimulationHUD& hud() const { return hud_; }
+    SimulationHUD& hud() { return hud_; }
+
+    void toggleSandSimulation() { sand_.toggleEnabled(); }
+    void toggleWaterSimulation() { water_.toggleEnabled(); }
+    void toggleHUD() { hud_.toggleVisible(); }
+    bool hudVisible() const { return hud_.visible(); }
+    void toggleHUDHelp() { hud_.toggleHelp(); }
+    void toggleSimulationDebug() { simulationDebugEnabled_ = !simulationDebugEnabled_; }
+    bool simulationDebugEnabled() const { return simulationDebugEnabled_; }
+
 private:
     struct WorkerInstance
     {
@@ -326,4 +352,13 @@ private:
     ShadowDebugMode shadowDebugMode_ = ShadowDebugMode::Normal;
     StaticGizaSceneStats stats_;
     RenderStats renderStats_;
+
+    QuarrySystem quarry_;
+    ConstructionLogistics logistics_;
+    SandSimulation sand_;
+    WaterSimulation water_;
+    SphinxMonument sphinx_;
+    SimulationHUD hud_;
+    bool simulationDebugEnabled_ = false;
+    float currentFps_ = 60.0f;
 };
