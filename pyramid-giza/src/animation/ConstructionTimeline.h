@@ -57,6 +57,7 @@ public:
     void setDuration(float seconds);
     void setSpeed(float speed);
     void setPlaying(bool playing) { playing_ = playing; }
+    void registerPhysicalBlockSettlement();
 
     float progress() const { return progress_; }
     float duration() const { return durationSeconds_; }
@@ -87,6 +88,7 @@ private:
     float durationSeconds_ = defaultDurationSeconds;
     float speed_ = 1.0f;
     bool playing_ = false;
+    std::size_t settledBlocks_ = 0;
 };
 
 bool validateConstructionTimeline(std::ostream& output);

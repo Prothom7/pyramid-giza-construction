@@ -1181,9 +1181,9 @@ void StaticGizaScene::buildScaffoldAccess()
         bool groundPosts;
     };
     const Walkway walkways[]{
-        {{-17.0f, 5.55f, 2.8f}, {8.0f, 0.22f, 1.35f}, 0.0f, 0.05f, 0.48f, false},
-        {{18.0f, 5.55f, 2.8f}, {8.0f, 0.22f, 1.35f}, 0.0f, 0.20f, 0.62f, false},
-        {{9.0f, 8.21f, -4.8f}, {7.0f, 0.22f, 1.30f}, 0.0f, 0.62f, 0.90f, false},
+        {{-17.0f, 5.55f, 2.8f}, {8.0f, 0.22f, 1.35f}, 0.0f, 0.05f, 0.48f, true},
+        {{18.0f, 5.55f, 2.8f}, {8.0f, 0.22f, 1.35f}, 0.0f, 0.20f, 0.62f, true},
+        {{9.0f, 8.21f, -4.8f}, {7.0f, 0.22f, 1.30f}, 0.0f, 0.62f, 0.90f, true},
         {{-40.0f, 4.705f, -25.0f}, {6.0f, 0.22f, 1.25f}, 0.0f, 0.05f, 0.62f, true}
     };
     for (const Walkway& walkway : walkways)
@@ -1317,7 +1317,7 @@ void StaticGizaScene::buildWorkshopRepairAndInspection()
     // Inspection bed, reference rods and a plumb marker link dressing to loading.
     const glm::vec3 inspection{-50.0f, 0.0f, 8.0f};
     addObject(ScenePrimitive::Cube,
-              makeTransform(inspection + glm::vec3{0.0f, 0.42f, 0.0f}, {},
+              makeTransform(inspection + glm::vec3{0.0f, 0.25f, 0.0f}, {},
                             {7.0f, 0.50f, 5.0f}), MaterialId::DarkWood);
     addObject(ScenePrimitive::Cube,
               makeTransform(inspection + glm::vec3{0.0f, 1.32f, 0.0f}, {},
@@ -1546,9 +1546,9 @@ void StaticGizaScene::buildCompositeObjects()
               MaterialId::ClothingLinen, true, false);
     addWorker({12.0f, 0.0f, 35.0f}, 0.0f, WorkerPose::PullingReady,
               MaterialId::ClothingBlue, true, false);
-    addWorker({-123.0f, -7.42f, -16.0f}, -80.0f, WorkerPose::Standing,
+    addWorker({-123.0f, -6.5f, -16.0f}, -80.0f, WorkerPose::Standing,
               MaterialId::ClothingBlue, true, false);
-    addWorker({-108.0f, -7.42f, -3.0f}, 155.0f, WorkerPose::CarryingReady,
+    addWorker({-108.0f, -6.5f, -3.0f}, 155.0f, WorkerPose::CarryingReady,
               MaterialId::ClothingLinen, true, false);
     addWorker({5.0f, 0.0f, 2.0f}, -35.0f, WorkerPose::CarryingReady,
               MaterialId::ClothingBlue, true, false);
@@ -1564,10 +1564,10 @@ void StaticGizaScene::buildCompositeObjects()
         float heading;
         WorkerPose pose;
     } secondarySeeds[] = {
-        {{-143.0f, -7.42f, -17.0f}, 45.0f, WorkerPose::BentKnees},
-        {{-133.0f, -7.42f, -17.0f}, -70.0f, WorkerPose::Standing},
-        {{-118.0f, -7.42f, -5.0f}, 90.0f, WorkerPose::BentKnees},
-        {{-105.0f, -7.42f, 5.0f}, -90.0f, WorkerPose::CarryingReady},
+        {{-143.0f, -6.5f, -17.0f}, 45.0f, WorkerPose::BentKnees},
+        {{-133.0f, -6.5f, -17.0f}, -70.0f, WorkerPose::Standing},
+        {{-118.0f, -6.5f, -5.0f}, 90.0f, WorkerPose::BentKnees},
+        {{-105.0f, -6.5f, 5.0f}, -90.0f, WorkerPose::CarryingReady},
         {{-82.0f, 0.0f, 20.0f}, 120.0f, WorkerPose::CarryingReady},
         {{-61.0f, 0.0f, 16.0f}, 20.0f, WorkerPose::Standing},
         {{-55.0f, 0.0f, 18.0f}, -60.0f, WorkerPose::BentKnees},
@@ -1588,9 +1588,9 @@ void StaticGizaScene::buildCompositeObjects()
     }
 
     const struct WorkerSeed backgroundSeeds[] = {
-        {{-150.0f, -5.55f, -10.0f}, 120.0f, WorkerPose::Standing},
-        {{-142.0f, -3.45f, -35.0f}, -20.0f, WorkerPose::CarryingReady},
-        {{-112.0f, -5.55f, -28.0f}, 70.0f, WorkerPose::Standing},
+        {{-150.0f, -6.5f, -10.0f}, 120.0f, WorkerPose::Standing},
+        {{-142.0f, -6.5f, -35.0f}, -20.0f, WorkerPose::CarryingReady},
+        {{-112.0f, -6.5f, -28.0f}, 70.0f, WorkerPose::Standing},
         {{-91.0f, 0.0f, 18.0f}, 160.0f, WorkerPose::CarryingReady},
         {{-76.0f, 0.0f, 6.0f}, -30.0f, WorkerPose::Standing},
         {{-58.0f, 0.0f, 34.0f}, 120.0f, WorkerPose::CarryingReady},
@@ -1617,7 +1617,7 @@ void StaticGizaScene::buildCompositeObjects()
 
     loadedSledgeParts_ = Sledge::create(true);
     stats_.sledgeInstances = 1;
-    addStaticSledge({-108.0f, -7.40f, -3.5f}, -35.0f, 1.05f);
+    addStaticSledge({-108.0f, -6.5f, -3.5f}, -35.0f, 1.05f);
     addStaticSledge({-82.0f, 0.0f, 21.0f}, 15.0f, 1.0f);
     addComposite(makeTransform({-42.0f, 0.0f, 33.0f}, {0.0f, -25.0f, 0.0f},
                                {1.0f, 1.0f, 1.0f}), Sledge::create(true));
@@ -1647,9 +1647,13 @@ void StaticGizaScene::update(float deltaTime)
         articulationTime_ += deltaTime * articulationSpeed_;
 
     particles_.update(deltaTime);
-    quarry_.update(deltaTime);
-    logistics_.update(deltaTime, quarry_, constructionTimeline_, quarryPulleyController_);
+    
+    const float simulationMultiplier = constructionTimeline_.playing() ? constructionTimeline_.speed() * 60.0f : 1.0f;
+    const float simDelta = deltaTime * simulationMultiplier;
+    quarry_.update(simDelta);
+    logistics_.update(simDelta, quarry_, constructionTimeline_, quarryPulleyController_);
     sand_.update(deltaTime, logistics_.snapshot().sledgePosition);
+    if (sand_.enabled()) sandMesh_.upload(sand_.generateTerrainMesh());
     water_.update(deltaTime);
     if (deltaTime > 1.0e-5f)
         currentFps_ = 0.9f * currentFps_ + 0.1f * (1.0f / deltaTime);
@@ -2377,7 +2381,6 @@ void StaticGizaScene::collectFrameObjects()
 
     quarry_.collectSceneObjects(frameObjects_);
     logistics_.collectSceneObjects(frameObjects_);
-    sand_.collectSceneObjects(frameObjects_);
     water_.collectSceneObjects(frameObjects_);
 }
 
@@ -2475,6 +2478,16 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
             ++renderStats_.shadowInstances;
             renderStats_.shadowTriangles += mesh.indexCount() / 3u;
         }
+        
+        if (sand_.enabled() && sandMesh_.isUploaded())
+        {
+            depthShader_.setMat4("model", glm::mat4(1.0f));
+            sandMesh_.draw();
+            ++renderStats_.shadowDrawCalls;
+            ++renderStats_.shadowInstances;
+            renderStats_.shadowTriangles += sandMesh_.indexCount() / 3u;
+        }
+        
         shadowMap_.endDepthPass(viewportWidth, viewportHeight);
         glPolygonMode(GL_FRONT_AND_BACK, polygonMode[0]);
     }
@@ -2602,6 +2615,21 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         ++renderStats_.visibleDrawCalls;
         ++renderStats_.visibleInstances;
         renderStats_.visibleTriangles += mesh.indexCount() / 3u;
+    }
+
+    if (sand_.enabled() && sandMesh_.isUploaded())
+    {
+        shader_.setMat4("model", glm::mat4(1.0f));
+        shader_.setMat3("normalMatrix", glm::mat3(1.0f));
+        if (activeMaterial != MaterialId::Sand)
+        {
+            applyMaterial(shader_, MaterialId::Sand, false);
+            activeMaterial = MaterialId::Sand;
+        }
+        sandMesh_.draw();
+        ++renderStats_.visibleDrawCalls;
+        ++renderStats_.visibleInstances;
+        renderStats_.visibleTriangles += sandMesh_.indexCount() / 3u;
     }
 
     // Transparent dust follows all opaque geometry and never enters the shadow

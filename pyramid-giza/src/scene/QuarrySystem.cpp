@@ -123,13 +123,14 @@ void QuarrySystem::startExtraction(int depositIndex)
         activeDepositIndex_ = depositIndex;
     else
     {
-        // Find first natural or marked deposit
+        // Find first natural or marked deposit, cycling from current
         for (std::size_t i = 0; i < deposits_.size(); ++i)
         {
-            if (deposits_[i].state == QuarryDepositState::Natural ||
-                deposits_[i].state == QuarryDepositState::Marked)
+            std::size_t idx = (static_cast<std::size_t>(activeDepositIndex_ + 1) + i) % deposits_.size();
+            if (deposits_[idx].state == QuarryDepositState::Natural ||
+                deposits_[idx].state == QuarryDepositState::Marked)
             {
-                activeDepositIndex_ = static_cast<int>(i);
+                activeDepositIndex_ = static_cast<int>(idx);
                 break;
             }
         }
@@ -157,7 +158,14 @@ void QuarrySystem::markCurrentDepositTransported()
     QuarryDeposit* dep = activeDeposit();
     if (dep != nullptr)
     {
-        dep->state = QuarryDepositState::Transported;
+        // Causal pipeline: respawn this deposit so we never run out of quarry material
+        // while maintaining the same physical extraction site.
+        dep->state = QuarryDepositState::Natural;
+        dep->extractionProgress = 0.0f;
+        dep->shapingProgress = 0.0f;
+        dep->remainingVolume = dep->initialVolume;
+        dep->id += 100; // Ensure unique ID per cycle
+        
         // Select next deposit for future extraction
         startExtraction(-1);
     }

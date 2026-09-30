@@ -261,27 +261,72 @@ SandSimulationStats SandSimulation::stats() const
     return s;
 }
 
-void SandSimulation::collectSceneObjects(std::vector<SceneObject>& objects) const
+MeshData SandSimulation::generateTerrainMesh() const
 {
-    // Generate instanced/shared sand drift patches at accumulating cells and dune crests
-    for (int z = 1; z < GridResolution - 1; z += 2)
+    MeshData mesh("SandTerrain");
+    if (!enabled_) return mesh;
+
+    mesh.vertices.reserve(GridResolution * GridResolution);
+    for (int z = 0; z < GridResolution; ++z)
     {
-        for (int x = 1; x < GridResolution - 1; x += 2)
+        for (int x = 0; x < GridResolution; ++x)
         {
             const SandCell& cell = grid_[gridIndex(x, z)];
-            if (cell.height < 0.40f)
-                continue;
-
             const glm::vec2 wPos = cellWorldPos(x, z);
-            const float h = cell.height;
-            const glm::vec3 pos{wPos.x, cell.baseElevation + h * 0.5f, wPos.y};
-            const glm::vec3 scale{CellSize * 1.85f, h, CellSize * 1.85f};
-
-            objects.push_back({ScenePrimitive::Cube,
-                               makeTransform(pos, {0.0f, static_cast<float>((x * 37 + z * 19) % 360), 0.0f}, scale),
-                               MaterialId::Sand});
+            Vertex v;
+            v.position = {wPos.x, cell.baseElevation + cell.height, wPos.y};
+            v.normal = {0.0f, 1.0f, 0.0f};
+            v.texCoord = {wPos.x * 0.2f, wPos.y * 0.2f};
+            mesh.vertices.push_back(v);
         }
     }
+
+    for (int z = 0; z < GridResolution; ++z)
+    {
+        for (int x = 0; x < GridResolution; ++x)
+        {
+            glm::vec3 p = mesh.vertices[gridIndex(x, z)].position;
+            glm::vec3 dx = (x < GridResolution - 1) ? mesh.vertices[gridIndex(x + 1, z)].position - p : p - mesh.vertices[gridIndex(x - 1, z)].position;
+            glm::vec3 dz = (z < GridResolution - 1) ? mesh.vertices[gridIndex(x, z + 1)].position - p : p - mesh.vertices[gridIndex(x, z - 1)].position;
+            
+            if (x > 0 && x < GridResolution - 1) dx = mesh.vertices[gridIndex(x + 1, z)].position - mesh.vertices[gridIndex(x - 1, z)].position;
+            if (z > 0 && z < GridResolution - 1) dz = mesh.vertices[gridIndex(x, z + 1)].position - mesh.vertices[gridIndex(x, z - 1)].position;
+
+            glm::vec3 n = glm::normalize(glm::cross(dz, dx));
+            if (n.y < 0.0f) n = -n;
+            mesh.vertices[gridIndex(x, z)].normal = n;
+        }
+    }
+
+    mesh.indices.reserve((GridResolution - 1) * (GridResolution - 1) * 6);
+    for (int z = 0; z < GridResolution - 1; ++z)
+    {
+        for (int x = 0; x < GridResolution - 1; ++x)
+        {
+            const SandCell& c1 = grid_[gridIndex(x, z)];
+            const SandCell& c2 = grid_[gridIndex(x + 1, z)];
+            const SandCell& c3 = grid_[gridIndex(x, z + 1)];
+            const SandCell& c4 = grid_[gridIndex(x + 1, z + 1)];
+            
+            if (c1.isObstacle && c2.isObstacle && c3.isObstacle && c4.isObstacle) continue;
+            if (c1.height < 0.1f && c2.height < 0.1f && c3.height < 0.1f && c4.height < 0.1f) continue;
+
+            std::uint32_t tl = gridIndex(x, z);
+            std::uint32_t tr = gridIndex(x + 1, z);
+            std::uint32_t bl = gridIndex(x, z + 1);
+            std::uint32_t br = gridIndex(x + 1, z + 1);
+
+            mesh.indices.push_back(tl);
+            mesh.indices.push_back(bl);
+            mesh.indices.push_back(tr);
+
+            mesh.indices.push_back(tr);
+            mesh.indices.push_back(bl);
+            mesh.indices.push_back(br);
+        }
+    }
+
+    return mesh;
 }
 
 bool SandSimulation::validateSandSimulation(std::ostream& output)

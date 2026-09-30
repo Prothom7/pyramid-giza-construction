@@ -166,11 +166,17 @@ void ConstructionLogistics::advanceState(QuarrySystem& quarry,
     switch (state_)
     {
     case LogisticsState::QuarryReady:
+    {
+        const QuarryDeposit* dep = quarry.activeDeposit();
+        if (dep != nullptr)
+            activeBlockNumber_ = dep->id;
+            
         state_ = LogisticsState::Extracting;
         quarry.startExtraction();
         activeWorkers_ = 4;
         ropeTaut_ = false;
         break;
+    }
 
     case LogisticsState::Extracting:
         state_ = LogisticsState::Staged;
@@ -234,14 +240,14 @@ void ConstructionLogistics::advanceState(QuarrySystem& quarry,
         justSettled_ = true;
         settledFlashTimer_ = 1.5f;
         // Block settles into pyramid! Contribute to authoritative timeline progress
-        timeline.setProgress(std::min(1.0f, timeline.progress() + 0.005f));
+        timeline.registerPhysicalBlockSettlement();
         quarry.markCurrentDepositTransported();
         break;
 
     case LogisticsState::Settled:
         // Cycle completes, start next quarry block
         state_ = LogisticsState::QuarryReady;
-        ++activeBlockNumber_;
+        // activeBlockNumber_ will be pulled from the new quarry deposit
         justSettled_ = false;
         break;
     }

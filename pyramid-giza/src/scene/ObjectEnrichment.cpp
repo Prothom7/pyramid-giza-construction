@@ -169,7 +169,7 @@ bool validateObjectEnrichment(std::ostream& output)
     const bool deterministic = &repeatedRigs == &ObjectEnrichment::ropeRigs() &&
                                repeatedRigs.front().center ==
                                    ObjectEnrichment::ropeRigs().front().center;
-    // 349 support-aware primitive instances plus four rigid-part workers (4 * 17).
+    // 361 support-aware primitive instances (349 + 12 new walkway ground posts) plus four rigid-part workers (4 * 17).
     const std::size_t estimatedAddedDrawCalls = ObjectEnrichment::expectedAddedDrawCalls;
     const bool performanceValid = estimatedAddedDrawCalls <=
                                   ObjectEnrichment::maximumAddedDrawCalls;

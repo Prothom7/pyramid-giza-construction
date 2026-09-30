@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 
 #include "scene/SceneTypes.h"
+#include "graphics/Mesh.h"
 
 enum class SandCellState
 {
@@ -63,7 +64,7 @@ public:
     SandSimulationStats stats() const;
 
     // Visual geometry generation (sand drifts, dune patches, track clearance)
-    void collectSceneObjects(std::vector<SceneObject>& objects) const;
+    MeshData generateTerrainMesh() const;
 
     static bool validateSandSimulation(std::ostream& output);
 

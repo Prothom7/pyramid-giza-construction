@@ -314,6 +314,7 @@ private:
     Mesh cube_;
     Mesh cylinder_;
     Mesh sphere_;
+    Mesh sandMesh_;
     TextureLibrary textures_;
     ParticleSystem particles_;
     PyramidLayoutConfig pyramidConfig_;
