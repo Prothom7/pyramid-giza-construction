@@ -234,8 +234,7 @@ void StaticGizaScene::buildPyramid()
     stats_.pyramidInteriorExcludedBlocks = interiorStats.total;
     stats_.pyramidRenderedStructuralBlocks =
         pyramidBlocks_.size() - interiorStats.total;
-    stats_.pyramidBlocks =
-        constructionTimeline_.visibleBlockCount(pyramidBlocks_, pyramidConfig_);
+    stats_.pyramidBlocks = simulation_.occupiedTargetCount();
     buildPyramidInstanceBatches();
 }
 
@@ -263,6 +262,7 @@ void StaticGizaScene::buildPyramidInstanceBatches()
     struct ScheduledInstance
     {
         float stableThreshold = 0.0f;
+        std::size_t targetIndex = 0;
         InstanceData data;
         glm::vec3 minimum{0.0f};
         glm::vec3 maximum{0.0f};
@@ -271,8 +271,10 @@ void StaticGizaScene::buildPyramidInstanceBatches()
     constexpr unsigned int chunksPerMaterial = 4;
     constexpr unsigned int levelsPerChunk = 7;
     std::array<std::vector<ScheduledInstance>, 8> scheduled;
-    for (const PyramidBlockPlacement& block : pyramidBlocks_)
+    for (std::size_t targetIndex = 0; targetIndex < pyramidBlocks_.size();
+         ++targetIndex)
     {
+        const PyramidBlockPlacement& block = pyramidBlocks_[targetIndex];
         if (PyramidInterior::blockIntersectsVoid(block) ||
             (pyramidCutawayEnabled_ && PyramidInterior::isCutawayBlock(block)))
             continue;
@@ -287,6 +289,7 @@ void StaticGizaScene::buildPyramidInstanceBatches()
         const glm::mat4 model = makeTransform(block.position, {}, block.scale);
         scheduled[materialIndex * chunksPerMaterial + chunk].push_back({
             ConstructionTimelineController::stableThreshold(block, pyramidConfig_),
+            targetIndex,
             makeInstanceData(model, material.textureScale, material.textureOffset),
             block.position - 0.5f * block.scale,
             block.position + 0.5f * block.scale});
@@ -306,26 +309,30 @@ void StaticGizaScene::buildPyramidInstanceBatches()
                              ? MaterialId::Limestone
                              : MaterialId::LimestoneVariation;
         group.levelChunk = index % chunksPerMaterial;
-        std::vector<InstanceData> instances;
-        instances.reserve(source.size());
+        group.instances.reserve(source.size());
+        group.targetIndices.reserve(source.size());
         group.stableThresholds.reserve(source.size());
         glm::vec3 minimum{std::numeric_limits<float>::max()};
         glm::vec3 maximum{std::numeric_limits<float>::lowest()};
         for (const ScheduledInstance& item : source)
         {
-            instances.push_back(item.data);
+            group.instances.push_back(item.data);
+            group.targetIndices.push_back(item.targetIndex);
             group.stableThresholds.push_back(item.stableThreshold);
             minimum = glm::min(minimum, item.minimum);
             maximum = glm::max(maximum, item.maximum);
         }
-        if (!instances.empty())
+        if (!group.instances.empty())
         {
             group.bounds.center = 0.5f * (minimum + maximum);
             group.bounds.radius = glm::length(0.5f * (maximum - minimum));
         }
-        group.batch.uploadStatic(instances);
+        group.batch.uploadStatic(group.instances);
+        group.physicalBatch.updateDynamic({});
         pyramidInstanceGroups_.push_back(std::move(group));
     }
+
+    renderedOccupancyRevision_ = 0;
 
     for (std::vector<InstanceData>& instances : frontierInstances_)
         instances.reserve(384);
@@ -1919,6 +1926,7 @@ void StaticGizaScene::resetAnimation()
     quarryPulleyController_.reset();
     quarry_.reset();
     logistics_.reset();
+    simulation_.reset();
     sand_.reset();
     water_.reset();
     demoPose_ = WorkerPose::Standing;
@@ -1930,8 +1938,52 @@ void StaticGizaScene::resetAnimation()
         animationController_.snapshot().loadedSledgeRoot[3]};
 }
 
+void StaticGizaScene::toggleConstructionTimelapse()
+{
+    if (physicalConstructionMode())
+    {
+        setCinematicConstructionMode();
+        constructionTimeline_.setPlaying(true);
+    }
+    else
+    {
+        constructionTimeline_.setPlaying(false);
+        setPhysicalConstructionMode();
+    }
+}
+
+void StaticGizaScene::setCinematicConstructionMode()
+{
+    pyramidConstructionMode_ =
+        PyramidConstructionRenderMode::CinematicTimelapse;
+}
+
+void StaticGizaScene::setPhysicalConstructionMode()
+{
+    constructionTimeline_.setPlaying(false);
+    pyramidConstructionMode_ = PyramidConstructionRenderMode::Physical;
+}
+
+void StaticGizaScene::setConstructionPlaying(bool playing)
+{
+    if (playing)
+        setCinematicConstructionMode();
+    constructionTimeline_.setPlaying(playing);
+}
+
+float StaticGizaScene::constructionProgress() const
+{
+    if (!physicalConstructionMode())
+        return constructionTimeline_.progress();
+    if (simulation_.totalCount() == 0)
+        return 0.0f;
+    return static_cast<float>(simulation_.occupiedTargetCount()) /
+           static_cast<float>(simulation_.totalCount());
+}
+
 void StaticGizaScene::resetConstruction()
 {
+    setCinematicConstructionMode();
     constructionTimeline_.reset();
     particles_.clear();
     ambientEmissionAccumulator_ = 0.0f;
@@ -1942,6 +1994,7 @@ void StaticGizaScene::completeConstruction()
 {
     // Direct timeline jumps deliberately clear rather than replaying historical
     // placement events. Puffs are emitted only by actual forward playback.
+    setCinematicConstructionMode();
     constructionTimeline_.complete();
     particles_.clear();
     ambientEmissionAccumulator_ = 0.0f;
@@ -1950,6 +2003,7 @@ void StaticGizaScene::completeConstruction()
 
 void StaticGizaScene::setConstructionProgress(float progress)
 {
+    setCinematicConstructionMode();
     constructionTimeline_.setProgress(progress);
     particles_.clear();
     ambientEmissionAccumulator_ = 0.0f;
@@ -2057,13 +2111,67 @@ const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
     }
 }
 
+void StaticGizaScene::updatePhysicalPyramidBatches()
+{
+    if (renderedOccupancyRevision_ == simulation_.occupancyRevision())
+        return;
+
+    for (PyramidInstanceGroup& group : pyramidInstanceGroups_)
+    {
+        std::vector<InstanceData> occupiedInstances;
+        occupiedInstances.reserve(simulation_.occupiedTargetCount());
+        glm::vec3 minimum{std::numeric_limits<float>::max()};
+        glm::vec3 maximum{std::numeric_limits<float>::lowest()};
+
+        for (std::size_t index = 0; index < group.targetIndices.size(); ++index)
+        {
+            const std::size_t targetIndex = group.targetIndices[index];
+            if (!simulation_.isTargetOccupied(targetIndex))
+                continue;
+
+            occupiedInstances.push_back(group.instances[index]);
+            const PyramidBlockPlacement& block = pyramidBlocks_[targetIndex];
+            minimum = glm::min(minimum, block.position - 0.5f * block.scale);
+            maximum = glm::max(maximum, block.position + 0.5f * block.scale);
+        }
+
+        group.occupiedCount = occupiedInstances.size();
+        group.physicalBatch.updateDynamic(occupiedInstances);
+        if (occupiedInstances.empty())
+            group.physicalBounds = {};
+        else
+        {
+            group.physicalBounds.center = 0.5f * (minimum + maximum);
+            group.physicalBounds.radius =
+                glm::length(0.5f * (maximum - minimum));
+        }
+    }
+
+    stats_.pyramidBlocks = simulation_.occupiedTargetCount();
+    renderedOccupancyRevision_ = simulation_.occupancyRevision();
+}
+
 std::size_t StaticGizaScene::activeStableCount(
     const PyramidInstanceGroup& group) const
 {
+    if (physicalConstructionMode())
+        return group.occupiedCount;
     return static_cast<std::size_t>(std::upper_bound(
         group.stableThresholds.begin(), group.stableThresholds.end(),
         constructionTimeline_.progress() + 1.0e-6f) -
         group.stableThresholds.begin());
+}
+
+const InstanceBatch& StaticGizaScene::activePyramidBatch(
+    const PyramidInstanceGroup& group) const
+{
+    return physicalConstructionMode() ? group.physicalBatch : group.batch;
+}
+
+const BoundingSphere& StaticGizaScene::activePyramidBounds(
+    const PyramidInstanceGroup& group) const
+{
+    return physicalConstructionMode() ? group.physicalBounds : group.bounds;
 }
 
 float StaticGizaScene::primitiveLocalRadius(ScenePrimitive primitive) const
@@ -2098,7 +2206,7 @@ void StaticGizaScene::updateFrontierBatches()
         glm::vec3{std::numeric_limits<float>::lowest()},
         glm::vec3{std::numeric_limits<float>::lowest()}};
 
-    if (!constructionTimeline_.playing())
+    if (physicalConstructionMode() || !constructionTimeline_.playing())
     {
         for (std::size_t index = 0; index < frontierBatches_.size(); ++index)
         {
@@ -2262,6 +2370,7 @@ void StaticGizaScene::collectFrameObjects()
             MaterialId::Rope);
     }
 
+    updatePhysicalPyramidBatches();
     updateFrontierBatches();
 
     const auto drawPart = [&](ScenePrimitive primitive, const glm::mat4& model,
@@ -2455,12 +2564,12 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
             if (count == 0)
                 continue;
             if (frustumCullingEnabled_ &&
-                !lightFrustum.intersects(group.bounds, 3.0f))
+                !lightFrustum.intersects(activePyramidBounds(group), 3.0f))
             {
                 renderStats_.culledInstances += count;
                 continue;
             }
-            group.batch.draw(cube_, count);
+            activePyramidBatch(group).draw(cube_, count);
             ++renderStats_.shadowDrawCalls;
             renderStats_.shadowInstances += count;
             renderStats_.shadowTriangles += count * (cube_.indexCount() / 3u);
@@ -2573,7 +2682,7 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         if (count == 0)
             continue;
         if (frustumCullingEnabled_ &&
-            !cameraFrustum.intersects(group.bounds, 0.75f))
+            !cameraFrustum.intersects(activePyramidBounds(group), 0.75f))
         {
             renderStats_.culledInstances += count;
             continue;
@@ -2583,7 +2692,7 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
             applyMaterial(instancedShader_, group.material, true);
             activeInstancedMaterial = group.material;
         }
-        group.batch.draw(cube_, count);
+        activePyramidBatch(group).draw(cube_, count);
         ++renderStats_.visibleDrawCalls;
         renderStats_.visibleInstances += count;
         renderStats_.visibleTriangles += count * (cube_.indexCount() / 3u);
@@ -2675,8 +2784,8 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
 
     // Render in-window OpenGL HUD overlay
     SimulationHUDState hudState;
-    hudState.constructionProgress = constructionTimeline_.progress();
-    hudState.constructionStage = ConstructionTimelineController::stageName(constructionTimeline_.stage());
+    hudState.constructionProgress = constructionProgress();
+    hudState.constructionStage = constructionStageName();
     hudState.activeBlockNumber = logistics_.activeBlockNumber();
     hudState.logisticsState = ConstructionLogistics::stateName(logistics_.state());
     hudState.routeDescription = logistics_.routeDescription();
@@ -2692,11 +2801,24 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
     hudState.quarryProgress = dep ? (dep->state == QuarryDepositState::Cutting ? dep->extractionProgress * 100.0f : dep->shapingProgress * 100.0f) : 0.0f;
     hudState.pulleyState = QuarryPulleyAnimationController::stateName(quarryPulleyController_.snapshot().state);
     hudState.pulleyHeight = quarryPulleyController_.snapshot().loadPosition.y;
-    hudState.activeLevel = constructionTimeline_.activeLevel(pyramidConfig_);
-    hudState.frontierPhase = ConstructionTimelineController::frontierPhaseName(
-        ConstructionTimelineController::frontierTransform(
-            pyramidBlocks_.empty() ? PyramidBlockPlacement{} : pyramidBlocks_[0],
-            pyramidConfig_, 0.5f).phase);
+    if (physicalConstructionMode())
+    {
+        hudState.activeLevel = 0;
+        for (std::size_t index = 0; index < pyramidBlocks_.size(); ++index)
+            if (simulation_.isTargetOccupied(index))
+                hudState.activeLevel = std::max(
+                    hudState.activeLevel,
+                    static_cast<int>(pyramidBlocks_[index].level));
+        hudState.frontierPhase = "Physical occupancy";
+    }
+    else
+    {
+        hudState.activeLevel = constructionTimeline_.activeLevel(pyramidConfig_);
+        hudState.frontierPhase = ConstructionTimelineController::frontierPhaseName(
+            ConstructionTimelineController::frontierTransform(
+                pyramidBlocks_.empty() ? PyramidBlockPlacement{} : pyramidBlocks_[0],
+                pyramidConfig_, 0.5f).phase);
+    }
     hudState.debugOverlay = simulationDebugEnabled_;
 
     hud_.render(viewportWidth, viewportHeight, hudState);
@@ -2706,7 +2828,7 @@ void StaticGizaScene::printRenderStats(std::ostream& output) const
 {
     output << std::fixed << std::setprecision(3)
            << "Phase 11 render statistics (latest frame)\n"
-           << "  construction: " << constructionTimeline_.progress() * 100.0f
+           << "  construction: " << constructionProgress() * 100.0f
            << "% (" << constructionStageName() << ")\n"
            << "  visible draws / instances / triangles: "
            << renderStats_.visibleDrawCalls << " / "

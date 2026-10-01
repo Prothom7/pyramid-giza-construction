@@ -159,6 +159,8 @@ void cancelShowcaseForManualInput(AppState& state, GLFWwindow* window,
     if (!state.showcaseController.controlsCamera())
         return;
     state.showcaseController.cancel();
+    if (state.scene != nullptr)
+        state.scene->setPhysicalConstructionMode();
     state.firstMouse = true;
     setShowcaseWindowTitle(window, state);
     std::cout << "Showcase canceled by " << reason
@@ -667,6 +669,7 @@ int main(int argc, char** argv)
     float initialShowcaseSpeed = 1.0f;
     bool startTimelapse = false;
     float initialConstructionProgress = ConstructionTimelineController::defaultProgress;
+    bool constructionProgressSpecified = false;
     float initialConstructionSpeed = 1.0f;
     int shadowResolution = ShadowSettings::defaultResolution;
     std::size_t particleCapacity = ParticleSystem::defaultCapacity;
@@ -958,6 +961,7 @@ int main(int argc, char** argv)
             startTimelapse = true;
         else if (option == "--construction-progress" && argument + 1 < argc)
         {
+            constructionProgressSpecified = true;
             try
             {
                 initialConstructionProgress = std::stof(argv[++argument]);
@@ -1262,7 +1266,8 @@ int main(int argc, char** argv)
         scene.setTexturesEnabled(startWithTextures);
         scene.setFrustumCullingEnabled(startWithFrustumCulling);
         scene.setEffectsEnabled(startWithEffects);
-        scene.setConstructionProgress(initialConstructionProgress);
+        if (constructionProgressSpecified)
+            scene.setConstructionProgress(initialConstructionProgress);
         scene.setConstructionSpeed(initialConstructionSpeed);
         scene.setConstructionPlaying(startTimelapse);
         if (startCutaway)

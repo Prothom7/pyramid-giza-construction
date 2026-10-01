@@ -395,29 +395,9 @@ bool validateTimelapsePlaybackRepair(std::ostream& output)
     std::size_t settlementEvents = 0;
     float previous = natural.progress();
     constexpr int frameCount = 24 * 60;
-    float blockAccumulator = 0.0f;
-    ConstructionSimulation sim;
-    sim.initialize(blocks);
     for (int frame = 0; frame < frameCount; ++frame)
     {
         natural.update(1.0f / 60.0f);
-        // Simulate physical block placement to drive progress in the test
-        // To complete 82% of 7714 blocks (~6326) in 1440 frames:
-        blockAccumulator += 6326.0f / static_cast<float>(frameCount);
-        while (blockAccumulator >= 1.0f && natural.progress() < 1.0f)
-        {
-            sim.incrementSettledCount();
-            natural.registerPhysicalBlockSettlement(sim);
-            blockAccumulator -= 1.0f;
-        }
-        if (frame == frameCount - 1 && natural.progress() < 1.0f) {
-            // Ensure we hit exactly 1.0 at the end if there are rounding errors
-            while (natural.progress() < 1.0f) {
-                sim.incrementSettledCount();
-                natural.registerPhysicalBlockSettlement(sim);
-            }
-        }
-
         monotonic = monotonic && natural.progress() + 1.0e-6f >= previous;
         std::size_t active = 0;
         for (const PyramidBlockPlacement& block : blocks)

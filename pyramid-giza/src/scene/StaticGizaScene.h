@@ -91,6 +91,12 @@ struct RenderStats
     double cpuSubmissionMilliseconds = 0.0;
 };
 
+enum class PyramidConstructionRenderMode
+{
+    Physical,
+    CinematicTimelapse
+};
+
 class StaticGizaScene
 {
 public:
@@ -142,17 +148,25 @@ public:
     void toggleTextures() { texturesEnabled_ = !texturesEnabled_; }
     void setTexturesEnabled(bool enabled) { texturesEnabled_ = enabled; }
     bool texturesEnabled() const { return texturesEnabled_; }
-    void toggleConstructionTimelapse() { constructionTimeline_.togglePlayback(); }
+    void toggleConstructionTimelapse();
     void adjustConstructionSpeed(int direction) { constructionTimeline_.adjustSpeed(direction); }
     void resetConstruction();
     void completeConstruction();
     void setConstructionProgress(float progress);
     void setConstructionSpeed(float speed) { constructionTimeline_.setSpeed(speed); }
-    void setConstructionPlaying(bool playing) { constructionTimeline_.setPlaying(playing); }
-    float constructionProgress() const { return constructionTimeline_.progress(); }
+    void setConstructionPlaying(bool playing);
+    void setCinematicConstructionMode();
+    void setPhysicalConstructionMode();
+    bool physicalConstructionMode() const
+    {
+        return pyramidConstructionMode_ == PyramidConstructionRenderMode::Physical;
+    }
+    float constructionProgress() const;
     float constructionSpeed() const { return constructionTimeline_.speed(); }
     const char* constructionStageName() const
     {
+        if (physicalConstructionMode())
+            return "Physical construction";
         return ConstructionTimelineController::stageName(constructionTimeline_.stage());
     }
     const ShadowSettings& shadowSettings() const { return shadowSettings_; }
@@ -248,8 +262,13 @@ private:
         MaterialId material = MaterialId::Limestone;
         unsigned int levelChunk = 0;
         InstanceBatch batch;
+        InstanceBatch physicalBatch;
+        std::vector<InstanceData> instances;
+        std::vector<std::size_t> targetIndices;
         std::vector<float> stableThresholds;
         BoundingSphere bounds;
+        BoundingSphere physicalBounds;
+        std::size_t occupiedCount = 0;
     };
 
     struct TreeMotionPart
@@ -288,6 +307,7 @@ private:
     void buildCompositeObjects();
     void buildConstructionStages();
     void collectFrameObjects();
+    void updatePhysicalPyramidBatches();
     void updateFrontierBatches();
     void updateAtmosphericEffects(float deltaTime, float previousAnimationTime,
                                   float previousConstructionProgress,
@@ -300,6 +320,10 @@ private:
                            bool constructionWasPlaying);
     void emitAmbientDust(float deltaTime);
     std::size_t activeStableCount(const PyramidInstanceGroup& group) const;
+    const InstanceBatch& activePyramidBatch(
+        const PyramidInstanceGroup& group) const;
+    const BoundingSphere& activePyramidBounds(
+        const PyramidInstanceGroup& group) const;
     float primitiveLocalRadius(ScenePrimitive primitive) const;
     bool objectVisible(const SceneObject& object, const Frustum& frustum,
                        float margin = 0.0f) const;
@@ -351,6 +375,9 @@ private:
     bool effectsEnabled_ = true;
     bool interiorInspectionActive_ = false;
     bool pyramidCutawayEnabled_ = false;
+    PyramidConstructionRenderMode pyramidConstructionMode_ =
+        PyramidConstructionRenderMode::Physical;
+    std::uint64_t renderedOccupancyRevision_ = 0;
     ShadowDebugMode shadowDebugMode_ = ShadowDebugMode::Normal;
     StaticGizaSceneStats stats_;
     RenderStats renderStats_;

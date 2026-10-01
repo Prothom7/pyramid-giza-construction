@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iomanip>
 #include <ostream>
+#include <stdexcept>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -236,12 +237,14 @@ void ConstructionLogistics::advanceState(ConstructionSimulation& simulation, Qua
         break;
 
     case LogisticsState::Placement:
+        if (!simulation.settleBlock(activeBlockId_))
+            throw std::runtime_error(
+                "Construction block settlement rejected for invalid or occupied target");
         state_ = LogisticsState::Settled;
         activeWorkers_ = 4;
         ropeTaut_ = false;
         justSettled_ = true;
         settledFlashTimer_ = 1.5f;
-        simulation.incrementSettledCount();
         timeline.registerPhysicalBlockSettlement(simulation);
         break;
 
@@ -417,7 +420,7 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
 
 bool ConstructionLogistics::validateConstructionLogistics(std::ostream& output)
 {
-    return true;
+    return validateConstructionOccupancy(output);
 }
 
 bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)
@@ -435,10 +438,15 @@ bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)
     
     quarry.startExtraction(sim, 0);
     uint64_t targetBlockId = sim.activeBlocks.back().id;
+    const std::size_t targetIndex = sim.activeBlocks.back().targetIndex;
+    const std::size_t unrelatedTarget = targetIndex + 1;
+    const bool occupiedBefore = sim.isTargetOccupied(targetIndex);
     
     output << "=== CONSTRUCTION TRACE ===\n\n";
     output << "Block " << targetBlockId << "\n";
-    output << "Target Cell Index: " << sim.activeBlocks.back().targetIndex << "\n\n";
+    output << "Target Cell Index: " << targetIndex << "\n";
+    output << "Occupied Before Settlement: "
+           << (occupiedBefore ? "YES" : "NO") << "\n\n";
            
     const int maxSteps = 10000;
     const float dt = 0.1f;
@@ -492,8 +500,19 @@ bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)
     
     output << "Pyramid Settled Count Before: 0\n";
     output << "Pyramid Settled Count After: " << sim.settledCount() << "\n\n";
-    
-    bool valid = (block->state == BlockState::Settled) && (posError < 0.1f) && (sim.settledCount() == 1);
+
+    const bool occupiedAfter = sim.isTargetOccupied(targetIndex);
+    const bool unrelatedOccupied = unrelatedTarget < sim.totalCount() &&
+                                   sim.isTargetOccupied(unrelatedTarget);
+    output << "Occupied After Settlement: "
+           << (occupiedAfter ? "YES" : "NO") << "\n";
+    output << "Unrelated Target Occupied: "
+           << (unrelatedOccupied ? "YES" : "NO") << "\n\n";
+
+    bool valid = !occupiedBefore && occupiedAfter && !unrelatedOccupied &&
+                 (block->state == BlockState::Settled) &&
+                 (posError < 0.1f) && (sim.settledCount() == 1) &&
+                 (sim.settledCount() == sim.occupiedTargetCount());
     output << "Conservation Accounting Valid: " << (valid ? "YES" : "NO") << "\n\n";
     output << (valid ? "PASS\n" : "FAIL\n");
     

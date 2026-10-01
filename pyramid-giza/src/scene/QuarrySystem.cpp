@@ -427,6 +427,7 @@ bool QuarrySystem::validateQuarry(std::ostream& output)
 
     // Test extraction progression
     ConstructionSimulation sim;
+    sim.initialize(PyramidLayout::generateComplete(PyramidLayoutConfig{}));
     system.startExtraction(sim, 0);
     const float initialProgress = system.activeDeposit()->extractionProgress;
     for (int step = 0; step < 20; ++step)
