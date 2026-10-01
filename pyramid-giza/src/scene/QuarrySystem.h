@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 
 #include "scene/SceneTypes.h"
+#include "scene/ConstructionSimulation.h"
 
 enum class RockProfileType
 {
@@ -63,7 +64,7 @@ class QuarrySystem
 public:
     QuarrySystem();
 
-    void update(float deltaTime);
+    void update(float deltaTime, ConstructionSimulation& simulation);
     void reset();
 
     // Query active state
@@ -74,8 +75,8 @@ public:
     QuarryToolActivity toolActivity() const;
 
     // Simulation control
-    void startExtraction(int depositIndex = -1);
-    bool isCurrentDepositStaged() const;
+    void startExtraction(ConstructionSimulation& simulation, int depositIndex = -1);
+    bool isCurrentDepositStaged(const ConstructionSimulation& simulation) const;
     void markCurrentDepositTransported();
 
     // Visual geometry generation
@@ -89,10 +90,11 @@ public:
 
 private:
     void initDeposits();
-    void updateExtraction(float deltaTime);
+    void updateExtraction(float deltaTime, ConstructionSimulation& simulation);
 
     std::vector<QuarryDeposit> deposits_;
     int activeDepositIndex_ = 0;
+    uint64_t activeBlockId_ = 0; // ID of the currently extracted block
     float cycleTimer_ = 0.0f;
     float dustTimer_ = 0.0f;
     bool emitDustNow_ = false;

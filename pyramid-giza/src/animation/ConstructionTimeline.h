@@ -57,7 +57,7 @@ public:
     void setDuration(float seconds);
     void setSpeed(float speed);
     void setPlaying(bool playing) { playing_ = playing; }
-    void registerPhysicalBlockSettlement();
+    void registerPhysicalBlockSettlement(const class ConstructionSimulation& simulation);
 
     float progress() const { return progress_; }
     float duration() const { return durationSeconds_; }

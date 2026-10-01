@@ -11,6 +11,7 @@
 #include "animation/QuarryPulleyAnimation.h"
 #include "scene/QuarrySystem.h"
 #include "scene/SceneTypes.h"
+#include "scene/ConstructionSimulation.h"
 
 enum class LogisticsState
 {
@@ -49,12 +50,14 @@ class ConstructionLogistics
 public:
     ConstructionLogistics();
 
-    void update(float deltaTime, QuarrySystem& quarry,
+    void update(float deltaTime, ConstructionSimulation& simulation,
+                QuarrySystem& quarry,
                 ConstructionTimelineController& timeline,
                 QuarryPulleyAnimationController& pulley);
     void reset();
 
     LogisticsSnapshot snapshot() const;
+    uint64_t activeBlockId() const { return activeBlockId_; }
     LogisticsState state() const { return state_; }
     float stateProgress() const { return stateProgress_; }
     int activeBlockNumber() const { return activeBlockNumber_; }
@@ -65,16 +68,18 @@ public:
 
     static const char* stateName(LogisticsState state);
     static bool validateConstructionLogistics(std::ostream& output);
+    static bool validateConstructionTrace(std::ostream& output);
 
 private:
-    void advanceState(QuarrySystem& quarry, ConstructionTimelineController& timeline,
+    void advanceState(ConstructionSimulation& simulation, QuarrySystem& quarry, ConstructionTimelineController& timeline,
                       QuarryPulleyAnimationController& pulley);
     glm::vec3 computeHaulPosition(float progress) const;
     glm::vec3 computeRampPosition(float progress) const;
     glm::vec3 computeLiftPosition(float progress) const;
-    glm::vec3 computePlacementPosition(float progress) const;
+    glm::vec3 computePlacementPosition(float progress, ConstructionSimulation& simulation) const;
 
     LogisticsState state_ = LogisticsState::QuarryReady;
+    uint64_t activeBlockId_ = 0;
     int activeBlockNumber_ = 101;
     float stateProgress_ = 0.0f;
     float stateTimer_ = 0.0f;

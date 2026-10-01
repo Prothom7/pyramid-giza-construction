@@ -7,6 +7,7 @@
 #include <ostream>
 
 #include "animation/ConstructionAnimation.h"
+#include "scene/ConstructionSimulation.h"
 #include "effects/ParticleSystem.h"
 #include "lighting/SunController.h"
 
@@ -44,24 +45,23 @@ void ConstructionTimelineController::update(float deltaTime)
 {
     if (!playing_ || deltaTime <= 0.0f || !std::isfinite(deltaTime))
         return;
-    // Progress is now driven exclusively by physical block settlement.
-    // The timeline controller acts as the authoritative progress tracker
-    // but relies on ConstructionLogistics for the causal simulation.
+    setProgress(progress_ + deltaTime * speed_ / durationSeconds_);
     if (progress_ >= 1.0f)
         playing_ = false;
 }
 
-void ConstructionTimelineController::registerPhysicalBlockSettlement()
+void ConstructionTimelineController::registerPhysicalBlockSettlement(const ConstructionSimulation& simulation)
 {
     if (!playing_ && progress_ < 1.0f) 
     {
         // Allow settlement even if not explicitly "playing" a timelapse
     }
     
-    // Pyramid has exactly 7714 blocks. Each block adds an equal fraction.
-    constexpr float blockFraction = 1.0f / 7714.0f;
-    setProgress(std::min(1.0f, progress_ + blockFraction));
-    ++settledBlocks_;
+    // Pyramid progress is driven entirely by authoritative simulation settled blocks
+    if (simulation.totalCount() > 0 && !playing_) {
+        float exactProgress = static_cast<float>(simulation.settledCount()) / static_cast<float>(simulation.totalCount());
+        setProgress(std::max(progress_, std::min(1.0f, exactProgress)));
+    }
     
     if (progress_ >= 1.0f)
         playing_ = false;
@@ -396,6 +396,8 @@ bool validateTimelapsePlaybackRepair(std::ostream& output)
     float previous = natural.progress();
     constexpr int frameCount = 24 * 60;
     float blockAccumulator = 0.0f;
+    ConstructionSimulation sim;
+    sim.initialize(blocks);
     for (int frame = 0; frame < frameCount; ++frame)
     {
         natural.update(1.0f / 60.0f);
@@ -404,12 +406,16 @@ bool validateTimelapsePlaybackRepair(std::ostream& output)
         blockAccumulator += 6326.0f / static_cast<float>(frameCount);
         while (blockAccumulator >= 1.0f && natural.progress() < 1.0f)
         {
-            natural.registerPhysicalBlockSettlement();
+            sim.incrementSettledCount();
+            natural.registerPhysicalBlockSettlement(sim);
             blockAccumulator -= 1.0f;
         }
         if (frame == frameCount - 1 && natural.progress() < 1.0f) {
             // Ensure we hit exactly 1.0 at the end if there are rounding errors
-            while (natural.progress() < 1.0f) natural.registerPhysicalBlockSettlement();
+            while (natural.progress() < 1.0f) {
+                sim.incrementSettledCount();
+                natural.registerPhysicalBlockSettlement(sim);
+            }
         }
 
         monotonic = monotonic && natural.progress() + 1.0e-6f >= previous;
@@ -479,7 +485,6 @@ bool validateTimelapsePlaybackRepair(std::ostream& output)
                        frontierActivity && placementEvents && phases &&
                        directSeekQuiet;
     output << "Phase 12.5 natural timelapse validation\n"
-           << "  DEBUG: monotonic=" << monotonic << ", playing=" << natural.playing() << ", progress=" << std::fixed << std::setprecision(8) << natural.progress() << '\n'
            << "  exact 0/25/50/75/100 checkpoint counts: "
            << (checkpoints ? "PASS" : "FAIL") << '\n'
            << "  update-driven monotonic 18% -> 100% playback: "

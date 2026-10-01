@@ -117,7 +117,7 @@ QuarryDeposit* QuarrySystem::activeDeposit()
     return nullptr;
 }
 
-void QuarrySystem::startExtraction(int depositIndex)
+void QuarrySystem::startExtraction(ConstructionSimulation& simulation, int depositIndex)
 {
     if (depositIndex >= 0 && depositIndex < static_cast<int>(deposits_.size()))
         activeDepositIndex_ = depositIndex;
@@ -144,13 +144,28 @@ void QuarrySystem::startExtraction(int depositIndex)
         dep->shapingProgress = 0.0f;
         dep->seamWidth = 0.04f;
         dep->separationOffset = 0.0f;
+        
+        // Spawn the authoritative simulation block immediately
+        simulation.spawnNewBlock(dep->position);
+        activeBlockId_ = simulation.activeBlocks.back().id;
+        ConstructionBlock* block = simulation.getBlock(activeBlockId_);
+        if (block) {
+            block->state = BlockState::Extracting;
+        }
     }
 }
 
-bool QuarrySystem::isCurrentDepositStaged() const
+bool QuarrySystem::isCurrentDepositStaged(const ConstructionSimulation& simulation) const
 {
-    const QuarryDeposit* dep = activeDeposit();
-    return dep != nullptr && dep->state == QuarryDepositState::Staged;
+    if (activeBlockId_ == 0) return false;
+    
+    // Iterate manually because getBlock is not const, or just find it
+    for (const auto& block : simulation.activeBlocks) {
+        if (block.id == activeBlockId_) {
+            return block.state == BlockState::Staged;
+        }
+    }
+    return false;
 }
 
 void QuarrySystem::markCurrentDepositTransported()
@@ -166,12 +181,14 @@ void QuarrySystem::markCurrentDepositTransported()
         dep->remainingVolume = dep->initialVolume;
         dep->id += 100; // Ensure unique ID per cycle
         
-        // Select next deposit for future extraction
-        startExtraction(-1);
+        activeBlockId_ = 0; // Detach from the block since logistics has it
+        
+        // Select next deposit for future extraction (logistics/static scene will call this)
+        // Note: we'll defer startExtraction so it accepts simulation reference.
     }
 }
 
-void QuarrySystem::update(float deltaTime)
+void QuarrySystem::update(float deltaTime, ConstructionSimulation& simulation)
 {
     if (!std::isfinite(deltaTime) || deltaTime <= 0.0f)
         return;
@@ -180,16 +197,21 @@ void QuarrySystem::update(float deltaTime)
     dustTimer_ += deltaTime;
     emitDustNow_ = false;
 
+    // Automatically start the next block extraction if idle
+    if (activeBlockId_ == 0) {
+        startExtraction(simulation, 0); // Always restart from deposit 0 for simplicity of looping
+    }
+
     if (dustTimer_ >= 0.85f)
     {
         dustTimer_ = 0.0f;
         emitDustNow_ = true;
     }
 
-    updateExtraction(deltaTime);
+    updateExtraction(deltaTime, simulation);
 }
 
-void QuarrySystem::updateExtraction(float deltaTime)
+void QuarrySystem::updateExtraction(float deltaTime, ConstructionSimulation& simulation)
 {
     QuarryDeposit* dep = activeDeposit();
     if (dep == nullptr)
@@ -211,6 +233,9 @@ void QuarrySystem::updateExtraction(float deltaTime)
             dep->separationOffset = 0.22f;
             dep->vibration = 0.0f;
             dep->profile = RockProfileType::PartiallyShapedBlock;
+            
+            ConstructionBlock* block = simulation.getBlock(activeBlockId_);
+            if (block) block->state = BlockState::Separating;
         }
     }
     else if (dep->state == QuarryDepositState::Detached)
@@ -226,6 +251,9 @@ void QuarrySystem::updateExtraction(float deltaTime)
             dep->state = QuarryDepositState::Shaped;
             dep->profile = RockProfileType::FinishedConstructionBlock;
             dep->material = MaterialId::PreparedStone;
+            
+            ConstructionBlock* block = simulation.getBlock(activeBlockId_);
+            if (block) block->state = BlockState::Shaping;
         }
     }
     else if (dep->state == QuarryDepositState::Shaped)
@@ -242,6 +270,25 @@ void QuarrySystem::updateExtraction(float deltaTime)
         {
             dep->position = target;
             dep->state = QuarryDepositState::Staged;
+            
+            ConstructionBlock* block = simulation.getBlock(activeBlockId_);
+            if (block) {
+                block->state = BlockState::Staged;
+                block->position = dep->position;
+                block->previousPosition = dep->position;
+            }
+        }
+    }
+    
+    // Sync active block position during shaping/staging movement
+    if (activeBlockId_ != 0) {
+        ConstructionBlock* block = simulation.getBlock(activeBlockId_);
+        if (block) {
+            block->position = dep->position;
+            if (dep->state == QuarryDepositState::Cutting) block->position.y += dep->vibration;
+            else if (dep->state == QuarryDepositState::Detached || dep->state == QuarryDepositState::Shaped) block->position.y += dep->separationOffset;
+            block->position.y += dep->size.y * 0.5f; // Match the visual center of the deposit
+            block->taskProgress = dep->extractionProgress; // Or shaping progress
         }
     }
 }
@@ -275,11 +322,13 @@ void QuarrySystem::collectSceneObjects(std::vector<SceneObject>& objects) const
         else if (dep.state == QuarryDepositState::Detached || dep.state == QuarryDepositState::Shaped)
             renderPos.y += dep.separationOffset;
 
-        // Main block body
-        objects.push_back({ScenePrimitive::Cube,
-                           makeTransform(renderPos + glm::vec3{0.0f, dep.size.y * 0.5f, 0.0f},
-                                         {}, dep.size),
-                           dep.material});
+        // The main block body is now rendered by ConstructionSimulation::collectSceneObjects when active
+        if (&dep != activeDeposit()) {
+            objects.push_back({ScenePrimitive::Cube,
+                               makeTransform(renderPos + glm::vec3{0.0f, dep.size.y * 0.5f, 0.0f},
+                                             {}, dep.size),
+                               dep.material});
+        }
 
         // If cutting or detached, render visible trench seam and wooden wedges
         if (dep.state == QuarryDepositState::Cutting || dep.state == QuarryDepositState::Detached)
@@ -377,28 +426,29 @@ bool QuarrySystem::validateQuarry(std::ostream& output)
     }
 
     // Test extraction progression
-    system.startExtraction(0);
+    ConstructionSimulation sim;
+    system.startExtraction(sim, 0);
     const float initialProgress = system.activeDeposit()->extractionProgress;
     for (int step = 0; step < 20; ++step)
-        system.update(0.1f);
+        system.update(0.1f, sim);
     const float progressed = system.activeDeposit()->extractionProgress;
     bool extractionAdvances = progressed > initialProgress;
 
     // Advance until detachment
     while (system.activeDeposit()->state == QuarryDepositState::Cutting)
-        system.update(0.2f);
+        system.update(0.2f, sim);
     bool detaches = (system.activeDeposit()->state == QuarryDepositState::Detached) &&
                     (system.activeDeposit()->separationOffset > 0.1f);
 
     // Advance until shaped
     while (system.activeDeposit()->state == QuarryDepositState::Detached)
-        system.update(0.2f);
+        system.update(0.2f, sim);
     bool shapes = (system.activeDeposit()->state == QuarryDepositState::Shaped) &&
                   (system.activeDeposit()->profile == RockProfileType::FinishedConstructionBlock);
 
     // Advance until staged
     for (int step = 0; step < 200 && system.activeDeposit()->state != QuarryDepositState::Staged; ++step)
-        system.update(0.2f);
+        system.update(0.2f, sim);
     bool stages = (system.activeDeposit()->state == QuarryDepositState::Staged);
 
     const bool valid = depositsExist && depositsGrounded && extractionAdvances &&

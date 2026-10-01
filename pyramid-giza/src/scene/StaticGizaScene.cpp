@@ -227,6 +227,7 @@ void StaticGizaScene::buildGround()
 void StaticGizaScene::buildPyramid()
 {
     pyramidBlocks_ = PyramidLayout::generateComplete(pyramidConfig_);
+    simulation_.initialize(pyramidBlocks_);
     const InteriorExclusionStats interiorStats =
         PyramidInterior::exclusionStats(pyramidBlocks_);
     stats_.pyramidGeneratedBlocks = pyramidBlocks_.size();
@@ -1650,8 +1651,8 @@ void StaticGizaScene::update(float deltaTime)
     
     const float simulationMultiplier = constructionTimeline_.playing() ? constructionTimeline_.speed() * 60.0f : 1.0f;
     const float simDelta = deltaTime * simulationMultiplier;
-    quarry_.update(simDelta);
-    logistics_.update(simDelta, quarry_, constructionTimeline_, quarryPulleyController_);
+    quarry_.update(simDelta, simulation_);
+    logistics_.update(simDelta, simulation_, quarry_, constructionTimeline_, quarryPulleyController_);
     sand_.update(deltaTime, logistics_.snapshot().sledgePosition);
     if (sand_.enabled()) sandMesh_.upload(sand_.generateTerrainMesh());
     water_.update(deltaTime);
@@ -2097,6 +2098,16 @@ void StaticGizaScene::updateFrontierBatches()
         glm::vec3{std::numeric_limits<float>::lowest()},
         glm::vec3{std::numeric_limits<float>::lowest()}};
 
+    if (!constructionTimeline_.playing())
+    {
+        for (std::size_t index = 0; index < frontierBatches_.size(); ++index)
+        {
+            frontierBatches_[index].updateDynamic(frontierInstances_[index]);
+            frontierBounds_[index] = {};
+        }
+        return;
+    }
+
     for (const PyramidBlockPlacement& block : pyramidBlocks_)
     {
         if (PyramidInterior::blockIntersectsVoid(block) ||
@@ -2227,11 +2238,12 @@ void StaticGizaScene::collectFrameObjects()
         ConstructionAnimationController::cylinderBetween(
             quarryPulley.pulleyPoint, {-124.7f, -3.4f, -14.3f}, 0.10f),
         MaterialId::Rope);
-    appendPulleyPart(ScenePrimitive::Cube,
-                     makeTransform(quarryPulley.loadPosition,
-                                   {0.0f, 5.0f, 0.0f},
-                                   {2.6f, 1.6f, 2.4f}),
-                     MaterialId::LimestoneVariation);
+    // The load is now managed by ConstructionSimulation authoritative block
+    // appendPulleyPart(ScenePrimitive::Cube,
+    //                  makeTransform(quarryPulley.loadPosition,
+    //                                {0.0f, 5.0f, 0.0f},
+    //                                {2.6f, 1.6f, 2.4f}),
+    //                  MaterialId::LimestoneVariation);
     if (quarryPulley.ropeAttached)
     {
         const glm::vec3 topLeft =
@@ -2313,15 +2325,16 @@ void StaticGizaScene::collectFrameObjects()
             drawPart(part.primitive, part.model, part.material);
     }
 
-    const glm::mat4 loadedRoot = coordinatedAnimationEnabled_
-                                     ? animation.loadedSledgeRoot
-                                     : makeTransform({10.0f, 0.0f, 40.0f}, {},
-                                                     {1.0f, 1.0f, 1.0f});
+    const LogisticsSnapshot logSnap = logistics_.snapshot();
+    const glm::mat4 sledgeRoot = makeTransform(logSnap.sledgePosition, glm::vec3{0.0f, logSnap.sledgeHeading, 0.0f}, glm::vec3{1.0f});
+    const glm::mat4 blockRoot = makeTransform(logSnap.blockPosition, logSnap.blockRotation, glm::vec3{1.0f});
+
     for (const ObjectPart& part : loadedSledgeParts_)
     {
-        if (part.name == "PullingRope")
+        if (part.name == "PullingRope" || part.name == "TransportStone")
             continue;
-        drawPart(part.primitive, loadedRoot * part.localTransform, part.material);
+        
+        drawPart(part.primitive, sledgeRoot * part.localTransform, part.material);
     }
 
     if (coordinatedAnimationEnabled_ && animation.ropeVisible)
@@ -2335,8 +2348,8 @@ void StaticGizaScene::collectFrameObjects()
         };
         const glm::vec3 leftStart = handPoint(evaluatedWorkers[0]);
         const glm::vec3 rightStart = handPoint(evaluatedWorkers[1]);
-        const glm::vec3 leftEnd{loadedRoot * glm::vec4{-0.30f, 0.36f, -2.42f, 1.0f}};
-        const glm::vec3 rightEnd{loadedRoot * glm::vec4{0.30f, 0.36f, -2.42f, 1.0f}};
+        const glm::vec3 leftEnd{sledgeRoot * glm::vec4{-0.30f, 0.36f, -2.42f, 1.0f}};
+        const glm::vec3 rightEnd{sledgeRoot * glm::vec4{0.30f, 0.36f, -2.42f, 1.0f}};
         drawPart(ScenePrimitive::Cylinder,
                  ConstructionAnimationController::cylinderBetween(
                      leftStart, leftEnd, 0.065f),
@@ -2375,11 +2388,13 @@ void StaticGizaScene::collectFrameObjects()
     drawPart(ScenePrimitive::Cylinder,
              ConstructionAnimationController::leverBeamModel(leverAngle),
              MaterialId::Wood);
-    drawPart(ScenePrimitive::Cube,
-             ConstructionAnimationController::leverStoneModel(liftOffset),
-             MaterialId::PreparedStone);
+    // Dummy lever block disabled in favor of real simulation block
+    // drawPart(ScenePrimitive::Cube,
+    //          ConstructionAnimationController::leverStoneModel(liftOffset),
+    //          MaterialId::PreparedStone);
 
     quarry_.collectSceneObjects(frameObjects_);
+    simulation_.collectSceneObjects(frameObjects_);
     logistics_.collectSceneObjects(frameObjects_);
     water_.collectSceneObjects(frameObjects_);
 }

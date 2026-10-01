@@ -39,6 +39,7 @@
 #include "camera/CursorController.h"
 #include "presentation/SimulationHUD.h"
 #include "scene/ConstructionLogistics.h"
+#include "scene/ConstructionSimulation.h"
 #include "scene/QuarrySystem.h"
 #include "scene/SandSimulation.h"
 #include "scene/SphinxMonument.h"
@@ -612,6 +613,7 @@ int main(int argc, char** argv)
     bool lightingValidationOnly = false;
     bool shadowValidationOnly = false;
     bool constructionValidationOnly = false;
+    bool constructionTraceOnly = false;
     bool textureValidationOnly = false;
     bool layoutValidationOnly = false;
     bool instancingValidationOnly = false;
@@ -700,6 +702,8 @@ int main(int argc, char** argv)
             shadowValidationOnly = true;
         else if (option == "--validate-construction")
             constructionValidationOnly = true;
+        else if (option == "--validate-construction-trace")
+            constructionTraceOnly = true;
         else if (option == "--validate-textures")
             textureValidationOnly = true;
         else if (option == "--validate-layout")
@@ -1045,6 +1049,8 @@ int main(int argc, char** argv)
         return validatePhase8Shadows(std::cout) ? 0 : 1;
     if (constructionValidationOnly)
         return validateConstructionTimeline(std::cout) ? 0 : 1;
+    if (constructionTraceOnly)
+        return ConstructionLogistics::validateConstructionTrace(std::cout) ? 0 : 1;
     if (textureValidationOnly)
         return validatePhase9Textures(std::cout) ? 0 : 1;
     if (layoutValidationOnly)

@@ -59,6 +59,7 @@ add_executable(PyramidGiza
     src/presentation/SimulationHUD.cpp
     src/scene/QuarrySystem.cpp
     src/scene/ConstructionLogistics.cpp
+    src/scene/ConstructionSimulation.cpp
     src/scene/SandSimulation.cpp
     src/scene/WaterSimulation.cpp
     src/scene/SphinxMonument.cpp

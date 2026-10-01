@@ -22,6 +22,7 @@
 #include "objects/Worker.h"
 #include "presentation/SimulationHUD.h"
 #include "scene/ConstructionLogistics.h"
+#include "scene/ConstructionSimulation.h"
 #include "scene/PyramidLayout.h"
 #include "scene/PyramidInterior.h"
 #include "scene/QuarrySystem.h"
@@ -356,6 +357,7 @@ private:
 
     QuarrySystem quarry_;
     ConstructionLogistics logistics_;
+    ConstructionSimulation simulation_;
     SandSimulation sand_;
     WaterSimulation water_;
     SphinxMonument sphinx_;
