@@ -55,6 +55,7 @@ struct StaticGizaSceneStats
     std::size_t repairStations = 0;
     std::size_t scaffoldAccessObjects = 0;
     std::size_t upperPlatformObjects = 0;
+    std::size_t cinematicConstructionProps = 0;
     std::size_t riverLandingObjects = 0;
     std::size_t enrichmentObjects = 0;
     std::size_t quarryPulleyObjects = 0;
@@ -245,6 +246,7 @@ private:
         SceneObject object;
         float minimumProgress = 0.0f;
         float maximumProgress = 1.01f;
+        bool cinematicOnly = false;
     };
 
     struct DynamicPulleyWheel

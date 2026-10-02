@@ -138,6 +138,9 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
               << "% of " << pyramidBlocks_.size()
               << " raw layout cells; procedural textures use approximately "
               << textures_.memoryBytes() / 1024u << " KiB\n";
+    std::cout << "Legacy cinematic construction props: "
+              << stats_.cinematicConstructionProps
+              << " retained for timelapse, 0 submitted in physical mode\n";
     std::cout << "Phase 12.8 interior: " << stats_.pyramidGeneratedBlocks
               << " generated, " << stats_.pyramidInteriorExcludedBlocks
               << " permanently excluded, " << stats_.pyramidRenderedStructuralBlocks
@@ -563,10 +566,6 @@ void StaticGizaScene::buildQuarryAndCutting()
                   MaterialId::LimestoneVariation);
 
     const auto& bays = IndustrialLandscape::extractionBays();
-    addObject(ScenePrimitive::Cube,
-              makeTransform({bays[0].center.x, -6.25f, bays[0].center.z}, {},
-                            {5.2f, 1.55f, 5.0f}),
-              MaterialId::QuarryStone);
     for (float offset : {-3.05f, 3.05f})
     {
         addObject(ScenePrimitive::Cube,
@@ -578,15 +577,9 @@ void StaticGizaScene::buildQuarryAndCutting()
                                 {5.0f, 1.25f, 1.20f}),
                   MaterialId::QuarryStone);
     }
-    addObject(ScenePrimitive::Cube,
-              makeTransform({bays[1].center.x, -6.35f, bays[1].center.z}, {},
-                            {4.4f, 1.50f, 4.4f}),
-              MaterialId::Limestone);
-
-    addObject(ScenePrimitive::Cube,
-              makeTransform({bays[2].center.x, -6.20f, bays[2].center.z},
-                            {0.0f, 6.0f, 3.0f}, {4.7f, 1.65f, 4.3f}),
-              MaterialId::Limestone);
+    // QuarrySystem owns the actual Bay A-C stone bodies. The former static
+    // progression cubes occupied these same centers and visibly duplicated
+    // the authoritative deposits, so only the grounded bay cuts/props remain.
     addObject(ScenePrimitive::Cube,
               makeTransform({bays[2].center.x + 3.0f, -6.55f, bays[2].center.z},
                             {0.0f, 0.0f, 45.0f}, {0.65f, 0.65f, 0.85f}),
@@ -981,12 +974,14 @@ void StaticGizaScene::buildObjectEnrichment()
 
 void StaticGizaScene::buildConstructionStages()
 {
+    const std::size_t start = stagedObjects_.size();
     const auto addStaged = [this](ScenePrimitive primitive, const glm::mat4& model,
                                   MaterialId material, float minimum, float maximum)
     {
         if (!isFiniteNonSingularTransform(model))
             throw std::runtime_error("Staged infrastructure has an invalid transform");
-        stagedObjects_.push_back({{primitive, model, material}, minimum, maximum});
+        stagedObjects_.push_back(
+            {{primitive, model, material}, minimum, maximum, true});
     };
 
     // Prepared stones wait on a ground-supported staging lane beside the haul
@@ -1032,6 +1027,7 @@ void StaticGizaScene::buildConstructionStages()
         for (const ObjectPart& part : emptySledge)
             addStaged(part.primitive, stagedSledge.first * part.localTransform,
                       part.material, stagedSledge.second.x, stagedSledge.second.y);
+    stats_.cinematicConstructionProps = stagedObjects_.size() - start;
 }
 
 void StaticGizaScene::buildRopeInfrastructure()
@@ -2292,7 +2288,8 @@ void StaticGizaScene::collectFrameObjects()
     }
     const float constructionProgress = constructionTimeline_.progress();
     for (const StagedSceneObject& staged : stagedObjects_)
-        if (SceneSupport::stageActive(constructionProgress,
+        if ((!staged.cinematicOnly || !physicalConstructionMode()) &&
+            SceneSupport::stageActive(constructionProgress,
                                       staged.minimumProgress,
                                       staged.maximumProgress))
             frameObjects_.push_back(staged.object);
