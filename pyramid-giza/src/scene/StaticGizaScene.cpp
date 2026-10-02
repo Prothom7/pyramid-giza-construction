@@ -1647,7 +1647,8 @@ void StaticGizaScene::update(float deltaTime)
     const glm::vec3 previousSledge = previousSledgePosition_;
     sunController_.update(deltaTime);
     constructionTimeline_.update(deltaTime);
-    if (constructionTimeline_.progress() <= 0.85f)
+    if (!physicalConstructionMode() &&
+        constructionTimeline_.progress() <= 0.85f)
         quarryPulleyController_.update(deltaTime);
     if (coordinatedAnimationEnabled_)
         animationController_.update(deltaTime);
@@ -1659,7 +1660,8 @@ void StaticGizaScene::update(float deltaTime)
     const float simulationMultiplier = constructionTimeline_.playing() ? constructionTimeline_.speed() * 60.0f : 1.0f;
     const float simDelta = deltaTime * simulationMultiplier;
     quarry_.update(simDelta, simulation_);
-    logistics_.update(simDelta, simulation_, quarry_, constructionTimeline_, quarryPulleyController_);
+    logistics_.update(simDelta, simulation_, quarry_, constructionTimeline_,
+                      quarryPulleyController_, physicalConstructionMode());
     sand_.update(deltaTime, logistics_.snapshot().sledgePosition);
     if (sand_.enabled()) sandMesh_.upload(sand_.generateTerrainMesh());
     water_.update(deltaTime);
@@ -1954,6 +1956,9 @@ void StaticGizaScene::toggleConstructionTimelapse()
 
 void StaticGizaScene::setCinematicConstructionMode()
 {
+    if (quarryPulleyController_.physicalBlockAttached())
+        quarryPulleyController_.seek(
+            quarryPulleyController_.elapsedTime(), true);
     pyramidConstructionMode_ =
         PyramidConstructionRenderMode::CinematicTimelapse;
 }
@@ -2302,7 +2307,9 @@ void StaticGizaScene::collectFrameObjects()
     }
 
     const QuarryPulleySnapshot quarryPulley =
-        constructionProgress <= 0.85f
+        physicalConstructionMode()
+            ? quarryPulleyController_.snapshot()
+            : constructionProgress <= 0.85f
             ? quarryPulleyController_.snapshot()
             : QuarryPulleyAnimationController::snapshotAt(0.0f);
     const auto appendPulleyPart = [&](ScenePrimitive primitive,

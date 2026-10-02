@@ -53,7 +53,8 @@ public:
     void update(float deltaTime, ConstructionSimulation& simulation,
                 QuarrySystem& quarry,
                 ConstructionTimelineController& timeline,
-                QuarryPulleyAnimationController& pulley);
+                QuarryPulleyAnimationController& pulley,
+                bool physicalLiftEnabled = true);
     void reset();
 
     LogisticsSnapshot snapshot() const;
@@ -72,10 +73,10 @@ public:
 
 private:
     void advanceState(ConstructionSimulation& simulation, QuarrySystem& quarry, ConstructionTimelineController& timeline,
-                      QuarryPulleyAnimationController& pulley);
+                      QuarryPulleyAnimationController& pulley,
+                      bool physicalLiftEnabled);
     glm::vec3 computeHaulPosition(float progress) const;
     glm::vec3 computeRampPosition(float progress) const;
-    glm::vec3 computeLiftPosition(float progress) const;
     glm::vec3 computePlacementPosition(float progress, ConstructionSimulation& simulation) const;
 
     LogisticsState state_ = LogisticsState::QuarryReady;

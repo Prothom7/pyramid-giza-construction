@@ -15,6 +15,21 @@
 
 namespace
 {
+constexpr glm::vec3 cargoSocketOffset{0.0f, 1.36f, -0.02f};
+
+glm::vec3 pulleySledgeParkPosition()
+{
+    const glm::vec3 pickup =
+        QuarryPulleyAnimationController::startLoadPosition();
+    return {pickup.x - 3.6f,
+            QuarryPulleyAnimationController::quarryFloorY(), pickup.z};
+}
+
+glm::vec3 pulleyMountedCargoPosition()
+{
+    return pulleySledgeParkPosition() + cargoSocketOffset;
+}
+
 float stateBaseDuration(LogisticsState state)
 {
     switch (state)
@@ -127,23 +142,19 @@ glm::vec3 ConstructionLogistics::computeHaulPosition(float progress) const
 
 glm::vec3 ConstructionLogistics::computeRampPosition(float progress) const
 {
-    // Ramp base up to lift level
+    // The legacy state name is retained, but the physical route now finishes
+    // beside the actual supported quarry pulley rather than an imaginary lift.
     const glm::vec3 rampStart{0.0f, 1.0f, 45.0f};
-    const glm::vec3 rampEnd{0.0f, 8.55f, -0.8f};
+    const glm::vec3 rampEnd = pulleySledgeParkPosition();
     return glm::mix(rampStart, rampEnd, progress);
-}
-
-glm::vec3 ConstructionLogistics::computeLiftPosition(float progress) const
-{
-    const glm::vec3 liftBottom{0.0f, 8.55f, -0.8f};
-    const glm::vec3 liftTop{0.0f, 15.35f, -0.8f};
-    return glm::mix(liftBottom, liftTop, progress);
 }
 
 glm::vec3 ConstructionLogistics::computePlacementPosition(float progress, ConstructionSimulation& simulation) const
 {
-    // Upper platform staging to actual target position
-    const glm::vec3 stagePos{0.0f, 8.55f, -0.8f};
+    // Placement begins at the real pulley lift top. Final target travel remains
+    // a later-task concern, but there is no longer a 6.8-unit downward snap.
+    const glm::vec3 stagePos =
+        QuarryPulleyAnimationController::raisedLoadPosition();
     glm::vec3 frontierPos = stagePos;
     
     if (activeBlockId_ != 0) {
@@ -160,7 +171,8 @@ glm::vec3 ConstructionLogistics::computePlacementPosition(float progress, Constr
 
 void ConstructionLogistics::advanceState(ConstructionSimulation& simulation, QuarrySystem& quarry,
                                         ConstructionTimelineController& timeline,
-                                        QuarryPulleyAnimationController& pulley)
+                                        QuarryPulleyAnimationController& pulley,
+                                        bool physicalLiftEnabled)
 {
     const LogisticsState oldState = state_;
     stateTimer_ = 0.0f;
@@ -215,25 +227,40 @@ void ConstructionLogistics::advanceState(ConstructionSimulation& simulation, Qua
         state_ = LogisticsState::LiftPrep;
         activeWorkers_ = 6;
         ropeTaut_ = false;
-        pulley.seek(0.0f, true);
+        if (physicalLiftEnabled &&
+            !pulley.setPhysicalPreparationProgress(activeBlockId_, 0.0f))
+            throw std::runtime_error(
+                "Failed to attach authoritative block to physical pulley");
         break;
 
     case LogisticsState::LiftPrep:
         state_ = LogisticsState::Lifting;
         activeWorkers_ = 6;
         ropeTaut_ = true;
+        if (physicalLiftEnabled &&
+            !pulley.setPhysicalLiftProgress(activeBlockId_, 0.0f))
+            throw std::runtime_error(
+                "Physical pulley lost the authoritative block before lifting");
         break;
 
     case LogisticsState::Lifting:
         state_ = LogisticsState::UpperStaging;
         activeWorkers_ = 6;
         ropeTaut_ = false;
+        if (physicalLiftEnabled &&
+            !pulley.holdPhysicalBlockAtLiftTop(activeBlockId_))
+            throw std::runtime_error(
+                "Physical pulley failed to retain the block at lift top");
         break;
 
     case LogisticsState::UpperStaging:
         state_ = LogisticsState::Placement;
         activeWorkers_ = 6;
         ropeTaut_ = false;
+        if (physicalLiftEnabled &&
+            !pulley.releasePhysicalBlock(activeBlockId_))
+            throw std::runtime_error(
+                "Physical pulley released an unexpected block identity");
         break;
 
     case LogisticsState::Placement:
@@ -269,7 +296,8 @@ void ConstructionLogistics::advanceState(ConstructionSimulation& simulation, Qua
 void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simulation,
                                    QuarrySystem& quarry,
                                    ConstructionTimelineController& timeline,
-                                   QuarryPulleyAnimationController& pulley)
+                                   QuarryPulleyAnimationController& pulley,
+                                   bool physicalLiftEnabled)
 {
     if (!std::isfinite(deltaTime) || deltaTime <= 0.0f)
         return;
@@ -279,8 +307,6 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     stateProgress_ = std::min(1.0f, stateTimer_ / duration);
 
     bool shouldAdvance = false;
-    glm::vec3 currentTargetPos = blockPosition_;
-    
     switch (state_) {
         case LogisticsState::QuarryReady:
         case LogisticsState::Extracting:
@@ -292,7 +318,8 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     }
 
     if (shouldAdvance && state_ != LogisticsState::QuarryReady) {
-        advanceState(simulation, quarry, timeline, pulley);
+        advanceState(simulation, quarry, timeline, pulley,
+                     physicalLiftEnabled);
         if (state_ == LogisticsState::QuarryReady) {
             return;
         }
@@ -305,7 +332,8 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     {
     case LogisticsState::QuarryReady:
     {
-        advanceState(simulation, quarry, timeline, pulley);
+        advanceState(simulation, quarry, timeline, pulley,
+                     physicalLiftEnabled);
         break;
     }
     
@@ -317,7 +345,6 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     {
         sledgePosition_ = glm::vec3{-108.0f, -6.0f, -5.0f};
         sledgeHeading_ = 0.0f;
-        const glm::vec3 cargoSocketOffset{0.0f, 1.36f, -0.02f};
         const glm::vec3 groundStaging{-108.0f, -5.2f, -5.0f}; // Resting on ground (Y=-6.0 + 0.8)
         const glm::vec3 mountedOnSledge = sledgePosition_ + cargoSocketOffset;
         blockPosition_ = glm::mix(groundStaging, mountedOnSledge, stateProgress_);
@@ -357,37 +384,70 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     }
     case LogisticsState::LiftPrep:
     {
-        sledgePosition_ = computeRampPosition(1.0f);
+        sledgePosition_ = pulleySledgeParkPosition();
         sledgeHeading_ = 0.0f;
-        blockPosition_ = sledgePosition_ + glm::vec3(0.0f, 1.36f, -0.02f);
+        if (physicalLiftEnabled)
+        {
+            if (!pulley.setPhysicalPreparationProgress(activeBlockId_,
+                                                       stateProgress_))
+                throw std::runtime_error(
+                    "Physical pulley preparation rejected the active block");
+            // Finish positioning the stone before the controller reaches its
+            // tension phase, so the sling always closes on the real payload.
+            const float positioning = glm::smoothstep(
+                0.0f, 0.55f, stateProgress_);
+            blockPosition_ = glm::mix(
+                pulleyMountedCargoPosition(),
+                QuarryPulleyAnimationController::startLoadPosition(),
+                positioning);
+        }
+        else
+            blockPosition_ = pulleyMountedCargoPosition();
         blockRotation_ = glm::vec3{0.0f};
         break;
     }
     case LogisticsState::Lifting:
     {
-        liftHeight_ = glm::smoothstep(0.0f, 1.0f, stateProgress_) * 5.8f;
-        sledgePosition_ = computeRampPosition(1.0f);
+        sledgePosition_ = pulleySledgeParkPosition();
         sledgeHeading_ = 0.0f;
-        const glm::vec3 liftAttachment = sledgePosition_ + glm::vec3(0.0f, 1.36f, -0.02f) + glm::vec3{0.0f, liftHeight_, 0.0f};
-        blockPosition_ = liftAttachment;
+        if (physicalLiftEnabled)
+        {
+            if (!pulley.setPhysicalLiftProgress(activeBlockId_, stateProgress_))
+                throw std::runtime_error(
+                    "Physical pulley lift rejected the active block");
+            const QuarryPulleySnapshot lift = pulley.snapshot();
+            blockPosition_ = lift.loadPosition;
+            liftHeight_ = blockPosition_.y -
+                          QuarryPulleyAnimationController::startLoadPosition().y;
+        }
+        else
+        {
+            const float eased = glm::smoothstep(0.0f, 1.0f, stateProgress_);
+            blockPosition_ = glm::mix(
+                QuarryPulleyAnimationController::startLoadPosition(),
+                QuarryPulleyAnimationController::raisedLoadPosition(), eased);
+            liftHeight_ = blockPosition_.y -
+                          QuarryPulleyAnimationController::startLoadPosition().y;
+        }
         blockRotation_ = glm::vec3{0.0f};
         break;
     }
 
     case LogisticsState::UpperStaging:
-        sledgePosition_ = computeRampPosition(1.0f);
-        blockPosition_ = glm::vec3{0.0f, 15.35f, -0.8f};
+        sledgePosition_ = pulleySledgeParkPosition();
+        blockPosition_ =
+            QuarryPulleyAnimationController::raisedLoadPosition();
         blockRotation_ = glm::vec3{0.0f};
         break;
 
     case LogisticsState::Placement:
-        sledgePosition_ = computeRampPosition(1.0f);
+        sledgePosition_ = pulleySledgeParkPosition();
         blockPosition_ = computePlacementPosition(stateProgress_, simulation);
         blockRotation_ = glm::vec3{0.0f};
         break;
 
     case LogisticsState::Settled:
-        sledgePosition_ = computeRampPosition(1.0f);
+        sledgePosition_ = pulleySledgeParkPosition();
         blockPosition_ = computePlacementPosition(1.0f, simulation);
         blockRotation_ = glm::vec3{0.0f};
         break;
@@ -418,9 +478,178 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     }
 }
 
+namespace
+{
+bool validatePhysicalPulleyIntegration(std::ostream& output)
+{
+    ConstructionSimulation simulation;
+    QuarrySystem quarry;
+    ConstructionTimelineController timeline;
+    QuarryPulleyAnimationController pulley;
+    ConstructionLogistics logistics;
+
+    simulation.initialize(
+        PyramidLayout::generateComplete(PyramidLayoutConfig{}));
+    timeline.setProgress(0.0f);
+    quarry.startExtraction(simulation, 0);
+    if (simulation.activeBlocks.empty())
+    {
+        output << "Phase 13 physical pulley integration validation\n"
+               << "  authoritative block creation: FAIL\n";
+        return false;
+    }
+
+    const std::uint64_t blockId = simulation.activeBlocks.back().id;
+    bool pickupReached = false;
+    bool attachmentAligned = true;
+    bool ropeAligned = true;
+    bool sameIdentity = true;
+    bool singlePayload = true;
+    std::size_t maximumSimulationCubes = 0;
+    std::size_t maximumMatchingPayloadCubes = 0;
+    bool logisticsDummyDetected = false;
+    bool liftSampled = false;
+    bool topReached = false;
+    float maximumAttachmentError = 0.0f;
+    glm::vec3 pickupBlock{0.0f};
+    glm::vec3 liftTopBlock{0.0f};
+
+    constexpr float deltaTime = 0.05f;
+    constexpr int maximumSteps = 10000;
+    for (int step = 0; step < maximumSteps && !topReached; ++step)
+    {
+        quarry.update(deltaTime, simulation);
+        logistics.update(deltaTime, simulation, quarry, timeline, pulley, true);
+
+        ConstructionBlock* block = simulation.getBlock(blockId);
+        if (block == nullptr)
+        {
+            sameIdentity = false;
+            break;
+        }
+
+        const QuarryPulleySnapshot snapshot = pulley.snapshot();
+        if (logistics.state() == LogisticsState::LiftPrep &&
+            logistics.stateProgress() >= 0.90f)
+        {
+            pickupBlock = block->position;
+            pickupReached =
+                glm::distance(block->position,
+                              QuarryPulleyAnimationController::startLoadPosition()) <=
+                1.0e-3f;
+            sameIdentity = sameIdentity &&
+                           pulley.activePhysicalBlockId() == blockId;
+        }
+        else if (logistics.state() == LogisticsState::Lifting)
+        {
+            liftSampled = true;
+            const glm::vec3 blockAttachment =
+                block->position +
+                QuarryPulleyAnimationController::loadAttachmentOffset();
+            const float attachmentError =
+                glm::distance(blockAttachment, snapshot.loadAttachmentPoint);
+            maximumAttachmentError =
+                std::max(maximumAttachmentError, attachmentError);
+            attachmentAligned = attachmentAligned &&
+                                glm::distance(block->position,
+                                              snapshot.loadPosition) <= 1.0e-3f &&
+                                attachmentError <= 1.0e-3f;
+            ropeAligned = ropeAligned && snapshot.ropeAttached &&
+                          glm::distance(snapshot.ropeEnd,
+                                        blockAttachment) <= 1.0e-3f;
+            sameIdentity = sameIdentity &&
+                           pulley.activePhysicalBlockId() == blockId;
+
+            std::vector<SceneObject> simulationObjects;
+            std::vector<SceneObject> logisticsObjects;
+            simulation.collectSceneObjects(simulationObjects);
+            logistics.collectSceneObjects(logisticsObjects);
+            const std::size_t simulationCubes =
+                static_cast<std::size_t>(std::count_if(
+                    simulationObjects.begin(), simulationObjects.end(),
+                    [](const SceneObject& object) {
+                        return object.primitive == ScenePrimitive::Cube;
+                    }));
+            const std::size_t matchingPayloadCubes =
+                static_cast<std::size_t>(std::count_if(
+                    simulationObjects.begin(), simulationObjects.end(),
+                    [block](const SceneObject& object) {
+                        return object.primitive == ScenePrimitive::Cube &&
+                               glm::distance(glm::vec3{object.model[3]},
+                                             block->position) <= 1.0e-3f;
+                    }));
+            const bool logisticsHasDummy = std::any_of(
+                logisticsObjects.begin(), logisticsObjects.end(),
+                [](const SceneObject& object) {
+                    return object.primitive == ScenePrimitive::Cube;
+                });
+            maximumSimulationCubes =
+                std::max(maximumSimulationCubes, simulationCubes);
+            maximumMatchingPayloadCubes = std::max(
+                maximumMatchingPayloadCubes, matchingPayloadCubes);
+            logisticsDummyDetected =
+                logisticsDummyDetected || logisticsHasDummy;
+            singlePayload = singlePayload && matchingPayloadCubes == 1 &&
+                            !logisticsHasDummy;
+        }
+        else if (logistics.state() == LogisticsState::UpperStaging)
+        {
+            liftTopBlock = block->position;
+            topReached =
+                glm::distance(block->position,
+                              QuarryPulleyAnimationController::raisedLoadPosition()) <=
+                    1.0e-3f &&
+                glm::distance(block->position, snapshot.loadPosition) <=
+                    1.0e-3f &&
+                pulley.activePhysicalBlockId() == blockId;
+        }
+    }
+
+    const glm::vec3 sledge = logistics.snapshot().sledgePosition;
+    const glm::vec3 pickup =
+        QuarryPulleyAnimationController::startLoadPosition();
+    const float horizontalSledgeDistance = glm::length(glm::vec2{
+        sledge.x - pickup.x, sledge.z - pickup.z});
+    const bool sledgeAtRig = horizontalSledgeDistance <= 5.0f;
+    const bool valid = pickupReached && liftSampled && attachmentAligned &&
+                       ropeAligned && sameIdentity && singlePayload &&
+                       topReached && sledgeAtRig;
+
+    output << std::fixed << std::setprecision(3)
+           << "Phase 13 physical pulley integration validation\n"
+           << "  authoritative block ID: " << blockId << '\n'
+           << "  pulley pickup: (" << pickup.x << ", " << pickup.y << ", "
+           << pickup.z << ")\n"
+           << "  block pickup: (" << pickupBlock.x << ", " << pickupBlock.y
+           << ", " << pickupBlock.z << ") "
+           << (pickupReached ? "PASS" : "FAIL") << '\n'
+           << "  maximum attachment/rope error: "
+           << maximumAttachmentError << ' '
+           << (attachmentAligned && ropeAligned ? "PASS" : "FAIL") << '\n'
+           << "  same block identity throughout lift: "
+           << (sameIdentity ? "PASS" : "FAIL") << '\n'
+           << "  one matching simulation payload and no logistics dummy: "
+           << (singlePayload ? "PASS" : "FAIL")
+           << " (matching " << maximumMatchingPayloadCubes
+           << ", all active simulation cubes " << maximumSimulationCubes
+           << ", logistics dummy "
+           << (logisticsDummyDetected ? "YES" : "NO") << ")\n"
+           << "  sledge reaches visible pulley area: "
+           << (sledgeAtRig ? "PASS" : "FAIL") << '\n'
+           << "  lift top: (" << liftTopBlock.x << ", " << liftTopBlock.y
+           << ", " << liftTopBlock.z << ") "
+           << (topReached ? "PASS" : "FAIL") << '\n'
+           << (valid ? "Physical pulley integration checks passed.\n"
+                     : "Physical pulley integration checks failed.\n");
+    return valid;
+}
+} // namespace
+
 bool ConstructionLogistics::validateConstructionLogistics(std::ostream& output)
 {
-    return validateConstructionOccupancy(output);
+    const bool occupancyValid = validateConstructionOccupancy(output);
+    const bool pulleyValid = validatePhysicalPulleyIntegration(output);
+    return occupancyValid && pulleyValid;
 }
 
 bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)
@@ -521,7 +750,7 @@ bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)
 
 void ConstructionLogistics::collectSceneObjects(std::vector<SceneObject>& objects) const
 {
-    // If block is currently being hauled, lifted, or placed, render the active block
+    // The authoritative block body is rendered by ConstructionSimulation.
     if (state_ == LogisticsState::Staged || state_ == LogisticsState::SledgeLoading || state_ == LogisticsState::Hauling ||
         state_ == LogisticsState::RampApproach || state_ == LogisticsState::RampAscent ||
         state_ == LogisticsState::LiftPrep || state_ == LogisticsState::Lifting ||
@@ -540,22 +769,6 @@ void ConstructionLogistics::collectSceneObjects(std::vector<SceneObject>& object
             }
         }
 
-        // Pulley lifting sling during lift
-        if (state_ == LogisticsState::Lifting)
-        {
-            // Vertical hoisting cable
-            objects.push_back({ScenePrimitive::Cylinder,
-                               makeTransform(blockPosition_ + glm::vec3{0.0f, 3.5f, 0.0f},
-                                             {}, {0.07f, 6.0f, 0.07f}),
-                               MaterialId::Rope});
-            // Sling cradle straps
-            for (float xOffset : {-1.0f, 1.0f})
-            {
-                objects.push_back({ScenePrimitive::Cylinder,
-                                   makeTransform(blockPosition_ + glm::vec3{xOffset, 0.0f, 0.0f},
-                                                 {0.0f, 0.0f, 0.0f}, {0.05f, 1.4f, 0.05f}),
-                                   MaterialId::Rope});
-            }
-        }
+        // The quarry pulley renderer owns the only hoisting rope and sling.
     }
 }

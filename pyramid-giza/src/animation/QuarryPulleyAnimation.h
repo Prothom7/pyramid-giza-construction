@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <iosfwd>
 
 #include <glm/glm.hpp>
@@ -45,12 +46,18 @@ public:
     void update(float deltaTime);
     void reset();
     void seek(float elapsedTime, bool playing = true);
+    bool setPhysicalPreparationProgress(std::uint64_t blockId, float progress);
+    bool setPhysicalLiftProgress(std::uint64_t blockId, float progress);
+    bool holdPhysicalBlockAtLiftTop(std::uint64_t blockId);
+    bool releasePhysicalBlock(std::uint64_t blockId);
     void togglePaused() { paused_ = !paused_; }
     void setPaused(bool paused) { paused_ = paused; }
     void setLooping(bool looping) { looping_ = looping; }
 
     bool paused() const { return paused_; }
     bool looping() const { return looping_; }
+    bool physicalBlockAttached() const { return activePhysicalBlockId_ != 0; }
+    std::uint64_t activePhysicalBlockId() const { return activePhysicalBlockId_; }
     float elapsedTime() const { return static_cast<float>(elapsedTime_); }
     QuarryPulleySnapshot snapshot() const;
 
@@ -65,6 +72,7 @@ public:
     static glm::vec3 destinationLoadPosition();
     static glm::vec3 frameLeftBase();
     static glm::vec3 frameRightBase();
+    static glm::vec3 loadAttachmentOffset();
     static float quarryFloorY() { return -7.45f; }
     static float destinationPlatformTopY() { return -2.60f; }
     static float wheelRadius() { return 0.75f; }
@@ -73,6 +81,7 @@ private:
     double elapsedTime_ = 0.0;
     bool paused_ = false;
     bool looping_ = true;
+    std::uint64_t activePhysicalBlockId_ = 0;
 };
 
 bool validateQuarryPulleyAnimation(std::ostream& output);

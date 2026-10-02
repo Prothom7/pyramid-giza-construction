@@ -61,7 +61,10 @@ float startTime(QuarryPulleyState state)
 
 void QuarryPulleyAnimationController::update(float deltaTime)
 {
-    if (paused_ || !std::isfinite(deltaTime) || deltaTime <= 0.0f)
+    // Physical logistics sets the controller from its normalized state progress.
+    // The free-running clock remains exclusively for cinematic presentation.
+    if (activePhysicalBlockId_ != 0 || paused_ || !std::isfinite(deltaTime) ||
+        deltaTime <= 0.0f)
         return;
     elapsedTime_ += static_cast<double>(deltaTime);
     const double duration = static_cast<double>(sequenceDuration());
@@ -79,12 +82,14 @@ void QuarryPulleyAnimationController::reset()
 {
     elapsedTime_ = 0.0f;
     paused_ = false;
+    activePhysicalBlockId_ = 0;
 }
 
 void QuarryPulleyAnimationController::seek(float elapsedTime, bool playing)
 {
     if (!std::isfinite(elapsedTime))
         return;
+    activePhysicalBlockId_ = 0;
     const double duration = static_cast<double>(sequenceDuration());
     if (looping_)
     {
@@ -96,6 +101,61 @@ void QuarryPulleyAnimationController::seek(float elapsedTime, bool playing)
     else
         elapsedTime_ = std::clamp(static_cast<double>(elapsedTime), 0.0, duration);
     paused_ = !playing;
+}
+
+bool QuarryPulleyAnimationController::setPhysicalPreparationProgress(
+    std::uint64_t blockId, float progress)
+{
+    if (blockId == 0 ||
+        (activePhysicalBlockId_ != 0 && activePhysicalBlockId_ != blockId) ||
+        !std::isfinite(progress))
+        return false;
+
+    activePhysicalBlockId_ = blockId;
+    paused_ = true;
+    const float attachStart = startTime(QuarryPulleyState::Attach);
+    const float liftStart = startTime(QuarryPulleyState::Lift);
+    elapsedTime_ = glm::mix(attachStart, liftStart,
+                            std::clamp(progress, 0.0f, 1.0f));
+    return true;
+}
+
+bool QuarryPulleyAnimationController::setPhysicalLiftProgress(
+    std::uint64_t blockId, float progress)
+{
+    if (blockId == 0 ||
+        (activePhysicalBlockId_ != 0 && activePhysicalBlockId_ != blockId) ||
+        !std::isfinite(progress))
+        return false;
+
+    activePhysicalBlockId_ = blockId;
+    paused_ = true;
+    const float liftStart = startTime(QuarryPulleyState::Lift);
+    elapsedTime_ = liftStart + std::clamp(progress, 0.0f, 1.0f) *
+                                   stateDuration(QuarryPulleyState::Lift);
+    return true;
+}
+
+bool QuarryPulleyAnimationController::holdPhysicalBlockAtLiftTop(
+    std::uint64_t blockId)
+{
+    if (blockId == 0 ||
+        (activePhysicalBlockId_ != 0 && activePhysicalBlockId_ != blockId))
+        return false;
+    activePhysicalBlockId_ = blockId;
+    paused_ = true;
+    elapsedTime_ = startTime(QuarryPulleyState::UpperHold);
+    return true;
+}
+
+bool QuarryPulleyAnimationController::releasePhysicalBlock(
+    std::uint64_t blockId)
+{
+    if (blockId == 0 || activePhysicalBlockId_ != blockId)
+        return false;
+    activePhysicalBlockId_ = 0;
+    paused_ = true;
+    return true;
 }
 
 QuarryPulleySnapshot QuarryPulleyAnimationController::snapshot() const
@@ -171,8 +231,7 @@ QuarryPulleySnapshot QuarryPulleyAnimationController::snapshotAt(float elapsedTi
     }
 
     result.pulleyPoint = result.carriagePosition;
-    result.loadAttachmentPoint = result.loadPosition +
-                                 glm::vec3{0.0f, loadHalfHeight + slingHeight, 0.0f};
+    result.loadAttachmentPoint = result.loadPosition + loadAttachmentOffset();
     result.ropeAttached = state >= QuarryPulleyState::Tension &&
                           state <= QuarryPulleyState::Lower;
     if (state == QuarryPulleyState::Idle)
@@ -287,6 +346,11 @@ glm::vec3 QuarryPulleyAnimationController::frameLeftBase()
 glm::vec3 QuarryPulleyAnimationController::frameRightBase()
 {
     return {-108.0f, quarryFloorY(), -10.0f};
+}
+
+glm::vec3 QuarryPulleyAnimationController::loadAttachmentOffset()
+{
+    return {0.0f, loadHalfHeight + slingHeight, 0.0f};
 }
 
 bool validateQuarryPulleyAnimation(std::ostream& output)
