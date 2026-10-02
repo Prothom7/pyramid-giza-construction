@@ -14,6 +14,7 @@
 #include "objects/Scaffold.h"
 #include "scene/ObjectEnrichment.h"
 #include "scene/PyramidLayout.h"
+#include "scene/SandSimulation.h"
 #include "scene/SceneTypes.h"
 
 namespace
@@ -115,10 +116,12 @@ bool footprintContains(const HorizontalFootprint& support,
 SupportSurface terrainAt(const glm::vec2& point)
 {
     if (point.x < -112.0f && point.y > -30.0f && point.y < 3.0f)
-        return {"QuarryFloor", SupportSurfaceKind::QuarryFloor, -7.50f,
-                {0.0f, 1.0f, 0.0f}, true};
-    return {"DesertGround", SupportSurfaceKind::DesertGround, 0.0f,
-            {0.0f, 1.0f, 0.0f}, true};
+        return {"QuarryFloor", SupportSurfaceKind::QuarryFloor,
+                SandSimulation::staticTerrainHeightAt(point.x, point.y),
+                SandSimulation::staticTerrainNormalAt(point.x, point.y), true};
+    return {"DesertGround", SupportSurfaceKind::DesertGround,
+            SandSimulation::staticTerrainHeightAt(point.x, point.y),
+            SandSimulation::staticTerrainNormalAt(point.x, point.y), true};
 }
 
 float rampUndersideY(const RampDescriptor& ramp, float rampProgress)

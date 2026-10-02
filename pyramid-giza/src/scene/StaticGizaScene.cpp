@@ -205,32 +205,10 @@ void StaticGizaScene::addStaticSledge(const glm::vec3& position, float rotationY
 
 void StaticGizaScene::buildGround()
 {
-    // Four expanded slabs cover all content with a presentation margin while
-    // retaining an actual opening for the recessed open-cut quarry.
-    addObject(ScenePrimitive::Plane,
-              makeTransform({-184.0f, -0.02f, -45.0f}, {}, {52.0f, 1.0f, 330.0f}),
-              MaterialId::Sand);
-    addObject(ScenePrimitive::Plane,
-              makeTransform({56.0f, -0.02f, -45.0f}, {}, {308.0f, 1.0f, 330.0f}),
-              MaterialId::Sand);
-    addObject(ScenePrimitive::Plane,
-              makeTransform({-128.0f, -0.02f, 67.5f}, {}, {60.0f, 1.0f, 105.0f}),
-              MaterialId::Sand);
-    addObject(ScenePrimitive::Plane,
-              makeTransform({-128.0f, -0.02f, -132.5f}, {}, {60.0f, 1.0f, 155.0f}),
-              MaterialId::Sand);
-    addObject(ScenePrimitive::Cube,
-              makeTransform({-211.5f, -0.32f, -45.0f}, {}, {3.0f, 0.6f, 336.0f}),
-              MaterialId::RampEarth);
-    addObject(ScenePrimitive::Cube,
-              makeTransform({211.5f, -0.32f, -45.0f}, {}, {3.0f, 0.6f, 336.0f}),
-              MaterialId::RampEarth);
-    addObject(ScenePrimitive::Cube,
-              makeTransform({0.0f, -0.32f, -211.5f}, {}, {420.0f, 0.6f, 3.0f}),
-              MaterialId::RampEarth);
-    addObject(ScenePrimitive::Cube,
-              makeTransform({0.0f, -0.32f, 121.5f}, {}, {420.0f, 0.6f, 3.0f}),
-              MaterialId::RampEarth);
+    // One shared indexed heightfield replaces the former four overlapping
+    // planes and four perimeter slabs. Its vertex heights are also the source
+    // used by SceneSupport::terrainAt(), preventing render/query divergence.
+    sandMesh_.upload(sand_.generateTerrainMesh());
 }
 
 void StaticGizaScene::buildPyramid()
@@ -1664,8 +1642,8 @@ void StaticGizaScene::update(float deltaTime)
     quarry_.update(simDelta, simulation_);
     logistics_.update(simDelta, simulation_, quarry_, constructionTimeline_,
                       quarryPulleyController_, physicalConstructionMode());
-    sand_.update(deltaTime, logistics_.snapshot().sledgePosition);
-    if (sand_.enabled()) sandMesh_.upload(sand_.generateTerrainMesh());
+    // Phase 13 static terrain foundation: dynamic wind/traffic deformation is
+    // intentionally deferred. SandSimulation remains the sole height source.
     water_.update(deltaTime);
     if (deltaTime > 1.0e-5f)
         currentFps_ = 0.9f * currentFps_ + 0.1f * (1.0f / deltaTime);
@@ -1932,6 +1910,7 @@ void StaticGizaScene::resetAnimation()
     logistics_.reset();
     simulation_.reset();
     sand_.reset();
+    sandMesh_.upload(sand_.generateTerrainMesh());
     water_.reset();
     demoPose_ = WorkerPose::Standing;
     articulationTime_ = 0.0f;

@@ -40,9 +40,16 @@ struct SandSimulationStats
 class SandSimulation
 {
 public:
-    static constexpr int GridResolution = 36;
-    static constexpr float GridExtent = 300.0f; // -150 to +150 meters
-    static constexpr float CellSize = GridExtent / static_cast<float>(GridResolution);
+    static constexpr int GridColumns = 129;
+    static constexpr int GridRows = 101;
+    static constexpr float WorldMinX = -210.0f;
+    static constexpr float WorldMaxX = 210.0f;
+    static constexpr float WorldMinZ = -210.0f;
+    static constexpr float WorldMaxZ = 120.0f;
+    static constexpr float CellSizeX =
+        (WorldMaxX - WorldMinX) / static_cast<float>(GridColumns - 1);
+    static constexpr float CellSizeZ =
+        (WorldMaxZ - WorldMinZ) / static_cast<float>(GridRows - 1);
     static constexpr float ReposeThreshold = 0.35f;
 
     SandSimulation();
@@ -59,6 +66,9 @@ public:
     void setWind(const glm::vec2& dir, float speed);
 
     float sandHeightAt(float worldX, float worldZ) const;
+    float terrainHeightAt(float worldX, float worldZ) const;
+    static float staticTerrainHeightAt(float worldX, float worldZ);
+    static glm::vec3 staticTerrainNormalAt(float worldX, float worldZ);
     SandCellState cellStateAt(float worldX, float worldZ) const;
     const SandCell& cellAt(int x, int z) const { return grid_[gridIndex(x, z)]; }
     SandSimulationStats stats() const;
@@ -73,9 +83,11 @@ private:
     void simulateWindTransport(float deltaTime);
     void simulateReposeRelaxation(float deltaTime);
     void applyTrafficDisturbance(const glm::vec3& sledgePos);
-    int gridIndex(int x, int z) const { return z * GridResolution + x; }
+    int gridIndex(int x, int z) const { return z * GridColumns + x; }
     glm::vec2 cellWorldPos(int x, int z) const;
-    bool worldToGrid(float worldX, float worldZ, int& outX, int& outZ) const;
+    bool worldToGrid(float worldX, float worldZ, int& outX, int& outZ,
+                     float& localX, float& localZ) const;
+    float sampleSurface(float worldX, float worldZ, bool sandDepthOnly) const;
 
     std::vector<SandCell> grid_;
     glm::vec2 windDirection_{-0.707f, 0.707f};
