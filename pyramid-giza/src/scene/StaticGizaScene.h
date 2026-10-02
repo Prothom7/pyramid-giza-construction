@@ -103,6 +103,7 @@ class StaticGizaScene
 public:
     explicit StaticGizaScene(int shadowResolution = ShadowSettings::defaultResolution,
                              std::size_t particleCapacity = ParticleSystem::defaultCapacity);
+    ~StaticGizaScene();
 
     void render(const glm::mat4& view, const glm::mat4& projection,
                 const glm::vec3& cameraPosition,

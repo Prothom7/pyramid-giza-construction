@@ -155,6 +155,12 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
               << " dynamic frontier batches; conservative frustum culling ON\n"
               << "Phase 11 effects: " << particles_.capacity()
               << " shared billboard-particle slots, one indexed instanced draw\n";
+    SceneSupport::setTerrainSource(&sand_);
+}
+
+StaticGizaScene::~StaticGizaScene()
+{
+    SceneSupport::setTerrainSource(nullptr);
 }
 
 void StaticGizaScene::addObject(ScenePrimitive primitive, const glm::mat4& model,
@@ -1642,8 +1648,16 @@ void StaticGizaScene::update(float deltaTime)
     quarry_.update(simDelta, simulation_);
     logistics_.update(simDelta, simulation_, quarry_, constructionTimeline_,
                       quarryPulleyController_, physicalConstructionMode());
-    // Phase 13 static terrain foundation: dynamic wind/traffic deformation is
-    // intentionally deferred. SandSimulation remains the sole height source.
+    const LogisticsSnapshot transport = logistics_.snapshot();
+    const bool sandContact = physicalConstructionMode() &&
+        transport.state == LogisticsState::Hauling &&
+        std::abs(transport.sledgePosition.y - sand_.terrainHeightAt(
+            transport.sledgePosition.x, transport.sledgePosition.z)) <= 0.08f;
+    const std::uint64_t previousSandRevision = sand_.revision();
+    sand_.update(deltaTime, transport.sledgePosition,
+                 transport.sledgeHeading, sandContact);
+    if (sand_.revision() != previousSandRevision)
+        sandMesh_.updateVertices(sand_.generateTerrainMesh().vertices);
     water_.update(deltaTime);
     if (deltaTime > 1.0e-5f)
         currentFps_ = 0.9f * currentFps_ + 0.1f * (1.0f / deltaTime);
@@ -1910,7 +1924,7 @@ void StaticGizaScene::resetAnimation()
     logistics_.reset();
     simulation_.reset();
     sand_.reset();
-    sandMesh_.upload(sand_.generateTerrainMesh());
+    sandMesh_.updateVertices(sand_.generateTerrainMesh().vertices);
     water_.reset();
     demoPose_ = WorkerPose::Standing;
     articulationTime_ = 0.0f;
@@ -2641,7 +2655,7 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
             renderStats_.shadowTriangles += mesh.indexCount() / 3u;
         }
         
-        if (sand_.enabled() && sandMesh_.isUploaded())
+        if (sandMesh_.isUploaded())
         {
             depthShader_.setMat4("model", glm::mat4(1.0f));
             sandMesh_.draw();
@@ -2779,7 +2793,7 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         renderStats_.visibleTriangles += mesh.indexCount() / 3u;
     }
 
-    if (sand_.enabled() && sandMesh_.isUploaded())
+    if (sandMesh_.isUploaded())
     {
         shader_.setMat4("model", glm::mat4(1.0f));
         shader_.setMat3("normalMatrix", glm::mat3(1.0f));
@@ -2897,6 +2911,13 @@ void StaticGizaScene::printRenderStats(std::ostream& output) const
 
 void StaticGizaScene::printEffectStats(std::ostream& output) const
 {
+    const SandSimulationStats sandStats = sand_.stats();
+    output << "Dynamic sand: volume=" << sandStats.movableVolume
+           << " m^3, max change=" << sandStats.maximumChange
+           << " m, movable slope=" << sandStats.maximumSlope
+           << ", protected change=" << sandStats.protectedChange
+           << " m, track depth=" << sandStats.trackDepth
+           << " m, changed cells=" << sandStats.changedCells << '\n';
     output << std::fixed << std::setprecision(3)
            << "Phase 11 effect statistics\n"
            << "  enabled: " << (effectsEnabled_ ? "YES" : "NO") << '\n'

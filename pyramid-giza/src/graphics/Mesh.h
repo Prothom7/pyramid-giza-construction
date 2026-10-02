@@ -38,6 +38,7 @@ public:
     Mesh& operator=(Mesh&& other) noexcept;
 
     void upload(const MeshData& data);
+    void updateVertices(const std::vector<Vertex>& vertices);
     void draw() const;
     void bind() const;
     void cleanup();
@@ -50,4 +51,5 @@ private:
     unsigned int vbo_ = 0;
     unsigned int ebo_ = 0;
     std::uint32_t indexCount_ = 0;
+    std::size_t vertexCount_ = 0;
 };

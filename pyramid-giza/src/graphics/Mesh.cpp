@@ -24,6 +24,7 @@ Mesh::Mesh(Mesh&& other) noexcept
       ebo_(std::exchange(other.ebo_, 0)),
       indexCount_(std::exchange(other.indexCount_, 0))
 {
+    vertexCount_ = std::exchange(other.vertexCount_, 0);
 }
 
 Mesh& Mesh::operator=(Mesh&& other) noexcept
@@ -35,6 +36,7 @@ Mesh& Mesh::operator=(Mesh&& other) noexcept
         vbo_ = std::exchange(other.vbo_, 0);
         ebo_ = std::exchange(other.ebo_, 0);
         indexCount_ = std::exchange(other.indexCount_, 0);
+        vertexCount_ = std::exchange(other.vertexCount_, 0);
     }
     return *this;
 }
@@ -74,6 +76,18 @@ void Mesh::upload(const MeshData& data)
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     indexCount_ = static_cast<std::uint32_t>(data.indices.size());
+    vertexCount_ = data.vertices.size();
+}
+
+void Mesh::updateVertices(const std::vector<Vertex>& vertices)
+{
+    if (!isUploaded() || vertices.size() != vertexCount_)
+        throw std::invalid_argument("Dynamic vertex update must preserve mesh topology");
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+    glBufferSubData(GL_ARRAY_BUFFER, 0,
+                   static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)),
+                   vertices.data());
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void Mesh::draw() const
@@ -100,4 +114,5 @@ void Mesh::cleanup()
         glDeleteVertexArrays(1, &vao_);
     vao_ = vbo_ = ebo_ = 0;
     indexCount_ = 0;
+    vertexCount_ = 0;
 }

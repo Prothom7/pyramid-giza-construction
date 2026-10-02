@@ -56,8 +56,11 @@ struct StageSupportDependency
     const char* notes;
 };
 
+class SandSimulation;
+
 namespace SceneSupport
 {
+void setTerrainSource(const SandSimulation* terrain);
 constexpr float minimumContactGap = -0.08f;
 constexpr float maximumContactGap = 0.08f;
 

@@ -20,6 +20,7 @@
 namespace
 {
 constexpr int rampFillSegments = 64;
+const SandSimulation* liveTerrain = nullptr;
 
 bool finiteVector(const glm::vec3& value)
 {
@@ -115,13 +116,22 @@ bool footprintContains(const HorizontalFootprint& support,
 
 SupportSurface terrainAt(const glm::vec2& point)
 {
+    const float height = liveTerrain
+        ? liveTerrain->terrainHeightAt(point.x, point.y)
+        : SandSimulation::staticTerrainHeightAt(point.x, point.y);
+    const glm::vec3 normal = liveTerrain
+        ? liveTerrain->terrainNormalAt(point.x, point.y)
+        : SandSimulation::staticTerrainNormalAt(point.x, point.y);
     if (point.x < -112.0f && point.y > -30.0f && point.y < 3.0f)
         return {"QuarryFloor", SupportSurfaceKind::QuarryFloor,
-                SandSimulation::staticTerrainHeightAt(point.x, point.y),
-                SandSimulation::staticTerrainNormalAt(point.x, point.y), true};
+                height, normal, true};
     return {"DesertGround", SupportSurfaceKind::DesertGround,
-            SandSimulation::staticTerrainHeightAt(point.x, point.y),
-            SandSimulation::staticTerrainNormalAt(point.x, point.y), true};
+            height, normal, true};
+}
+
+void setTerrainSource(const SandSimulation* terrain)
+{
+    liveTerrain = terrain;
 }
 
 float rampUndersideY(const RampDescriptor& ramp, float rampProgress)

@@ -6,6 +6,8 @@
 #include <ostream>
 
 #include <glm/gtc/matrix_transform.hpp>
+#include "scene/MonumentalSite.h"
+#include "scene/SupportSystem.h"
 
 
 
@@ -38,6 +40,32 @@ float capsuleMask(const glm::vec2& point, const glm::vec2& start,
                         : 0.0f;
     const float distance = glm::length(point - (start + t * segment));
     return 1.0f - smoothStep(radius, radius + feather, distance);
+}
+
+// Reuse the static grading masks and explicit support footprints. Haul-road
+// shoulders stay mobile; foundations and structural surfaces never receive flux.
+float mobilityAt(const glm::vec2& point)
+{
+    float protection = 0.0f;
+    for (const SiteZoneDescriptor& zone : MonumentalSite::zones())
+    {
+        if (std::string(zone.id) == "TransportZone")
+            continue;
+        protection = std::max(protection,
+            roundedBoxMask(point, {zone.center.x, zone.center.z},
+                           {zone.extents.x + 4.0f, zone.extents.z + 4.0f}, 10.0f));
+    }
+    protection = std::max(protection,
+        roundedBoxMask(point, {0.0f, -42.0f}, {68.0f, 70.0f}, 20.0f));
+    protection = std::max(protection,
+        roundedBoxMask(point, {-128.0f, -15.0f}, {35.0f, 37.0f}, 10.0f));
+    protection = std::max(protection,
+        roundedBoxMask(point, {0.0f, -157.0f}, {185.0f, 32.0f}, 10.0f));
+    for (const RampDescriptor& ramp : MonumentalSite::ramps())
+        protection = std::max(protection,
+            capsuleMask(point, {ramp.base.x, ramp.base.z}, {ramp.top.x, ramp.top.z},
+                        0.5f * ramp.width + 4.0f, 6.0f));
+    return 1.0f - protection;
 }
 
 float baseSurfaceFormula(float worldX, float worldZ)
@@ -91,6 +119,7 @@ SandSimulation::SandSimulation()
 void SandSimulation::initGrid()
 {
     grid_.assign(GridColumns * GridRows, SandCell{});
+    flux_.assign(grid_.size(), 0.0f);
     initialVolume_ = 0.0f;
 
     for (int z = 0; z < GridRows; ++z)
@@ -121,7 +150,8 @@ void SandSimulation::initGrid()
             cell.baseElevation =
                 baseSurfaceFormula(wPos.x, wPos.y) - initialSandDepth;
 
-            cell.windExposure = inPyramid ? 0.35f : nearSphinx ? 0.55f : 1.0f;
+            cell.mobility = mobilityAt(wPos);
+            cell.windExposure = cell.mobility;
             cell.state = SandCellState::Settled;
             initialVolume_ += cell.height;
         }
@@ -131,7 +161,13 @@ void SandSimulation::initGrid()
 void SandSimulation::reset()
 {
     initGrid();
-    simulationTimer_ = 0.0f;
+    simulationTimer_ = 0.0;
+    previousContact_ = false;
+    enabled_ = true;
+    trackDepth_ = 0.0f;
+    windDirection_ = glm::normalize(glm::vec2{-1.0f, 1.0f});
+    windSpeed_ = 4.2f;
+    ++revision_;
 }
 
 glm::vec2 SandSimulation::cellWorldPos(int x, int z) const
@@ -143,6 +179,8 @@ glm::vec2 SandSimulation::cellWorldPos(int x, int z) const
 bool SandSimulation::worldToGrid(float worldX, float worldZ, int& outX, int& outZ,
                                  float& localX, float& localZ) const
 {
+    if (!std::isfinite(worldX) || !std::isfinite(worldZ))
+        return false;
     const float fx = (worldX - WorldMinX) / CellSizeX;
     const float fz = (worldZ - WorldMinZ) / CellSizeZ;
     if (fx < 0.0f || fx > static_cast<float>(GridColumns - 1) ||
@@ -224,140 +262,165 @@ SandCellState SandSimulation::cellStateAt(float worldX, float worldZ) const
 
 void SandSimulation::setWind(const glm::vec2& dir, float speed)
 {
+    if (!std::isfinite(dir.x) || !std::isfinite(dir.y) || !std::isfinite(speed))
+        return;
     if (glm::length(dir) > 0.001f)
         windDirection_ = glm::normalize(dir);
     windSpeed_ = std::clamp(speed, 0.0f, 20.0f);
 }
 
-void SandSimulation::update(float deltaTime, const glm::vec3& sledgePos)
+void SandSimulation::update(float deltaTime, const glm::vec3& sledgePos,
+                            float headingDegrees, bool exposedSandContact)
 {
+    exposedSandContact = exposedSandContact && std::isfinite(sledgePos.x) &&
+        std::isfinite(sledgePos.y) && std::isfinite(sledgePos.z) &&
+        std::isfinite(headingDegrees);
     if (!enabled_ || !std::isfinite(deltaTime) || deltaTime <= 0.0f)
-        return;
-
-    simulationTimer_ += deltaTime;
-
-    // Fixed sub-stepping for numerical stability
-    constexpr float fixedStep = 0.05f;
-    float remaining = std::min(deltaTime, 0.25f);
-    while (remaining > 0.0f)
     {
-        const float step = std::min(remaining, fixedStep);
-        simulateWindTransport(step);
-        simulateReposeRelaxation(step);
-        remaining -= step;
+        previousContact_ = false;
+        return;
     }
+    simulationTimer_ += static_cast<double>(deltaTime);
+    bool changed = false;
+    while (simulationTimer_ + 1.0e-8 >= FixedStep)
+    {
+        simulateWindTransport(static_cast<float>(FixedStep));
+        simulateReposeRelaxation(static_cast<float>(FixedStep));
+        simulationTimer_ -= FixedStep;
+        changed = true;
+    }
+    // Traffic is distance-based rather than frame-based. Sampling the swept
+    // segment prevents gaps at low FPS, and stationary sledges make no ruts.
+    if (exposedSandContact && previousContact_ &&
+        glm::distance(sledgePos, previousSledge_) < 10.0f)
+    {
+        applyTrafficDisturbance(previousSledge_, sledgePos, headingDegrees);
+        changed = changed || glm::distance(sledgePos, previousSledge_) > 1.0e-5f;
+    }
+    previousSledge_ = sledgePos;
+    previousContact_ = exposedSandContact;
+    if (changed)
+        ++revision_;
+}
 
-    applyTrafficDisturbance(sledgePos);
+void SandSimulation::transferSand(std::size_t from, std::size_t to, float quantity)
+{
+    const float mobility = std::min(grid_[from].mobility, grid_[to].mobility);
+    // Each pair shares exactly the same bounded debit and credit. Protected
+    // vertices are impermeable; no clipping/renormalisation loses sand mass.
+    const float available = std::max(0.0f, grid_[from].height + flux_[from]);
+    const float capacity = std::max(0.0f,
+        MaximumSandDepth - grid_[to].height - flux_[to]);
+    const float transfer = std::min({quantity * mobility, available, capacity});
+    flux_[from] -= transfer;
+    flux_[to] += transfer;
 }
 
 void SandSimulation::simulateWindTransport(float deltaTime)
 {
-    const int stepX = (windDirection_.x > 0.1f) ? 1 : (windDirection_.x < -0.1f) ? -1 : 0;
-    const int stepZ = (windDirection_.y > 0.1f) ? 1 : (windDirection_.y < -0.1f) ? -1 : 0;
-
-    const float fluxRate = 0.015f * (windSpeed_ / 4.0f) * deltaTime;
-
+    std::fill(flux_.begin(), flux_.end(), 0.0f);
+    const int stepX = windDirection_.x > 0.1f ? 1 : windDirection_.x < -0.1f ? -1 : 0;
+    const int stepZ = windDirection_.y > 0.1f ? 1 : windDirection_.y < -0.1f ? -1 : 0;
+    if (stepX == 0 && stepZ == 0)
+        return;
     for (int z = 1; z < GridRows - 1; ++z)
-    {
         for (int x = 1; x < GridColumns - 1; ++x)
         {
-            SandCell& src = grid_[gridIndex(x, z)];
-            if (src.height <= 0.05f || src.isObstacle)
-                continue;
-
-            const int nx = x + stepX;
-            const int nz = z + stepZ;
-            if (nx < 0 || nx >= GridColumns || nz < 0 || nz >= GridRows)
-                continue;
-
-            SandCell& dst = grid_[gridIndex(nx, nz)];
-
-            // If destination is an obstacle, sand accumulates against its base
-            float transfer = fluxRate * src.windExposure;
-            transfer = std::min(transfer, src.height - 0.02f);
-
-            if (transfer > 0.0f)
-            {
-                src.height -= transfer;
-                dst.height += transfer;
-
-                if (dst.isObstacle || dst.windExposure < 0.6f)
-                    dst.state = SandCellState::Accumulating;
-                else
-                    src.state = SandCellState::WindMoved;
-            }
+            const std::size_t from = gridIndex(x, z);
+            const std::size_t to = gridIndex(x + stepX, z + stepZ);
+            const glm::vec2 point = cellWorldPos(x, z);
+            // Gentle deterministic exposure variation forms broad deposits,
+            // instead of draining the entire desert to a boundary ridge.
+            const float exposure = 0.65f + 0.35f *
+                std::sin(point.x * 0.035f + point.y * 0.024f);
+            transferSand(from, to, 0.0025f * windSpeed_ * deltaTime *
+                                   exposure * grid_[from].height / initialSandDepth);
         }
+    for (std::size_t i = 0; i < grid_.size(); ++i)
+    {
+        grid_[i].height += flux_[i];
+        if (flux_[i] != 0.0f)
+            grid_[i].state = flux_[i] > 0.0f ? SandCellState::Accumulating
+                                            : SandCellState::WindMoved;
     }
 }
 
 void SandSimulation::simulateReposeRelaxation(float deltaTime)
 {
-    const float relaxRate = std::min(0.6f, 3.5f * deltaTime);
-
-    for (int z = 1; z < GridRows - 1; ++z)
-    {
-        for (int x = 1; x < GridColumns - 1; ++x)
-        {
-            SandCell& center = grid_[gridIndex(x, z)];
-            if (center.isObstacle)
-                continue;
-
-            const int neighbors[4][2] = {{x + 1, z}, {x - 1, z}, {x, z + 1}, {x, z - 1}};
-            for (const auto& nb : neighbors)
+    std::fill(flux_.begin(), flux_.end(), 0.0f);
+    for (int z = 0; z < GridRows; ++z)
+        for (int x = 0; x < GridColumns; ++x)
+            for (int axis = 0; axis < 2; ++axis)
             {
-                SandCell& adj = grid_[gridIndex(nb[0], nb[1])];
-                if (adj.isObstacle)
+                const int nx = x + (axis == 0 ? 1 : 0);
+                const int nz = z + (axis == 1 ? 1 : 0);
+                if (nx >= GridColumns || nz >= GridRows)
                     continue;
-
-                const float totalH1 = center.baseElevation + center.height;
-                const float totalH2 = adj.baseElevation + adj.height;
-                const float diff = totalH1 - totalH2;
-
-                if (diff > ReposeThreshold && center.height > 0.02f)
-                {
-                    const float transfer = std::min((diff - ReposeThreshold) * relaxRate,
-                                                    center.height - 0.01f);
-                    if (transfer > 0.0f)
-                    {
-                        center.height -= transfer;
-                        adj.height += transfer;
-                        center.state = SandCellState::Sliding;
-                        adj.state = SandCellState::Settled;
-                    }
-                }
+                const std::size_t a = gridIndex(x, z), b = gridIndex(nx, nz);
+                // Relax the movable offset, never the immutable quarry grade.
+                const float difference = grid_[a].height - grid_[b].height;
+                const float spacing = axis == 0 ? CellSizeX : CellSizeZ;
+                const float allowed = 0.025f * spacing;
+                if (std::abs(difference) > allowed)
+                    transferSand(difference > 0.0f ? a : b,
+                                 difference > 0.0f ? b : a,
+                                 (std::abs(difference) - allowed) *
+                                     std::min(0.25f, deltaTime * 2.0f));
             }
-        }
-    }
+    for (std::size_t i = 0; i < grid_.size(); ++i)
+        grid_[i].height += flux_[i];
 }
 
-void SandSimulation::applyTrafficDisturbance(const glm::vec3& sledgePos)
+void SandSimulation::applyTrafficDisturbance(const glm::vec3& start,
+                                            const glm::vec3& end,
+                                            float headingDegrees)
 {
-    int sx = 0, sz = 0;
-    float localX = 0.0f, localZ = 0.0f;
-    if (worldToGrid(sledgePos.x, sledgePos.z, sx, sz, localX, localZ))
+    const float distance = glm::length(glm::vec2{end.x - start.x, end.z - start.z});
+    if (distance < 1.0e-5f)
+        return;
+    const glm::vec2 right{std::cos(glm::radians(headingDegrees)),
+                          -std::sin(glm::radians(headingDegrees))};
+    // The 3.3m vertex spacing cannot resolve 0.62m runner separation. Use one
+    // smoothly reconstructed contact band with the actual 1.24m runner width,
+    // broadened only by the grid reconstruction footprint (not a second mesh).
+    const int samples = std::max(1, static_cast<int>(std::ceil(distance / 0.25f)));
+    for (int sample = 0; sample < samples; ++sample)
     {
-        for (int dz = -1; dz <= 1; ++dz)
-        {
-            for (int dx = -1; dx <= 1; ++dx)
+        const glm::vec3 center = glm::mix(start, end,
+            (static_cast<float>(sample) + 0.5f) / static_cast<float>(samples));
+        int gx = 0, gz = 0;
+        float localX = 0.0f, localZ = 0.0f;
+        if (!worldToGrid(center.x, center.z, gx, gz, localX, localZ))
+            continue;
+        for (int z = std::max(0, gz - 2); z <= std::min(GridRows - 1, gz + 2); ++z)
+            for (int x = std::max(0, gx - 2); x <= std::min(GridColumns - 1, gx + 2); ++x)
             {
-                const int x = sx + dx;
-                const int z = sz + dz;
-                if (x >= 0 && x < GridColumns && z >= 0 && z < GridRows)
-                {
-                    SandCell& cell = grid_[gridIndex(x, z)];
-                    // Compress and clear track rut
-                    if (cell.height > 0.12f)
-                    {
-                        const float cleared = 0.035f;
-                        cell.height -= cleared;
-                        // Berm buildup on edges
-                        const int edgeX = std::clamp(x + (dx != 0 ? dx : 1), 0, GridColumns - 1);
-                        const int edgeZ = std::clamp(z + (dz != 0 ? dz : 1), 0, GridRows - 1);
-                        grid_[gridIndex(edgeX, edgeZ)].height += cleared;
-                    }
-                }
+                const std::size_t from = gridIndex(x, z);
+                const glm::vec2 offset = cellWorldPos(x, z) - glm::vec2{center.x, center.z};
+                const float lateral = std::abs(glm::dot(offset, right));
+                const float radial = glm::length(offset);
+                const float weight = std::exp(-0.5f * lateral * lateral / 2.25f) *
+                                     std::exp(-0.5f * radial * radial / 6.25f);
+                if (weight < 0.04f || grid_[from].mobility < 0.99f)
+                    continue;
+                // Move the shallow rut into a nearby shoulder, with a 4cm cap.
+                const int side = glm::dot(offset, right) < 0.0f ? -1 : 1;
+                const int tx = std::clamp(x + side * static_cast<int>(
+                    std::round(right.x * 2.0f)), 0, GridColumns - 1);
+                const int tz = std::clamp(z + side * static_cast<int>(
+                    std::round(right.y * 2.0f)), 0, GridRows - 1);
+                const std::size_t to = gridIndex(tx, tz);
+                if (to == from || grid_[to].mobility < 0.99f)
+                    continue;
+                const float amount = std::min({0.012f * distance /
+                    static_cast<float>(samples) * weight,
+                    std::max(0.0f, grid_[from].height - (initialSandDepth - 0.04f)),
+                    std::max(0.0f, MaximumSandDepth - grid_[to].height)});
+                grid_[from].height -= amount;
+                grid_[to].height += amount;
+                trackDepth_ = std::max(trackDepth_,
+                    initialSandDepth - grid_[from].height);
             }
-        }
     }
 }
 
@@ -368,6 +431,12 @@ SandSimulationStats SandSimulation::stats() const
     for (const auto& cell : grid_)
     {
         s.totalVolume += cell.height;
+        s.movableVolume += static_cast<double>(cell.height) * CellSizeX * CellSizeZ;
+        const float change = std::abs(cell.height - initialSandDepth);
+        s.maximumChange = std::max(s.maximumChange, change);
+        if (change > 1.0e-5f) ++s.changedCells;
+        if (cell.mobility == 0.0f)
+            s.protectedChange = std::max(s.protectedChange, change);
         s.maxAccumulation = std::max(s.maxAccumulation, cell.height);
         s.minSandDepth = std::min(s.minSandDepth, cell.height);
         if (cell.state == SandCellState::Sliding)
@@ -375,13 +444,32 @@ SandSimulationStats SandSimulation::stats() const
         else if (cell.state == SandCellState::Accumulating)
             ++s.accumulatingCells;
     }
+    s.trackDepth = trackDepth_;
+    for (int z = 0; z < GridRows - 1; ++z)
+        for (int x = 0; x < GridColumns - 1; ++x)
+        {
+            const float depth = grid_[gridIndex(x, z)].height;
+            s.maximumSlope = std::max(s.maximumSlope,
+                std::abs(depth - grid_[gridIndex(x + 1, z)].height) / CellSizeX);
+            s.maximumSlope = std::max(s.maximumSlope,
+                std::abs(depth - grid_[gridIndex(x, z + 1)].height) / CellSizeZ);
+        }
     return s;
+}
+
+glm::vec3 SandSimulation::terrainNormalAt(float x, float z) const
+{
+    constexpr float offset = 0.5f;
+    return glm::normalize(glm::vec3{
+        terrainHeightAt(x - offset, z) - terrainHeightAt(x + offset, z),
+        2.0f * offset,
+        terrainHeightAt(x, z - offset) - terrainHeightAt(x, z + offset)});
 }
 
 MeshData SandSimulation::generateTerrainMesh() const
 {
     MeshData mesh("SandTerrain");
-    if (!enabled_) return mesh;
+    // Pause freezes transport, never removes the terrain surface.
 
     mesh.vertices.reserve(GridColumns * GridRows);
     for (int z = 0; z < GridRows; ++z)
@@ -536,9 +624,86 @@ bool SandSimulation::validateSandSimulation(std::ostream& output)
         deterministic = glm::distance(terrain.vertices[index].position,
                                       duplicate.vertices[index].position) < 1.0e-7f;
 
+    SandSimulation sixtyFps, thirtyFps;
+    for (int frame = 0; frame < 1200; ++frame)
+        sixtyFps.update(1.0f / 60.0f);
+    for (int frame = 0; frame < 600; ++frame)
+        thirtyFps.update(1.0f / 30.0f);
+    float frameRateError = 0.0f;
+    double downwindMoment = 0.0;
+    bool dynamicFinite = true;
+    for (std::size_t i = 0; i < sixtyFps.grid_.size(); ++i)
+    {
+        const SandCell& cell = sixtyFps.grid_[i];
+        frameRateError = std::max(frameRateError,
+            std::abs(cell.height - thirtyFps.grid_[i].height));
+        const glm::vec2 point = sixtyFps.cellWorldPos(
+            static_cast<int>(i) % GridColumns, static_cast<int>(i) / GridColumns);
+        downwindMoment += (cell.height - initialSandDepth) *
+                           glm::dot(point, sixtyFps.windDirection_);
+        dynamicFinite = dynamicFinite && std::isfinite(cell.height) &&
+                        cell.height >= -1.0e-6f &&
+                        cell.height <= MaximumSandDepth + 1.0e-6f &&
+                        cell.baseElevation == terrainSource.grid_[i].baseElevation;
+    }
+    const SandSimulationStats dynamicStats = sixtyFps.stats();
+    const double relativeVolumeError = std::abs(dynamicStats.movableVolume -
+        terrainSource.stats().movableVolume) / terrainSource.stats().movableVolume;
+    const bool dynamicStable = dynamicFinite && relativeVolumeError < 1.0e-5 &&
+        dynamicStats.protectedChange == 0.0f && dynamicStats.maximumSlope < 0.03f &&
+        downwindMoment > 0.0 && frameRateError < 1.0e-6f;
+
+    SandSimulation tracks;
+    tracks.setWind({-1.0f, 1.0f}, 0.0f);
+    tracks.update(0.05f, {170.0f, 0.0f, 50.0f}, 0.0f, true);
+    for (int step = 1; step <= 100; ++step)
+        tracks.update(0.05f, {170.0f, 0.0f, 50.0f + step * 0.20f}, 0.0f, true);
+    const float depthBeforeRest = tracks.stats().trackDepth;
+    const float rutHeight = tracks.terrainHeightAt(170.0f, 60.0f);
+    const float offPathHeight = tracks.terrainHeightAt(150.0f, 60.0f);
+    for (int step = 0; step < 100; ++step) tracks.update(0.05f);
+    const bool tracksValid = depthBeforeRest > 0.001f && depthBeforeRest <= 0.04001f &&
+        rutHeight < staticTerrainHeightAt(170.0f, 60.0f) - 0.001f &&
+        std::abs(offPathHeight - staticTerrainHeightAt(150.0f, 60.0f)) < 1.0e-5f &&
+        tracks.terrainHeightAt(170.0f, 60.0f) <
+            staticTerrainHeightAt(170.0f, 60.0f) - 0.001f &&
+        std::abs(tracks.stats().movableVolume - terrainSource.stats().movableVolume) /
+            terrainSource.stats().movableVolume < 1.0e-5;
+    SandSimulation platform;
+    platform.setWind({1.0f, 0.0f}, 0.0f);
+    platform.update(0.05f, {170.0f, 4.0f, 50.0f}, 0.0f, false);
+    platform.update(0.05f, {170.0f, 4.0f, 55.0f}, 0.0f, false);
+    const bool platformValid = platform.stats().trackDepth == 0.0f;
+    const MeshData evolved = sixtyFps.generateTerrainMesh();
+    bool liveQueryMatches = true;
+    SceneSupport::setTerrainSource(&sixtyFps);
+    for (std::size_t i = 0; i + 3 < evolved.indices.size(); i += 306)
+    {
+        const glm::vec3 a = evolved.vertices[evolved.indices[i]].position;
+        const glm::vec3 b = evolved.vertices[evolved.indices[i + 1]].position;
+        const glm::vec3 c = evolved.vertices[evolved.indices[i + 2]].position;
+        const glm::vec3 center = (a + b + c) / 3.0f;
+        liveQueryMatches = liveQueryMatches && std::abs(
+            sixtyFps.terrainHeightAt(center.x, center.z) - center.y) < 1.0e-4f &&
+            std::abs(SceneSupport::terrainAt({center.x, center.z}).height - center.y)
+                < 1.0e-4f;
+    }
+    SceneSupport::setTerrainSource(nullptr);
+    for (const Vertex& vertex : evolved.vertices)
+        liveQueryMatches = liveQueryMatches && std::isfinite(vertex.normal.x) &&
+            std::isfinite(vertex.normal.y) && std::isfinite(vertex.normal.z) &&
+            std::abs(glm::length(vertex.normal) - 1.0f) < 1.0e-3f;
+    sixtyFps.reset();
+    bool resetValid = sixtyFps.trackDepth_ == 0.0f && sixtyFps.simulationTimer_ == 0.0 &&
+                      sixtyFps.windSpeed_ == 4.2f;
+    for (std::size_t i = 0; i < sixtyFps.grid_.size(); ++i)
+        resetValid = resetValid && sixtyFps.grid_[i].height == terrainSource.grid_[i].height &&
+                     sixtyFps.grid_[i].baseElevation == terrainSource.grid_[i].baseElevation;
+
     const bool valid = positiveHeights && conserved && reposeValid && verticesFinite &&
                        normalsValid && indicesValid && boundsValid && slopesBounded &&
-                       workZonesLevel && queryMatchesMesh && deterministic;
+                       workZonesLevel && queryMatchesMesh && deterministic &&
+                       dynamicStable && tracksValid && platformValid && liveQueryMatches && resetValid;
 
     output << "Phase 13 Sand Simulation Validation\n"
            << "  all cell heights strictly non-negative: "
@@ -560,6 +725,18 @@ bool SandSimulation::validateSandSimulation(std::ostream& output)
            << (queryMatchesMesh ? "PASS" : "FAIL") << '\n'
            << "  deterministic terrain generation: "
            << (deterministic ? "PASS" : "FAIL") << '\n'
+           << "  dynamic volume initial/final: " << terrainSource.stats().movableVolume
+           << " / " << dynamicStats.movableVolume << "; relative error "
+           << relativeVolumeError << '\n'
+           << "  maximum change/slope/protected change: " << dynamicStats.maximumChange
+           << " / " << dynamicStats.maximumSlope << " / " << dynamicStats.protectedChange
+           << "; changed cells " << dynamicStats.changedCells << '\n'
+           << "  fixed-step wind/mass/protection/FPS checks (error " << frameRateError
+           << "): " << (dynamicStable ? "PASS" : "FAIL") << '\n'
+           << "  distance-based persistent track depth " << depthBeforeRest << ": "
+           << (tracksValid ? "PASS" : "FAIL") << '\n'
+           << "  no platform disturbance / live query / reset: "
+           << (platformValid && liveQueryMatches && resetValid ? "PASS" : "FAIL") << '\n'
            << (valid ? "Sand simulation validation passed.\n"
                      : "Sand simulation validation failed.\n");
 
