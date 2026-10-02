@@ -1,26 +1,48 @@
 #include "scene/ConstructionSimulation.h"
 #include <algorithm>
+#include <cmath>
 #include <ostream>
 #include <glm/gtc/matrix_transform.hpp>
+#include "scene/PyramidInterior.h"
 
 ConstructionSimulation::ConstructionSimulation() = default;
 
 void ConstructionSimulation::initialize(const std::vector<PyramidBlockPlacement>& fullLayout)
 {
     layout = fullLayout;
-    targetCellsOccupied_.assign(layout.size(), false);
-    activeBlocks.clear();
-    settledBlocks_ = 0;
-    nextTargetIndex_ = 0;
-    nextBlockId_ = 1000;
-    ++occupancyRevision_;
+    targetCellsBuildable_.assign(layout.size(), false);
+    buildableTargets_ = 0;
+    for (std::size_t index = 0; index < layout.size(); ++index)
+    {
+        targetCellsBuildable_[index] =
+            !PyramidInterior::blockIntersectsVoid(layout[index]);
+        if (targetCellsBuildable_[index])
+            ++buildableTargets_;
+    }
+    restorePrebuiltBaseline();
 }
 
 void ConstructionSimulation::reset()
 {
+    restorePrebuiltBaseline();
+}
+
+void ConstructionSimulation::restorePrebuiltBaseline()
+{
     targetCellsOccupied_.assign(layout.size(), false);
+    targetCellsPrebuilt_.assign(layout.size(), false);
+    prebuiltBlocks_ = 0;
+    for (std::size_t index = 0; index < layout.size(); ++index)
+    {
+        const bool prebuilt = targetCellsBuildable_[index] &&
+                              layout[index].level < prebuiltLevelCount;
+        targetCellsOccupied_[index] = prebuilt;
+        targetCellsPrebuilt_[index] = prebuilt;
+        if (prebuilt)
+            ++prebuiltBlocks_;
+    }
     activeBlocks.clear();
-    settledBlocks_ = 0;
+    runtimeSettledBlocks_ = 0;
     nextTargetIndex_ = 0;
     nextBlockId_ = 1000;
     ++occupancyRevision_;
@@ -58,7 +80,8 @@ void ConstructionSimulation::spawnNewBlock(const glm::vec3& quarryPos)
 bool ConstructionSimulation::assignTarget(ConstructionBlock& block)
 {
     while (nextTargetIndex_ < layout.size() &&
-           targetCellsOccupied_[nextTargetIndex_])
+           (targetCellsOccupied_[nextTargetIndex_] ||
+            !targetCellsBuildable_[nextTargetIndex_]))
         ++nextTargetIndex_;
     if (nextTargetIndex_ >= layout.size())
         return false;
@@ -74,15 +97,26 @@ bool ConstructionSimulation::isTargetOccupied(std::size_t index) const
     return index < targetCellsOccupied_.size() && targetCellsOccupied_[index];
 }
 
+bool ConstructionSimulation::isTargetPrebuilt(std::size_t index) const
+{
+    return index < targetCellsPrebuilt_.size() && targetCellsPrebuilt_[index];
+}
+
+bool ConstructionSimulation::isTargetBuildable(std::size_t index) const
+{
+    return index < targetCellsBuildable_.size() && targetCellsBuildable_[index];
+}
+
 bool ConstructionSimulation::settleBlock(uint64_t blockId)
 {
     ConstructionBlock* block = getBlock(blockId);
     if (block == nullptr || block->targetIndex >= targetCellsOccupied_.size() ||
+        !targetCellsBuildable_[block->targetIndex] ||
         targetCellsOccupied_[block->targetIndex])
         return false;
 
     targetCellsOccupied_[block->targetIndex] = true;
-    ++settledBlocks_;
+    ++runtimeSettledBlocks_;
     ++occupancyRevision_;
     block->state = BlockState::Settled;
     block->position = block->targetPlacement.position;
@@ -128,10 +162,55 @@ void ConstructionSimulation::collectSceneObjects(std::vector<SceneObject>& objec
 
 bool validateConstructionOccupancy(std::ostream& output)
 {
+    const PyramidLayoutConfig config;
+    const std::vector<PyramidBlockPlacement> completeLayout =
+        PyramidLayout::generateComplete(config);
     ConstructionSimulation simulation;
-    simulation.initialize(PyramidLayout::generateComplete(PyramidLayoutConfig{}));
+    simulation.initialize(completeLayout);
 
-    const bool initiallyEmpty = simulation.occupiedTargetCount() == 0;
+    const std::size_t baseline = simulation.prebuiltCount();
+    const InteriorExclusionStats interiorStats =
+        PyramidInterior::exclusionStats(completeLayout);
+    const InteriorBounds interiorBounds = PyramidInterior::bounds();
+    const float baselineTop = config.origin.y +
+        static_cast<float>(ConstructionSimulation::prebuiltLevelCount) *
+            config.blockHeight;
+    const bool interiorSupported =
+        interiorStats.maximumLevel < ConstructionSimulation::prebuiltLevelCount &&
+        interiorBounds.maximum.y <= baselineTop + 1.0e-5f;
+    const bool baselineCountValid = baseline > 0 &&
+        simulation.occupiedTargetCount() == baseline &&
+        simulation.runtimeSettledCount() == 0 &&
+        simulation.buildableTargetCount() == 7459u;
+    bool baselineRuleValid = true;
+    bool unbuiltTargetsEmpty = true;
+    bool transformsFinite = true;
+    bool entranceOpen = true;
+    for (std::size_t index = 0; index < simulation.layout.size(); ++index)
+    {
+        const PyramidBlockPlacement& target = simulation.layout[index];
+        const bool expectedPrebuilt = simulation.isTargetBuildable(index) &&
+            target.level < ConstructionSimulation::prebuiltLevelCount;
+        baselineRuleValid = baselineRuleValid &&
+            simulation.isTargetPrebuilt(index) == expectedPrebuilt &&
+            simulation.isTargetOccupied(index) == expectedPrebuilt;
+        if (target.level >= ConstructionSimulation::prebuiltLevelCount &&
+            simulation.isTargetBuildable(index))
+            unbuiltTargetsEmpty = unbuiltTargetsEmpty &&
+                                  !simulation.isTargetOccupied(index);
+        transformsFinite = transformsFinite &&
+            std::isfinite(target.position.x) &&
+            std::isfinite(target.position.y) &&
+            std::isfinite(target.position.z) &&
+            std::isfinite(target.scale.x) &&
+            std::isfinite(target.scale.y) &&
+            std::isfinite(target.scale.z);
+        if (PyramidInterior::isEntranceOpeningBlock(target))
+            entranceOpen = entranceOpen &&
+                           !simulation.isTargetBuildable(index) &&
+                           !simulation.isTargetOccupied(index);
+    }
+
     simulation.spawnNewBlock({-143.0f, -6.75f, -22.0f});
     ConstructionBlock* first = simulation.activeBlocks.empty()
                                    ? nullptr
@@ -140,7 +219,12 @@ bool validateConstructionOccupancy(std::ostream& output)
                                         ? simulation.totalCount()
                                         : first->targetIndex;
     const std::size_t unrelatedTarget = firstTarget + 1;
-    const bool firstWasEmpty = !simulation.isTargetOccupied(firstTarget);
+    const bool firstWasEmpty = first != nullptr &&
+                               simulation.isTargetBuildable(firstTarget) &&
+                               !simulation.isTargetOccupied(firstTarget) &&
+                               !simulation.isTargetPrebuilt(firstTarget) &&
+                               first->targetPlacement.level ==
+                                   ConstructionSimulation::prebuiltLevelCount;
     const bool firstSettled = first != nullptr && simulation.settleBlock(first->id);
     const bool exactFirstOccupied = simulation.isTargetOccupied(firstTarget);
     const bool unrelatedStillEmpty =
@@ -157,8 +241,8 @@ bool validateConstructionOccupancy(std::ostream& output)
                                 second->targetIndex != firstTarget;
     const bool secondSettled = second != nullptr &&
                                simulation.settleBlock(second->id);
-    const bool twoOccupied = simulation.occupiedTargetCount() == 2 &&
-                             simulation.settledCount() == 2;
+    const bool twoOccupied = simulation.occupiedTargetCount() == baseline + 2 &&
+                             simulation.runtimeSettledCount() == 2;
 
     simulation.spawnNewBlock({-143.0f, -6.75f, -22.0f});
     ConstructionBlock* invalid = simulation.activeBlocks.empty()
@@ -170,27 +254,39 @@ bool validateConstructionOccupancy(std::ostream& output)
                                  !simulation.settleBlock(invalid->id);
 
     simulation.reset();
-    const bool resetValid = simulation.occupiedTargetCount() == 0 &&
-                            simulation.settledCount() == 0 &&
+    const bool resetValid = simulation.occupiedTargetCount() == baseline &&
+                            simulation.prebuiltCount() == baseline &&
+                            simulation.runtimeSettledCount() == 0 &&
                             simulation.activeBlocks.empty() &&
                             !simulation.isTargetOccupied(firstTarget);
 
-    const bool valid = initiallyEmpty && firstWasEmpty && firstSettled &&
+    const bool valid = baselineCountValid && baselineRuleValid &&
+                       interiorSupported &&
+                       unbuiltTargetsEmpty && transformsFinite && entranceOpen &&
+                       firstWasEmpty && firstSettled &&
                        exactFirstOccupied && unrelatedStillEmpty &&
                        duplicateRejected && distinctTarget && secondSettled &&
                        twoOccupied && invalidRejected && resetValid;
-    output << "Phase 13 physical target occupancy validation\n"
-           << "  initial occupied count is zero: "
-           << (initiallyEmpty ? "PASS" : "FAIL") << '\n'
+    output << "Phase 13 authoritative prebuilt occupancy validation\n"
+           << "  12-course structural baseline / buildable targets: "
+           << baseline << " / " << simulation.buildableTargetCount() << ' '
+           << (baselineCountValid && baselineRuleValid ? "PASS" : "FAIL") << '\n'
+           << "  interior voids reserved and entrance remains open: "
+           << (entranceOpen ? "PASS" : "FAIL") << '\n'
+           << "  interior through level " << interiorStats.maximumLevel
+           << " enclosed below baseline top y=" << baselineTop << ": "
+           << (interiorSupported ? "PASS" : "FAIL") << '\n'
+           << "  upper targets unoccupied and transforms finite: "
+           << (unbuiltTargetsEmpty && transformsFinite ? "PASS" : "FAIL") << '\n'
            << "  exact first target occupied only: "
            << (firstSettled && exactFirstOccupied && unrelatedStillEmpty
                    ? "PASS" : "FAIL") << '\n'
            << "  duplicate and invalid targets rejected: "
            << (duplicateRejected && invalidRejected ? "PASS" : "FAIL") << '\n'
-           << "  second target raises occupied count to two: "
+           << "  second target raises runtime occupied count to two: "
            << (distinctTarget && secondSettled && twoOccupied ? "PASS" : "FAIL")
            << '\n'
-           << "  reset clears occupancy and active blocks: "
+           << "  reset restores baseline and clears runtime state: "
            << (resetValid ? "PASS" : "FAIL") << '\n';
     return valid;
 }

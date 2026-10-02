@@ -110,7 +110,7 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
     std::cout << "Monumental Giza site: " << stats_.pyramidBlocks << " pyramid blocks, "
               << stats_.totalDrawCalls << " maximum draw calls\n"
               << "Pyramid footprint: " << pyramidStats.baseWidth << " x "
-              << pyramidStats.baseDepth << ", completed height: "
+              << pyramidStats.baseDepth << ", target height: "
               << pyramidStats.completedHeight << " ("
               << pyramidStats.completedHeight / Worker::approximateHeight()
               << " worker-heights)\n"
@@ -128,9 +128,15 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
               << "Object enrichment: " << stats_.enrichmentObjects << " primitive instances, "
               << stats_.anchorPosts << " anchors, " << stats_.ladders << " ladders, "
               << stats_.boats << " boats, 1 workshop and 1 sledge-repair station\n";
-    std::cout << "Construction timeline: default " << constructionTimeline_.progress() * 100.0f
-              << "% = " << stats_.pyramidBlocks << " visible blocks, final "
-              << pyramidBlocks_.size() << " blocks; procedural textures use approximately "
+    std::cout << "Physical baseline: "
+              << ConstructionSimulation::prebuiltLevelCount << " courses, "
+              << simulation_.prebuiltCount() << " occupied structural targets, "
+              << simulation_.runtimeSettledCount() << " runtime settlements, "
+              << simulation_.buildableTargetCount() << " buildable targets; "
+              << "cinematic timeline remains separate at "
+              << constructionTimeline_.progress() * 100.0f
+              << "% of " << pyramidBlocks_.size()
+              << " raw layout cells; procedural textures use approximately "
               << textures_.memoryBytes() / 1024u << " KiB\n";
     std::cout << "Phase 12.8 interior: " << stats_.pyramidGeneratedBlocks
               << " generated, " << stats_.pyramidInteriorExcludedBlocks
@@ -1980,10 +1986,10 @@ float StaticGizaScene::constructionProgress() const
 {
     if (!physicalConstructionMode())
         return constructionTimeline_.progress();
-    if (simulation_.totalCount() == 0)
+    if (simulation_.buildableTargetCount() == 0)
         return 0.0f;
     return static_cast<float>(simulation_.occupiedTargetCount()) /
-           static_cast<float>(simulation_.totalCount());
+           static_cast<float>(simulation_.buildableTargetCount());
 }
 
 void StaticGizaScene::resetConstruction()

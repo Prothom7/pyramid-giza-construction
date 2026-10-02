@@ -53,6 +53,10 @@ struct ConstructionBlock
 class ConstructionSimulation
 {
 public:
+    // Courses 0-11 enclose every Phase 12.8 interior void (maximum level 11)
+    // while leaving the upper 16 courses for authoritative physical work.
+    static constexpr unsigned int prebuiltLevelCount = 12u;
+
     ConstructionSimulation();
 
     void initialize(const std::vector<PyramidBlockPlacement>& fullLayout);
@@ -65,11 +69,22 @@ public:
     void collectSceneObjects(std::vector<SceneObject>& objects) const;
     std::vector<PyramidBlockPlacement> layout;
 
-    std::size_t settledCount() const { return settledBlocks_; }
-    std::size_t occupiedTargetCount() const { return settledBlocks_; }
+    // settledCount is deliberately the number constructed during this run.
+    // Prebuilt and runtime stones share target occupancy/rendering, but remain
+    // separate for reset and construction accounting.
+    std::size_t settledCount() const { return runtimeSettledBlocks_; }
+    std::size_t runtimeSettledCount() const { return runtimeSettledBlocks_; }
+    std::size_t prebuiltCount() const { return prebuiltBlocks_; }
+    std::size_t occupiedTargetCount() const
+    {
+        return prebuiltBlocks_ + runtimeSettledBlocks_;
+    }
     std::size_t totalCount() const { return targetCellsOccupied_.size(); }
+    std::size_t buildableTargetCount() const { return buildableTargets_; }
     std::uint64_t occupancyRevision() const { return occupancyRevision_; }
     bool isTargetOccupied(std::size_t index) const;
+    bool isTargetPrebuilt(std::size_t index) const;
+    bool isTargetBuildable(std::size_t index) const;
     bool settleBlock(uint64_t blockId);
 
     // Helpers
@@ -80,8 +95,14 @@ public:
     bool assignTarget(ConstructionBlock& block);
 
 private:
+    void restorePrebuiltBaseline();
+
     std::vector<bool> targetCellsOccupied_; // Indexed by PyramidLayout target index.
-    std::size_t settledBlocks_ = 0;
+    std::vector<bool> targetCellsPrebuilt_;
+    std::vector<bool> targetCellsBuildable_;
+    std::size_t prebuiltBlocks_ = 0;
+    std::size_t runtimeSettledBlocks_ = 0;
+    std::size_t buildableTargets_ = 0;
     std::size_t nextTargetIndex_ = 0;
     uint64_t nextBlockId_ = 1000;
     std::uint64_t occupancyRevision_ = 0;

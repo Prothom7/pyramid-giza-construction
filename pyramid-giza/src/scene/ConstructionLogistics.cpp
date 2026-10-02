@@ -1266,6 +1266,7 @@ bool validatePostLiftRouteIntegration(std::ostream& output)
 
     simulation.initialize(
         PyramidLayout::generateComplete(PyramidLayoutConfig{}));
+    const std::size_t baselineOccupied = simulation.prebuiltCount();
     timeline.setProgress(0.0f);
     quarry.startExtraction(simulation, 0);
     if (simulation.activeBlocks.empty())
@@ -1410,7 +1411,7 @@ bool validatePostLiftRouteIntegration(std::ostream& output)
         finalScaleError <= placementScaleTolerance;
     const bool occupancyOnce = occupiedBefore && occupiedAfter &&
         simulation.settledCount() == 1 &&
-        simulation.occupiedTargetCount() == 1 &&
+        simulation.occupiedTargetCount() == baselineOccupied + 1 &&
         settlementTransitions == 1;
     const bool valid = upperSampled && placementSampled && sameIdentity &&
         liftToStagingContinuous && stagingToPlacementContinuous &&
@@ -1471,6 +1472,7 @@ bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)
     ConstructionLogistics logistics;
     
     sim.initialize(PyramidLayout::generate(PyramidLayoutConfig()));
+    const std::size_t baselineOccupied = sim.prebuiltCount();
     
     // Disable timeline so simulation only runs due to physical settlement
     timeline.setProgress(0.0f);
@@ -1537,7 +1539,8 @@ bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)
     output << "Position Error: " << posError << "\n";
     output << "Settled: " << (block->state == BlockState::Settled ? "YES" : "NO") << "\n\n";
     
-    output << "Pyramid Settled Count Before: 0\n";
+    output << "Pyramid Runtime Settled Count Before: 0\n";
+    output << "Pyramid Prebuilt Count: " << baselineOccupied << "\n";
     output << "Pyramid Settled Count After: " << sim.settledCount() << "\n\n";
 
     const bool occupiedAfter = sim.isTargetOccupied(targetIndex);
@@ -1551,7 +1554,8 @@ bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)
     bool valid = !occupiedBefore && occupiedAfter && !unrelatedOccupied &&
                  (block->state == BlockState::Settled) &&
                  (posError < 0.1f) && (sim.settledCount() == 1) &&
-                 (sim.settledCount() == sim.occupiedTargetCount());
+                 (sim.occupiedTargetCount() == baselineOccupied +
+                                                   sim.settledCount());
     output << "Conservation Accounting Valid: " << (valid ? "YES" : "NO") << "\n\n";
     output << (valid ? "PASS\n" : "FAIL\n");
     
