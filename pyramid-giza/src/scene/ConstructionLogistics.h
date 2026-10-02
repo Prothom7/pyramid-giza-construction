@@ -9,6 +9,7 @@
 
 #include "animation/ConstructionTimeline.h"
 #include "animation/QuarryPulleyAnimation.h"
+#include "objects/Worker.h"
 #include "scene/QuarrySystem.h"
 #include "scene/SceneTypes.h"
 #include "scene/ConstructionSimulation.h"
@@ -37,7 +38,8 @@ struct LogisticsSnapshot
     glm::vec3 blockPosition{0.0f};
     glm::vec3 blockRotation{0.0f};
     glm::vec3 sledgePosition{0.0f};
-    float sledgeHeading = 0.0f;
+    float sledgeHeading = 0.0f; // Degrees; local -Z is the hauling direction.
+    float sledgePitch = 0.0f;   // Degrees; follows the current support grade.
     bool ropeTaut = false;
     int activeWorkers = 0;
     float liftHeight = 0.0f;
@@ -48,6 +50,8 @@ struct LogisticsSnapshot
 class ConstructionLogistics
 {
 public:
+    static constexpr std::size_t pullingCrewSize() { return 2; }
+
     ConstructionLogistics();
 
     void update(float deltaTime, ConstructionSimulation& simulation,
@@ -63,6 +67,21 @@ public:
     float stateProgress() const { return stateProgress_; }
     int activeBlockNumber() const { return activeBlockNumber_; }
     const char* routeDescription() const;
+
+    // Physical-mode hauling geometry. These helpers keep the visible sledge,
+    // pulling crew, evaluated hands, and tow ropes in one transport frame.
+    static bool isPhysicalHaulingState(LogisticsState state);
+    static glm::mat4 physicalSledgeRoot(const LogisticsSnapshot& snapshot);
+    static glm::vec3 haulingDirection(const LogisticsSnapshot& snapshot);
+    static float haulingSupportHeight(const LogisticsSnapshot& snapshot,
+                                      const glm::vec2& worldPoint);
+    static glm::mat4 physicalWorkerRoot(const LogisticsSnapshot& snapshot,
+                                        std::size_t crewIndex,
+                                        const WorkerJointAngles& angles);
+    static glm::vec3 pullingHandPosition(const Worker::EvaluatedPose& pose,
+                                         std::size_t crewIndex);
+    static glm::vec3 physicalTowPoint(const LogisticsSnapshot& snapshot,
+                                      std::size_t crewIndex);
 
     // Visual rendering of the active in-transit block, sledge lashings, and props
     void collectSceneObjects(std::vector<SceneObject>& objects) const;
@@ -88,6 +107,7 @@ private:
     glm::vec3 blockRotation_{0.0f};
     glm::vec3 sledgePosition_{-108.0f, -6.2f, -5.0f};
     float sledgeHeading_ = 0.0f;
+    float sledgePitch_ = 0.0f;
     bool ropeTaut_ = false;
     int activeWorkers_ = 6;
     float liftHeight_ = 0.0f;

@@ -2386,6 +2386,10 @@ void StaticGizaScene::collectFrameObjects()
     };
 
     const ConstructionAnimationSnapshot animation = animationController_.snapshot();
+    const LogisticsSnapshot logSnap = logistics_.snapshot();
+    const bool physicalHaulingCrew =
+        physicalConstructionMode() &&
+        ConstructionLogistics::isPhysicalHaulingState(logSnap.state);
     std::vector<Worker::EvaluatedPose> evaluatedWorkers(workers_.size());
     for (std::size_t index = 0; index < workers_.size(); ++index)
     {
@@ -2421,7 +2425,29 @@ void StaticGizaScene::collectFrameObjects()
                             0.0f, -13.0f - 2.0f * static_cast<float>(lane)};
             root[3] = glm::vec4{position, 1.0f};
         }
-        if (coordinatedAnimationEnabled_ && worker.isHero && index < heroWorkerCount)
+        const bool physicalPuller =
+            physicalHaulingCrew &&
+            (index == static_cast<std::size_t>(WorkerRole::PullerLeft) ||
+             index == static_cast<std::size_t>(WorkerRole::PullerRight));
+        if (physicalPuller)
+        {
+            const std::size_t crewIndex =
+                index == static_cast<std::size_t>(WorkerRole::PullerLeft)
+                    ? 0u
+                    : 1u;
+            const bool moving = logSnap.state != LogisticsState::SledgeLoading;
+            const float phase = crewIndex == 0u ? 0.0f : 0.63f;
+            angles = moving
+                         ? ConstructionAnimationController::walkingPose(
+                               Worker::poseAngles(WorkerPose::PullingReady),
+                               animationController_.elapsedTime() + phase,
+                               1.0f, true)
+                         : Worker::poseAngles(WorkerPose::PullingReady);
+            root = ConstructionLogistics::physicalWorkerRoot(
+                logSnap, crewIndex, angles);
+        }
+        else if (coordinatedAnimationEnabled_ && worker.isHero &&
+                 index < heroWorkerCount)
         {
             root = animation.workers[index].root;
             angles = animation.workers[index].joints;
@@ -2441,9 +2467,9 @@ void StaticGizaScene::collectFrameObjects()
             drawPart(part.primitive, part.model, part.material);
     }
 
-    const LogisticsSnapshot logSnap = logistics_.snapshot();
-    const glm::mat4 sledgeRoot = makeTransform(logSnap.sledgePosition, glm::vec3{0.0f, logSnap.sledgeHeading, 0.0f}, glm::vec3{1.0f});
-    const glm::mat4 blockRoot = makeTransform(logSnap.blockPosition, logSnap.blockRotation, glm::vec3{1.0f});
+    const glm::mat4 sledgeRoot = physicalConstructionMode()
+                                       ? ConstructionLogistics::physicalSledgeRoot(logSnap)
+                                       : animation.loadedSledgeRoot;
 
     for (const ObjectPart& part : loadedSledgeParts_)
     {
@@ -2453,7 +2479,30 @@ void StaticGizaScene::collectFrameObjects()
         drawPart(part.primitive, sledgeRoot * part.localTransform, part.material);
     }
 
-    if (coordinatedAnimationEnabled_ && animation.ropeVisible)
+    if (physicalHaulingCrew && logSnap.ropeTaut)
+    {
+        for (std::size_t crewIndex = 0;
+             crewIndex < ConstructionLogistics::pullingCrewSize();
+             ++crewIndex)
+        {
+            const std::size_t workerIndex = crewIndex == 0u
+                                                ? static_cast<std::size_t>(
+                                                      WorkerRole::PullerLeft)
+                                                : static_cast<std::size_t>(
+                                                      WorkerRole::PullerRight);
+            const glm::vec3 hand =
+                ConstructionLogistics::pullingHandPosition(
+                    evaluatedWorkers[workerIndex], crewIndex);
+            const glm::vec3 tow =
+                ConstructionLogistics::physicalTowPoint(logSnap, crewIndex);
+            drawPart(ScenePrimitive::Cylinder,
+                     ConstructionAnimationController::cylinderBetween(
+                         hand, tow, 0.065f),
+                     MaterialId::Rope);
+        }
+    }
+    else if (!physicalConstructionMode() && coordinatedAnimationEnabled_ &&
+             animation.ropeVisible)
     {
         const auto handPoint = [](const Worker::EvaluatedPose& pose) {
             const glm::vec3 left{

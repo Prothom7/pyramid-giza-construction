@@ -1,8 +1,10 @@
 #include "scene/ConstructionLogistics.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iomanip>
+#include <limits>
 #include <ostream>
 #include <stdexcept>
 
@@ -11,11 +13,51 @@
 #include "animation/ConstructionAnimation.h"
 #include "scene/IndustrialLandscape.h"
 #include "scene/MonumentalSite.h"
+#include "scene/SupportSystem.h"
 #include <iostream>
 
 namespace
 {
 constexpr glm::vec3 cargoSocketOffset{0.0f, 1.36f, -0.02f};
+constexpr std::array<glm::vec3, 2> pullingWorkerOffsets{{
+    {-0.72f, 0.0f, -4.70f},
+    {0.72f, 0.0f, -4.70f}}};
+constexpr std::array<glm::vec3, 2> sledgeTowPointOffsets{{
+    {-0.46f, 0.58f, -2.44f},
+    {0.46f, 0.58f, -2.44f}}};
+constexpr float workerGroundClearance = 0.015f;
+
+bool finiteVector(const glm::vec3& value)
+{
+    return std::isfinite(value.x) && std::isfinite(value.y) &&
+           std::isfinite(value.z);
+}
+
+float headingDegreesFor(const glm::vec3& direction)
+{
+    return glm::degrees(std::atan2(-direction.x, -direction.z));
+}
+
+float pitchDegreesFor(const glm::vec3& direction)
+{
+    const float horizontal = glm::length(glm::vec2{direction.x, direction.z});
+    return glm::degrees(std::atan2(direction.y, horizontal));
+}
+
+glm::vec3 normalizedRouteDirection(const glm::vec3& from,
+                                   const glm::vec3& to)
+{
+    const glm::vec3 delta = to - from;
+    const float length = glm::length(delta);
+    return length > 1.0e-5f ? delta / length : glm::vec3{0.0f, 0.0f, -1.0f};
+}
+
+glm::vec3 formationOffset(std::size_t crewIndex)
+{
+    if (crewIndex >= pullingWorkerOffsets.size())
+        throw std::out_of_range("Physical pulling-crew index is invalid");
+    return pullingWorkerOffsets[crewIndex];
+}
 
 glm::vec3 pulleySledgeParkPosition()
 {
@@ -67,6 +109,7 @@ void ConstructionLogistics::reset()
     blockRotation_ = glm::vec3{0.0f};
     sledgePosition_ = glm::vec3{-108.0f, -6.2f, -5.0f};
     sledgeHeading_ = 0.0f;
+    sledgePitch_ = 0.0f;
     ropeTaut_ = false;
     activeWorkers_ = 4;
     liftHeight_ = 0.0f;
@@ -124,12 +167,96 @@ LogisticsSnapshot ConstructionLogistics::snapshot() const
     s.blockRotation = blockRotation_;
     s.sledgePosition = sledgePosition_;
     s.sledgeHeading = sledgeHeading_;
+    s.sledgePitch = sledgePitch_;
     s.ropeTaut = ropeTaut_;
     s.activeWorkers = activeWorkers_;
     s.liftHeight = liftHeight_;
     s.blockSettled = justSettled_;
     s.routeDescription = routeDescription();
     return s;
+}
+
+bool ConstructionLogistics::isPhysicalHaulingState(LogisticsState state)
+{
+    return state == LogisticsState::SledgeLoading ||
+           state == LogisticsState::Hauling ||
+           state == LogisticsState::RampApproach ||
+           state == LogisticsState::RampAscent;
+}
+
+glm::mat4 ConstructionLogistics::physicalSledgeRoot(
+    const LogisticsSnapshot& snapshot)
+{
+    if (!finiteVector(snapshot.sledgePosition) ||
+        !std::isfinite(snapshot.sledgeHeading) ||
+        !std::isfinite(snapshot.sledgePitch))
+        throw std::invalid_argument("Physical sledge snapshot must be finite");
+    return makeTransform(snapshot.sledgePosition,
+                         {snapshot.sledgePitch, snapshot.sledgeHeading, 0.0f},
+                         {1.0f, 1.0f, 1.0f});
+}
+
+glm::vec3 ConstructionLogistics::haulingDirection(
+    const LogisticsSnapshot& snapshot)
+{
+    const glm::mat4 root = physicalSledgeRoot(snapshot);
+    return glm::normalize(glm::vec3{root * glm::vec4{0.0f, 0.0f, -1.0f, 0.0f}});
+}
+
+float ConstructionLogistics::haulingSupportHeight(
+    const LogisticsSnapshot& snapshot, const glm::vec2& worldPoint)
+{
+    const glm::mat4 root = physicalSledgeRoot(snapshot);
+    const glm::vec3 normal =
+        glm::normalize(glm::vec3{root * glm::vec4{0.0f, 1.0f, 0.0f, 0.0f}});
+    if (std::abs(normal.y) <= 1.0e-5f)
+        throw std::runtime_error("Physical hauling support plane is vertical");
+    const glm::vec3 delta{worldPoint.x - snapshot.sledgePosition.x, 0.0f,
+                          worldPoint.y - snapshot.sledgePosition.z};
+    return snapshot.sledgePosition.y -
+           (normal.x * delta.x + normal.z * delta.z) / normal.y;
+}
+
+glm::mat4 ConstructionLogistics::physicalWorkerRoot(
+    const LogisticsSnapshot& snapshot, std::size_t crewIndex,
+    const WorkerJointAngles& angles)
+{
+    const glm::vec3 anchor{physicalSledgeRoot(snapshot) *
+                           glm::vec4{formationOffset(crewIndex), 1.0f}};
+    // The transport frame supplies position and heading. Workers remain
+    // upright while their feet are grounded to its inclined support plane.
+    glm::mat4 root = makeTransform(anchor, {0.0f, snapshot.sledgeHeading, 0.0f},
+                                   {1.0f, 1.0f, 1.0f});
+    const Worker::EvaluatedPose ungrounded = Worker::evaluate(root, angles);
+    const float leftFootBottom = SceneSupport::transformedBottomY(
+        ungrounded[static_cast<std::size_t>(BodyPart::LeftFoot)].model);
+    const float rightFootBottom = SceneSupport::transformedBottomY(
+        ungrounded[static_cast<std::size_t>(BodyPart::RightFoot)].model);
+    const float footBottom = std::min(leftFootBottom, rightFootBottom);
+    const glm::vec3 position{root[3]};
+    const float support = haulingSupportHeight(
+        snapshot, {position.x, position.z});
+    root[3].y += support + workerGroundClearance - footBottom;
+    return root;
+}
+
+glm::vec3 ConstructionLogistics::pullingHandPosition(
+    const Worker::EvaluatedPose& pose, std::size_t crewIndex)
+{
+    if (crewIndex >= pullingCrewSize())
+        throw std::out_of_range("Physical pulling-hand index is invalid");
+    const BodyPart hand = crewIndex == 0 ? BodyPart::RightHand
+                                         : BodyPart::LeftHand;
+    return glm::vec3{pose[static_cast<std::size_t>(hand)].jointWorld[3]};
+}
+
+glm::vec3 ConstructionLogistics::physicalTowPoint(
+    const LogisticsSnapshot& snapshot, std::size_t crewIndex)
+{
+    if (crewIndex >= sledgeTowPointOffsets.size())
+        throw std::out_of_range("Physical tow-point index is invalid");
+    return glm::vec3{physicalSledgeRoot(snapshot) *
+                     glm::vec4{sledgeTowPointOffsets[crewIndex], 1.0f}};
 }
 
 glm::vec3 ConstructionLogistics::computeHaulPosition(float progress) const
@@ -344,9 +471,14 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     case LogisticsState::SledgeLoading:
     {
         sledgePosition_ = glm::vec3{-108.0f, -6.0f, -5.0f};
-        sledgeHeading_ = 0.0f;
+        const glm::vec3 direction = normalizedRouteDirection(
+            computeHaulPosition(0.0f), computeHaulPosition(1.0f));
+        sledgeHeading_ = headingDegreesFor(direction);
+        sledgePitch_ = pitchDegreesFor(direction);
         const glm::vec3 groundStaging{-108.0f, -5.2f, -5.0f}; // Resting on ground (Y=-6.0 + 0.8)
-        const glm::vec3 mountedOnSledge = sledgePosition_ + cargoSocketOffset;
+        const LogisticsSnapshot loading = snapshot();
+        const glm::vec3 mountedOnSledge{
+            physicalSledgeRoot(loading) * glm::vec4{cargoSocketOffset, 1.0f}};
         blockPosition_ = glm::mix(groundStaging, mountedOnSledge, stateProgress_);
         blockRotation_ = glm::vec3{0.0f};
         break;
@@ -355,9 +487,14 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     case LogisticsState::Hauling:
     {
         sledgePosition_ = computeHaulPosition(stateProgress_);
-        sledgeHeading_ = 0.0f;
-        blockPosition_ = sledgePosition_ + glm::vec3(glm::rotate(glm::mat4(1.0f), sledgeHeading_, glm::vec3(0,1,0)) * glm::vec4(0.0f, 1.36f, -0.02f, 1.0f));
-        blockRotation_ = glm::vec3{0.0f, sledgeHeading_, 0.0f};
+        const glm::vec3 direction = normalizedRouteDirection(
+            computeHaulPosition(0.0f), computeHaulPosition(1.0f));
+        sledgeHeading_ = headingDegreesFor(direction);
+        sledgePitch_ = pitchDegreesFor(direction);
+        const LogisticsSnapshot hauling = snapshot();
+        blockPosition_ = glm::vec3{physicalSledgeRoot(hauling) *
+                                   glm::vec4{cargoSocketOffset, 1.0f}};
+        blockRotation_ = {sledgePitch_, sledgeHeading_, 0.0f};
         break;
     }
     case LogisticsState::RampApproach:
@@ -365,27 +502,33 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
         const glm::vec3 p0 = computeHaulPosition(1.0f);
         const glm::vec3 p1{0.0f, 0.0f, 45.0f};
         sledgePosition_ = glm::mix(p0, p1, stateProgress_);
-        const float dx = p1.x - p0.x;
-        const float dz = p1.z - p0.z;
-        sledgeHeading_ = std::atan2(dx, dz);
-        blockPosition_ = sledgePosition_ + glm::vec3(glm::rotate(glm::mat4(1.0f), sledgeHeading_, glm::vec3(0,1,0)) * glm::vec4(0.0f, 1.36f, -0.02f, 1.0f));
-        blockRotation_ = glm::vec3{0.0f, sledgeHeading_, 0.0f};
+        const glm::vec3 direction = normalizedRouteDirection(p0, p1);
+        sledgeHeading_ = headingDegreesFor(direction);
+        sledgePitch_ = pitchDegreesFor(direction);
+        const LogisticsSnapshot approach = snapshot();
+        blockPosition_ = glm::vec3{physicalSledgeRoot(approach) *
+                                   glm::vec4{cargoSocketOffset, 1.0f}};
+        blockRotation_ = {sledgePitch_, sledgeHeading_, 0.0f};
         break;
     }
     case LogisticsState::RampAscent:
     {
         sledgePosition_ = computeRampPosition(stateProgress_);
-        sledgeHeading_ = 0.0f;
-        blockRotation_ = glm::vec3{-0.15f, sledgeHeading_, 0.0f};
-        glm::mat4 rot = glm::rotate(glm::mat4(1.0f), sledgeHeading_, glm::vec3(0,1,0));
-        rot = glm::rotate(rot, -0.15f, glm::vec3(1,0,0));
-        blockPosition_ = sledgePosition_ + glm::vec3(rot * glm::vec4(0.0f, 1.36f, -0.02f, 1.0f));
+        const glm::vec3 direction = normalizedRouteDirection(
+            computeRampPosition(0.0f), computeRampPosition(1.0f));
+        sledgeHeading_ = headingDegreesFor(direction);
+        sledgePitch_ = pitchDegreesFor(direction);
+        blockRotation_ = {sledgePitch_, sledgeHeading_, 0.0f};
+        const LogisticsSnapshot ramp = snapshot();
+        blockPosition_ = glm::vec3{physicalSledgeRoot(ramp) *
+                                   glm::vec4{cargoSocketOffset, 1.0f}};
         break;
     }
     case LogisticsState::LiftPrep:
     {
         sledgePosition_ = pulleySledgeParkPosition();
         sledgeHeading_ = 0.0f;
+        sledgePitch_ = 0.0f;
         if (physicalLiftEnabled)
         {
             if (!pulley.setPhysicalPreparationProgress(activeBlockId_,
@@ -410,6 +553,7 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     {
         sledgePosition_ = pulleySledgeParkPosition();
         sledgeHeading_ = 0.0f;
+        sledgePitch_ = 0.0f;
         if (physicalLiftEnabled)
         {
             if (!pulley.setPhysicalLiftProgress(activeBlockId_, stateProgress_))
@@ -643,13 +787,191 @@ bool validatePhysicalPulleyIntegration(std::ostream& output)
                      : "Physical pulley integration checks failed.\n");
     return valid;
 }
+
+bool validatePhysicalHaulingCrewIntegration(std::ostream& output)
+{
+    ConstructionSimulation simulation;
+    QuarrySystem quarry;
+    ConstructionTimelineController timeline;
+    QuarryPulleyAnimationController pulley;
+    ConstructionLogistics logistics;
+
+    simulation.initialize(
+        PyramidLayout::generateComplete(PyramidLayoutConfig{}));
+    timeline.setProgress(0.0f);
+    quarry.startExtraction(simulation, 0);
+
+    std::array<bool, 4> sampledStates{{false, false, false, false}};
+    bool rootsFinite = true;
+    bool formationSynchronized = true;
+    bool spacingValid = true;
+    bool workersInFront = true;
+    bool workersFacing = true;
+    bool handsFinite = true;
+    bool towPointsFinite = true;
+    bool ropeEndpointsOwned = true;
+    bool ropesAboveSupport = true;
+    bool flatGrounded = true;
+    bool rampGrounded = true;
+    float minimumSpacing = std::numeric_limits<float>::max();
+    float maximumGroundingError = 0.0f;
+
+    constexpr float deltaTime = 0.05f;
+    constexpr int maximumSteps = 10000;
+    for (int step = 0; step < maximumSteps; ++step)
+    {
+        quarry.update(deltaTime, simulation);
+        logistics.update(deltaTime, simulation, quarry, timeline, pulley, true);
+        const LogisticsSnapshot snapshot = logistics.snapshot();
+        if (!ConstructionLogistics::isPhysicalHaulingState(snapshot.state))
+        {
+            if (snapshot.state == LogisticsState::LiftPrep)
+                break;
+            continue;
+        }
+
+        const std::size_t stateIndex =
+            static_cast<std::size_t>(snapshot.state) -
+            static_cast<std::size_t>(LogisticsState::SledgeLoading);
+        if (stateIndex < sampledStates.size())
+            sampledStates[stateIndex] = true;
+
+        const glm::mat4 sledgeRoot =
+            ConstructionLogistics::physicalSledgeRoot(snapshot);
+        glm::vec3 direction = ConstructionLogistics::haulingDirection(snapshot);
+        direction.y = 0.0f;
+        direction = glm::normalize(direction);
+        std::array<glm::vec3, 2> workerPositions{};
+
+        for (std::size_t crewIndex = 0;
+             crewIndex < ConstructionLogistics::pullingCrewSize();
+             ++crewIndex)
+        {
+            const bool moving = snapshot.state != LogisticsState::SledgeLoading;
+            const WorkerJointAngles angles = moving
+                ? ConstructionAnimationController::walkingPose(
+                      Worker::poseAngles(WorkerPose::PullingReady),
+                      static_cast<float>(step) * deltaTime +
+                          (crewIndex == 0u ? 0.0f : 0.63f),
+                      1.0f, true)
+                : Worker::poseAngles(WorkerPose::PullingReady);
+            const glm::mat4 root = ConstructionLogistics::physicalWorkerRoot(
+                snapshot, crewIndex, angles);
+            rootsFinite = rootsFinite && isFiniteNonSingularTransform(root);
+            workerPositions[crewIndex] = glm::vec3{root[3]};
+
+            const glm::vec3 expectedWorld{
+                sledgeRoot * glm::vec4{formationOffset(crewIndex), 1.0f}};
+            formationSynchronized = formationSynchronized &&
+                std::abs(workerPositions[crewIndex].x - expectedWorld.x) <=
+                    1.0e-3f &&
+                std::abs(workerPositions[crewIndex].z - expectedWorld.z) <=
+                    1.0e-3f;
+
+            glm::vec3 workerForward{
+                root * glm::vec4{0.0f, 0.0f, -1.0f, 0.0f}};
+            workerForward.y = 0.0f;
+            workerForward = glm::normalize(workerForward);
+            workersFacing = workersFacing &&
+                            glm::dot(workerForward, direction) >= 0.999f;
+            glm::vec3 lead = workerPositions[crewIndex] - snapshot.sledgePosition;
+            lead.y = 0.0f;
+            workersInFront = workersInFront && glm::dot(lead, direction) > 3.5f;
+
+            const Worker::EvaluatedPose pose = Worker::evaluate(root, angles);
+            const float leftFootBottom = SceneSupport::transformedBottomY(
+                pose[static_cast<std::size_t>(BodyPart::LeftFoot)].model);
+            const float rightFootBottom = SceneSupport::transformedBottomY(
+                pose[static_cast<std::size_t>(BodyPart::RightFoot)].model);
+            const float footBottom = std::min(leftFootBottom, rightFootBottom);
+            const float support = ConstructionLogistics::haulingSupportHeight(
+                snapshot, {workerPositions[crewIndex].x,
+                           workerPositions[crewIndex].z});
+            const float groundingError =
+                std::abs(footBottom - support - workerGroundClearance);
+            maximumGroundingError =
+                std::max(maximumGroundingError, groundingError);
+            if (snapshot.state == LogisticsState::RampAscent)
+                rampGrounded = rampGrounded && groundingError <= 1.0e-3f;
+            else
+                flatGrounded = flatGrounded && groundingError <= 1.0e-3f;
+
+            const glm::vec3 hand =
+                ConstructionLogistics::pullingHandPosition(pose, crewIndex);
+            const glm::vec3 tow =
+                ConstructionLogistics::physicalTowPoint(snapshot, crewIndex);
+            handsFinite = handsFinite && finiteVector(hand);
+            towPointsFinite = towPointsFinite && finiteVector(tow);
+            ropeEndpointsOwned = ropeEndpointsOwned &&
+                glm::distance(hand,
+                              ConstructionLogistics::pullingHandPosition(
+                                  pose, crewIndex)) <= 1.0e-6f &&
+                glm::distance(tow,
+                              ConstructionLogistics::physicalTowPoint(
+                                  snapshot, crewIndex)) <= 1.0e-6f;
+            if (snapshot.ropeTaut)
+            {
+                const glm::mat4 rope =
+                    ConstructionAnimationController::cylinderBetween(
+                        hand, tow, 0.065f);
+                rootsFinite = rootsFinite && isFiniteNonSingularTransform(rope);
+                for (int sample = 0; sample <= 8; ++sample)
+                {
+                    const glm::vec3 point = glm::mix(
+                        hand, tow, static_cast<float>(sample) / 8.0f);
+                    const float ropeSupport =
+                        ConstructionLogistics::haulingSupportHeight(
+                            snapshot, {point.x, point.z});
+                    ropesAboveSupport = ropesAboveSupport &&
+                                        point.y - ropeSupport >= 0.08f;
+                }
+            }
+        }
+
+        const float spacing =
+            glm::distance(workerPositions[0], workerPositions[1]);
+        minimumSpacing = std::min(minimumSpacing, spacing);
+        spacingValid = spacingValid && spacing >= 1.25f;
+    }
+
+    const bool allStatesSampled =
+        std::all_of(sampledStates.begin(), sampledStates.end(),
+                    [](bool sampled) { return sampled; });
+    const bool valid = allStatesSampled && rootsFinite &&
+                       formationSynchronized && spacingValid &&
+                       workersInFront && workersFacing && flatGrounded &&
+                       rampGrounded && handsFinite && towPointsFinite &&
+                       ropeEndpointsOwned && ropesAboveSupport;
+
+    output << std::fixed << std::setprecision(3)
+           << "Phase 13 physical hauling crew validation\n"
+           << "  all physical hauling states sampled: "
+           << (allStatesSampled ? "PASS" : "FAIL") << '\n'
+           << "  roots derive from logistics sledge: "
+           << (formationSynchronized ? "PASS" : "FAIL") << '\n'
+           << "  minimum worker spacing: " << minimumSpacing << ' '
+           << (spacingValid ? "PASS" : "FAIL") << '\n'
+           << "  workers ahead and facing haul direction: "
+           << (workersInFront && workersFacing ? "PASS" : "FAIL") << '\n'
+           << "  maximum foot/support error: " << maximumGroundingError << ' '
+           << (flatGrounded && rampGrounded ? "PASS" : "FAIL") << '\n'
+           << "  hand and tow endpoints finite/authoritative: "
+           << (handsFinite && towPointsFinite && ropeEndpointsOwned
+                   ? "PASS" : "FAIL") << '\n'
+           << "  taut ropes remain above transport support: "
+           << (ropesAboveSupport ? "PASS" : "FAIL") << '\n'
+           << (valid ? "Physical hauling crew checks passed.\n"
+                     : "Physical hauling crew checks failed.\n");
+    return valid;
+}
 } // namespace
 
 bool ConstructionLogistics::validateConstructionLogistics(std::ostream& output)
 {
     const bool occupancyValid = validateConstructionOccupancy(output);
     const bool pulleyValid = validatePhysicalPulleyIntegration(output);
-    return occupancyValid && pulleyValid;
+    const bool haulingCrewValid = validatePhysicalHaulingCrewIntegration(output);
+    return occupancyValid && pulleyValid && haulingCrewValid;
 }
 
 bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)
