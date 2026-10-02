@@ -91,12 +91,15 @@ public:
     static bool validateConstructionTrace(std::ostream& output);
 
 private:
-    void advanceState(ConstructionSimulation& simulation, QuarrySystem& quarry, ConstructionTimelineController& timeline,
+    void advanceState(ConstructionSimulation& simulation, QuarrySystem& quarry,
                       QuarryPulleyAnimationController& pulley,
                       bool physicalLiftEnabled);
     glm::vec3 computeHaulPosition(float progress) const;
     glm::vec3 computeRampPosition(float progress) const;
     glm::vec3 computePlacementPosition(float progress, ConstructionSimulation& simulation) const;
+    void settlePlacementIfSpatiallyReady(
+        ConstructionSimulation& simulation,
+        ConstructionTimelineController& timeline);
 
     LogisticsState state_ = LogisticsState::QuarryReady;
     uint64_t activeBlockId_ = 0;
@@ -105,6 +108,7 @@ private:
     float stateTimer_ = 0.0f;
     glm::vec3 blockPosition_{-108.0f, -6.2f, -5.0f};
     glm::vec3 blockRotation_{0.0f};
+    glm::vec3 blockScale_{2.6f, 1.6f, 2.4f};
     glm::vec3 sledgePosition_{-108.0f, -6.2f, -5.0f};
     float sledgeHeading_ = 0.0f;
     float sledgePitch_ = 0.0f;
@@ -113,4 +117,7 @@ private:
     float liftHeight_ = 0.0f;
     bool justSettled_ = false;
     float settledFlashTimer_ = 0.0f;
+    glm::vec3 previousPostLiftPosition_{0.0f};
+    float largestPostLiftDisplacement_ = 0.0f;
+    bool hasPreviousPostLiftPosition_ = false;
 };

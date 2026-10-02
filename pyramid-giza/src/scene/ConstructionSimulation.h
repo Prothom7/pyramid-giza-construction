@@ -36,6 +36,7 @@ struct ConstructionBlock
     glm::vec3 previousPosition{0.0f};
     glm::vec3 velocity{0.0f};
     glm::vec3 rotation{0.0f};
+    glm::vec3 scale{2.6f, 1.6f, 2.4f};
 
     int sledgeId = -1;
     PyramidBlockPlacement targetPlacement;

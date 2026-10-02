@@ -136,6 +136,25 @@ bool QuarryPulleyAnimationController::setPhysicalLiftProgress(
     return true;
 }
 
+bool QuarryPulleyAnimationController::setPhysicalTransferProgress(
+    std::uint64_t blockId, float progress)
+{
+    if (blockId == 0 ||
+        (activePhysicalBlockId_ != 0 && activePhysicalBlockId_ != blockId) ||
+        !std::isfinite(progress))
+        return false;
+
+    activePhysicalBlockId_ = blockId;
+    paused_ = true;
+    const float guideStart = startTime(QuarryPulleyState::GuideToPlatform);
+    const float transferDuration =
+        stateDuration(QuarryPulleyState::GuideToPlatform) +
+        stateDuration(QuarryPulleyState::Lower);
+    elapsedTime_ = guideStart +
+                   std::clamp(progress, 0.0f, 1.0f) * transferDuration;
+    return true;
+}
+
 bool QuarryPulleyAnimationController::holdPhysicalBlockAtLiftTop(
     std::uint64_t blockId)
 {

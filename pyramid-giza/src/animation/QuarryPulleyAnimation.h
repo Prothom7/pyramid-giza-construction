@@ -48,6 +48,7 @@ public:
     void seek(float elapsedTime, bool playing = true);
     bool setPhysicalPreparationProgress(std::uint64_t blockId, float progress);
     bool setPhysicalLiftProgress(std::uint64_t blockId, float progress);
+    bool setPhysicalTransferProgress(std::uint64_t blockId, float progress);
     bool holdPhysicalBlockAtLiftTop(std::uint64_t blockId);
     bool releasePhysicalBlock(std::uint64_t blockId);
     void togglePaused() { paused_ = !paused_; }

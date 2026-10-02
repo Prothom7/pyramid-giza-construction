@@ -87,6 +87,8 @@ bool ConstructionSimulation::settleBlock(uint64_t blockId)
     block->state = BlockState::Settled;
     block->position = block->targetPlacement.position;
     block->previousPosition = block->position;
+    block->rotation = glm::vec3{0.0f};
+    block->scale = block->targetPlacement.scale;
     block->taskProgress = 1.0f;
     block->isSettled = true;
     return true;
@@ -118,8 +120,7 @@ void ConstructionSimulation::collectSceneObjects(std::vector<SceneObject>& objec
             model = glm::rotate(model, block.rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
         }
 
-        // Apply scale (approximate standard block size: length 2.6, height 1.6, width 2.4)
-        glm::mat4 scaleOnly = glm::scale(glm::mat4(1.0f), glm::vec3(2.6f, 1.6f, 2.4f));
+        const glm::mat4 scaleOnly = glm::scale(glm::mat4(1.0f), block.scale);
 
         objects.push_back({ScenePrimitive::Cube, model * scaleOnly, material});
     }
