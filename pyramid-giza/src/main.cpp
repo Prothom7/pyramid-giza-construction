@@ -644,6 +644,7 @@ int main(int argc, char** argv)
     bool quarryValidationOnly = false;
     bool logisticsValidationOnly = false;
     bool upperAccessValidationOnly = false;
+    bool upperAccessStageTwoValidationOnly = false;
     bool haulRouteValidationOnly = false;
     bool sandValidationOnly = false;
     bool waterValidationOnly = false;
@@ -767,6 +768,8 @@ int main(int argc, char** argv)
             haulRouteValidationOnly = true;
         else if (option == "--validate-upper-access")
             upperAccessValidationOnly = true;
+        else if (option == "--validate-upper-access-stage-two")
+            upperAccessStageTwoValidationOnly = true;
         else if (option == "--validate-sand")
             sandValidationOnly = true;
         else if (option == "--validate-water")
@@ -1125,6 +1128,8 @@ int main(int argc, char** argv)
         return ConstructionLogistics::validateConstructionLogistics(std::cout) ? 0 : 1;
     if (upperAccessValidationOnly)
         return ConstructionLogistics::validateUpperAccessStageOne(std::cout) ? 0 : 1;
+    if (upperAccessStageTwoValidationOnly)
+        return ConstructionLogistics::validateUpperAccessStageTwo(std::cout) ? 0 : 1;
     if (haulRouteValidationOnly)
         return ConstructionLogistics::validatePhysicalRoute(std::cout) ? 0 : 1;
     if (sandValidationOnly)

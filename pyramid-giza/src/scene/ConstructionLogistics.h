@@ -79,6 +79,7 @@ public:
                                                  float constructionProgress = 0.0f);
     static bool validatePhysicalRoute(std::ostream& output);
     static bool validateUpperAccessStageOne(std::ostream& output);
+    static bool validateUpperAccessStageTwo(std::ostream& output);
     void setSupportProgress(float progress) { supportProgress_ = progress; }
     static glm::vec3 haulingDirection(const LogisticsSnapshot& snapshot);
     static float haulingSupportHeight(const LogisticsSnapshot& snapshot,

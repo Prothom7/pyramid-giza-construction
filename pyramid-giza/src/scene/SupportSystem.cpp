@@ -152,8 +152,8 @@ SupportSurface transportAt(const glm::vec2& point, float constructionProgress)
             (frame.up.x * (point.x - center.x) +
              frame.up.z * (point.y - center.z)) / frame.up.y;
         const glm::vec3 offset{point.x - center.x, height - center.y, point.y - center.z};
-        if (std::abs(glm::dot(offset, frame.right)) > 0.5f * descriptor.width ||
-            std::abs(glm::dot(offset, frame.forward)) > 0.5f * frame.length ||
+        if (std::abs(glm::dot(offset, frame.right)) > 0.5f * descriptor.width + 0.002f ||
+            std::abs(glm::dot(offset, frame.forward)) > 0.5f * frame.length + 0.002f ||
             height < terrain.height - 0.001f)
             return;
         if (!explicitSurface.valid || height > explicitSurface.height)
@@ -162,7 +162,8 @@ SupportSurface transportAt(const glm::vec2& point, float constructionProgress)
     for (const RampDescriptor& ramp : MonumentalSite::ramps())
         if (MonumentalSite::rampActive(ramp, constructionProgress))
         {
-            topFace(ramp, SupportSurfaceKind::RampSurface);
+            topFace(ramp, std::string(ramp.id) == "UpperTargetLanding"
+                ? SupportSurfaceKind::WorkPlatform : SupportSurfaceKind::RampSurface);
             if (std::string(ramp.id).find("MainHauling") == 0)
             {
                 topFace(transportRampToe(ramp), SupportSurfaceKind::RampSurface);
@@ -253,6 +254,15 @@ float rampUndersideY(const RampDescriptor& ramp, float rampProgress)
 
 SupportSurface rampFillAt(const RampDescriptor& ramp, float rampProgress)
 {
+    const std::string id = ramp.id;
+    if (id == "UpperRampA" || id == "UpperRampB" ||
+        id == "UpperTargetLanding")
+    {
+        // These slabs span visible trestle bays rather than resting on the
+        // stepped earth fill used by the older ramps.
+        return {ramp.id, SupportSurfaceKind::WorkPlatform,
+                rampUndersideY(ramp, rampProgress), {0.0f, 1.0f, 0.0f}, true};
+    }
     const int segments = std::string(ramp.id) == "MainLanding"
                              ? 1
                              : rampFillSegments;

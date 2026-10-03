@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -10,6 +11,7 @@
 
 #include "objects/Scaffold.h"
 #include "scene/PyramidLayout.h"
+#include "scene/PyramidInterior.h"
 
 namespace
 {
@@ -63,6 +65,8 @@ const std::vector<RampDescriptor>& MonumentalSite::ramps()
          7.8f, 0.40f, MaterialId::RampEarth, false,
          0.62f, 0.90f, 0.25f, 0.0f, true, "Controlled pyramid-face landing"},
         upperRampA(),
+        upperRampB(),
+        targetLevelLanding(),
         {"WestAccessRamp", {-63.0f, 0.30f, -25.0f}, {-40.0f, 4.30f, -25.0f},
          4.5f, 0.60f, MaterialId::RampEarth, false,
          0.05f, 0.62f, 1.40f, 0.0f, false, "West worker access"},
@@ -143,6 +147,7 @@ const UpperAccessLayout& MonumentalSite::upperAccessLayout()
     static const UpperAccessLayout layout{
         {{-12.75f, 8.375f, 9.25f}, {11.5f, 0.35f, 8.5f}},
         {{-49.5f, 12.80976f, 6.0f}, {9.0f, 0.35f, 16.0f}},
+        {-28.05f, -63.90f},
         {-9.0f, 0.0f}, {-14.5f, 5.5f}, 5.5f,
         {-45.0f, 5.5f}, 5.5f, glm::radians(108.14056f)
     };
@@ -163,6 +168,103 @@ const RampDescriptor& MonumentalSite::upperRampA()
         0.62f, 0.90f, 0.30f, 0.0f, false, "Westward upper sledge ramp"
     };
     return ramp;
+}
+
+const RampDescriptor& MonumentalSite::upperRampB()
+{
+    const UpperAccessLayout& access = upperAccessLayout();
+    const glm::vec2 start = access.turnCenter + access.turnRadius *
+        glm::vec2{-std::sin(access.turnRadians), std::cos(access.turnRadians)};
+    const glm::vec2 end{-29.0f, -61.0f};
+    const float horizontal = glm::distance(start, end);
+    const float rise = 24.0f - 12.98476f;
+    const float centerOffset = 0.35f * std::cos(std::atan2(rise, horizontal));
+    static const RampDescriptor ramp{
+        "UpperRampB", {start.x, 12.98476f - centerOffset, start.y},
+        {end.x, 24.0f - centerOffset, end.y},
+        7.0f, 0.70f, MaterialId::Wood, false,
+        0.62f, 0.90f, 0.0f, 0.0f, false, "Target-course upper sledge ramp"
+    };
+    return ramp;
+}
+
+const RampDescriptor& MonumentalSite::targetLevelLanding()
+{
+    const RampDescriptor& ramp = upperRampB();
+    const glm::vec2 direction = glm::normalize(glm::vec2{
+        ramp.top.x - ramp.base.x, ramp.top.z - ramp.base.z});
+    // Favor the open west side. The small lateral offset keeps the flat deck
+    // clear of the finished course while still covering the ramp centerline.
+    const glm::vec2 west{rampFrame(ramp).right.x, rampFrame(ramp).right.z};
+    const glm::vec2 start = glm::vec2{ramp.top.x, ramp.top.z} -
+        0.20f * direction + 0.35f * west;
+    const glm::vec2 end = glm::vec2{ramp.top.x, ramp.top.z} +
+        9.5f * direction + 0.35f * west;
+    static const RampDescriptor landing{
+        "UpperTargetLanding", {start.x, 23.825f, start.y},
+        {end.x, 23.825f, end.y},
+        4.4f, 0.35f, MaterialId::Wood, false,
+        0.62f, 0.90f, 0.0f, 0.0f, false, "Target-course sledge staging deck"
+    };
+    return landing;
+}
+
+float MonumentalSite::occupiedCourseTopUnder(glm::vec2 point, float margin)
+{
+    static const auto blocks = PyramidLayout::generateComplete(PyramidLayoutConfig{});
+    float top = -std::numeric_limits<float>::infinity();
+    for (const PyramidBlockPlacement& block : blocks)
+    {
+        if (block.level >= 12u)
+            continue;
+        if (std::abs(point.x - block.position.x) + margin <= 0.5f * block.scale.x &&
+            std::abs(point.y - block.position.z) + margin <= 0.5f * block.scale.z &&
+            !PyramidInterior::blockIntersectsVoid(block))
+            top = std::max(top, block.position.y + 0.5f * block.scale.y);
+    }
+    return top;
+}
+
+UpperSupportFooting MonumentalSite::upperSupportFooting(glm::vec2 preferred,
+                                                         float undersideY)
+{
+    static const auto blocks = PyramidLayout::generateComplete(PyramidLayoutConfig{});
+    constexpr float offsets[]{0.0f, -0.20f, 0.20f, -0.40f, 0.40f,
+                              -0.60f, 0.60f};
+    UpperSupportFooting best;
+    float bestDistance = std::numeric_limits<float>::infinity();
+    for (float dx : offsets)
+        for (float dz : offsets)
+        {
+            const glm::vec2 point = preferred + glm::vec2{dx, dz};
+            const float course = occupiedCourseTopUnder(point, 0.23f);
+            const bool onCourse = std::isfinite(course);
+            const float foundation = onCourse ? course : 0.0f;
+            if (foundation >= undersideY - 0.15f) continue;
+            bool penetrates = false;
+            for (const PyramidBlockPlacement& block : blocks)
+            {
+                if (block.level >= 12u)
+                    continue;
+                if (std::abs(point.x - block.position.x) >=
+                        0.5f * block.scale.x + 0.19f ||
+                    std::abs(point.y - block.position.z) >=
+                        0.5f * block.scale.z + 0.19f)
+                    continue;
+                const float bottom = block.position.y - 0.5f * block.scale.y;
+                const float top = block.position.y + 0.5f * block.scale.y;
+                if (top > foundation + 0.005f && bottom < undersideY - 0.005f)
+                    if (!PyramidInterior::blockIntersectsVoid(block))
+                    { penetrates = true; break; }
+            }
+            const float distance = glm::dot(point - preferred, point - preferred);
+            if (!penetrates && distance < bestDistance)
+            {
+                best = {point, course, onCourse, true};
+                bestDistance = distance;
+            }
+        }
+    return best;
 }
 
 const std::vector<SiteZoneDescriptor>& MonumentalSite::zones()

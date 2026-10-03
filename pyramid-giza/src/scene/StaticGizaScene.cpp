@@ -405,7 +405,8 @@ void StaticGizaScene::buildRampNetwork()
         // segment reaches from the declared terrain/floor to the ramp underside.
         const int fillSegments = id == "MainLanding" ? 1 :
             (id == "QuarryDeckConnector" || id == "QuarryExitDeckExtension" ||
-             id == "UpperRampA") ? 0 : 64;
+             id == "UpperRampA" || id == "UpperRampB" ||
+             id == "UpperTargetLanding") ? 0 : 64;
         const glm::vec3 horizontalDelta{ramp.top.x - ramp.base.x, 0.0f,
                                         ramp.top.z - ramp.base.z};
         const float horizontalLength = glm::length(horizontalDelta);
@@ -433,6 +434,8 @@ void StaticGizaScene::buildRampNetwork()
 
         for (float sign : {-1.0f, 1.0f})
         {
+            if (id == "UpperRampB" || id == "UpperTargetLanding")
+                continue;
             // Leave a west-side exit from the landing onto the work deck.
             if (id == "MainLanding" && sign > 0.0f)
                 continue;
@@ -466,7 +469,8 @@ void StaticGizaScene::buildRampNetwork()
         }
 
         const bool needsSupports = id != "QuarryExitRamp" &&
-                                   id != "MainLanding" && id != "UpperRampA";
+                                   id != "MainLanding" && id != "UpperRampA" &&
+                                   id != "UpperRampB" && id != "UpperTargetLanding";
         if (needsSupports)
             for (float t : {0.25f, 0.50f, 0.75f})
             {
@@ -518,6 +522,58 @@ void StaticGizaScene::buildRampNetwork()
                         underside + frame.right * 3.05f, 0.16f),
                     MaterialId::Wood, ramp);
             }
+
+        if (id == "UpperRampB" || id == "UpperTargetLanding")
+        {
+            const int bays = id == "UpperRampB" ? 9 : 2;
+            const float sideOffset = id == "UpperRampB" ? 3.05f : 1.85f;
+            for (int bay = 1; bay <= bays; ++bay)
+            {
+                const float t = id == "UpperRampB" ? bay / 10.0f : bay / 3.0f;
+                const glm::vec3 surface = MonumentalSite::rampSurfacePoint(ramp, t);
+                const glm::vec3 underside = surface - frame.up * ramp.thickness;
+                for (float side : {-1.0f, 1.0f})
+                {
+                    const glm::vec3 edge = underside + frame.right * side * sideOffset;
+                    const UpperSupportFooting footing = MonumentalSite::upperSupportFooting(
+                        {edge.x, edge.z}, edge.y);
+                    if (!footing.valid)
+                        throw std::runtime_error("Upper access support intersects pyramid");
+                    const float foundation = footing.onCourse ? footing.courseTop :
+                        sand_.terrainHeightAt(footing.position.x, footing.position.y);
+                    const float height = edge.y - foundation;
+                    if (height <= 0.15f)
+                        throw std::runtime_error("Upper access support lacks clearance");
+                    addStaged(ScenePrimitive::Cylinder,
+                        makeTransform({footing.position.x, foundation + 0.5f * height,
+                                       footing.position.y},
+                            {}, {0.38f, height, 0.38f}),
+                        MaterialId::DarkWood, ramp);
+                    if (glm::distance(footing.position, glm::vec2{edge.x, edge.z}) > 0.01f)
+                        addStaged(ScenePrimitive::Cylinder,
+                            ConstructionAnimationController::cylinderBetween(
+                                {footing.position.x, edge.y, footing.position.y},
+                                edge, 0.13f), MaterialId::Wood, ramp);
+                    if (id == "UpperRampB")
+                        addStaged(ScenePrimitive::Cylinder,
+                            ConstructionAnimationController::cylinderBetween(
+                                {footing.position.x, foundation + 0.55f * height,
+                                 footing.position.y},
+                                underside, 0.13f), MaterialId::Wood, ramp);
+                }
+                addStaged(ScenePrimitive::Cylinder,
+                    ConstructionAnimationController::cylinderBetween(
+                        underside - frame.right * sideOffset,
+                        underside + frame.right * sideOffset, 0.16f),
+                    MaterialId::Wood, ramp);
+            }
+            if (id == "UpperTargetLanding")
+                for (float z : {-65.36f, -62.44f})
+                    addStaged(ScenePrimitive::Cylinder,
+                        ConstructionAnimationController::cylinderBetween(
+                            {-26.2f, 23.43f, z}, {-24.90f, 23.43f, z}, 0.10f),
+                        MaterialId::DarkWood, ramp);
+        }
 
     }
 

@@ -76,12 +76,21 @@ struct UpperAccessLayout
 {
     UpperWorkDeckPanel apron;
     UpperWorkDeckPanel turningLanding;
+    glm::vec2 targetParking{-28.05f, -63.90f};
     glm::vec2 departure{-9.0f, 0.0f};
     glm::vec2 apronCenter{-14.5f, 5.5f};
     float apronRadius = 5.5f;
     glm::vec2 turnCenter{-45.0f, 5.5f};
     float turnRadius = 5.5f;
     float turnRadians = 0.0f;
+};
+
+struct UpperSupportFooting
+{
+    glm::vec2 position{0.0f};
+    float courseTop = 0.0f;
+    bool onCourse = false;
+    bool valid = false;
 };
 
 struct SiteZoneDescriptor
@@ -105,6 +114,11 @@ public:
     static const std::vector<UpperWorkDeckPanel>& upperWorkDeckPanels();
     static const UpperAccessLayout& upperAccessLayout();
     static const RampDescriptor& upperRampA();
+    static const RampDescriptor& upperRampB();
+    static const RampDescriptor& targetLevelLanding();
+    static float occupiedCourseTopUnder(glm::vec2 point, float margin);
+    static UpperSupportFooting upperSupportFooting(glm::vec2 preferred,
+                                                   float undersideY);
     static const std::vector<SiteZoneDescriptor>& zones();
 
     static glm::mat4 rampModel(const RampDescriptor& ramp);

@@ -136,6 +136,7 @@ add_test(NAME Phase12_8_1EntranceFacadeValidation COMMAND PyramidGiza --validate
 add_test(NAME Phase13QuarryValidation COMMAND PyramidGiza --validate-quarry)
 add_test(NAME Phase13LogisticsValidation COMMAND PyramidGiza --validate-logistics)
 add_test(NAME Phase13UpperAccessStageOneValidation COMMAND PyramidGiza --validate-upper-access)
+add_test(NAME Phase13UpperAccessStageTwoValidation COMMAND PyramidGiza --validate-upper-access-stage-two)
 add_test(NAME Phase13SandValidation COMMAND PyramidGiza --validate-sand)
 add_test(NAME Phase13WaterValidation COMMAND PyramidGiza --validate-water)
 add_test(NAME Phase13SphinxValidation COMMAND PyramidGiza --validate-sphinx)
