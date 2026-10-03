@@ -19,13 +19,13 @@ enum class LogisticsState
     QuarryReady,
     Extracting,
     Staged,
+    LiftPrep,
+    Lifting,
+    QuarryPlatformTransfer,
     SledgeLoading,
     Hauling,
     RampApproach,
     RampAscent,
-    LiftPrep,
-    Lifting,
-    UpperStaging,
     Placement,
     Settled
 };
@@ -40,6 +40,7 @@ struct LogisticsSnapshot
     glm::vec3 sledgePosition{0.0f};
     float sledgeHeading = 0.0f; // Degrees; local -Z is the hauling direction.
     float sledgePitch = 0.0f;   // Degrees; follows the current support grade.
+    float supportProgress = 0.0f;
     bool ropeTaut = false;
     int activeWorkers = 0;
     float liftHeight = 0.0f;
@@ -72,6 +73,11 @@ public:
     // pulling crew, evaluated hands, and tow ropes in one transport frame.
     static bool isPhysicalHaulingState(LogisticsState state);
     static glm::mat4 physicalSledgeRoot(const LogisticsSnapshot& snapshot);
+    static std::vector<glm::vec2> physicalRouteWaypoints(LogisticsState state);
+    static LogisticsSnapshot samplePhysicalRoute(LogisticsState state, float progress,
+                                                 float constructionProgress = 0.0f);
+    static bool validatePhysicalRoute(std::ostream& output);
+    void setSupportProgress(float progress) { supportProgress_ = progress; }
     static glm::vec3 haulingDirection(const LogisticsSnapshot& snapshot);
     static float haulingSupportHeight(const LogisticsSnapshot& snapshot,
                                       const glm::vec2& worldPoint);
@@ -106,10 +112,10 @@ private:
     int activeBlockNumber_ = 101;
     float stateProgress_ = 0.0f;
     float stateTimer_ = 0.0f;
-    glm::vec3 blockPosition_{-108.0f, -6.2f, -5.0f};
+    glm::vec3 blockPosition_{-121.0f, -6.65f, -3.0f};
     glm::vec3 blockRotation_{0.0f};
     glm::vec3 blockScale_{2.6f, 1.6f, 2.4f};
-    glm::vec3 sledgePosition_{-108.0f, -6.2f, -5.0f};
+    glm::vec3 sledgePosition_{0.0f}; // reset() derives the initial root from support.
     float sledgeHeading_ = 0.0f;
     float sledgePitch_ = 0.0f;
     bool ropeTaut_ = false;
@@ -120,4 +126,5 @@ private:
     glm::vec3 previousPostLiftPosition_{0.0f};
     float largestPostLiftDisplacement_ = 0.0f;
     bool hasPreviousPostLiftPosition_ = false;
+    float supportProgress_ = 0.0f;
 };

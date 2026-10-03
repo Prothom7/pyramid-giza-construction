@@ -129,6 +129,93 @@ SupportSurface terrainAt(const glm::vec2& point)
             height, normal, true};
 }
 
+RampDescriptor transportRampToe(const RampDescriptor& ramp)
+{
+    const glm::vec3 surface = MonumentalSite::rampSurfacePoint(ramp, 0.0f);
+    RampDescriptor toe{"TransportRampToe", {0.0f, 0.04f, 52.0f},
+        {surface.x, surface.y - 0.04f, surface.z}, ramp.width, 0.08f,
+        MaterialId::RampEarth, false};
+    toe.minimumProgress = ramp.minimumProgress;
+    toe.maximumProgress = ramp.maximumProgress;
+    return toe;
+}
+
+SupportSurface transportAt(const glm::vec2& point, float constructionProgress)
+{
+    const SupportSurface terrain = terrainAt(point);
+    SupportSurface explicitSurface;
+    const auto topFace = [&](const RampDescriptor& descriptor, SupportSurfaceKind kind)
+    {
+        const RampFrame frame = MonumentalSite::rampFrame(descriptor);
+        const glm::vec3 center = MonumentalSite::rampSurfacePoint(descriptor, 0.5f);
+        const float height = center.y -
+            (frame.up.x * (point.x - center.x) +
+             frame.up.z * (point.y - center.z)) / frame.up.y;
+        const glm::vec3 offset{point.x - center.x, height - center.y, point.y - center.z};
+        if (std::abs(glm::dot(offset, frame.right)) > 0.5f * descriptor.width ||
+            std::abs(glm::dot(offset, frame.forward)) > 0.5f * frame.length ||
+            height < terrain.height - 0.001f)
+            return;
+        if (!explicitSurface.valid || height > explicitSurface.height)
+            explicitSurface = {descriptor.id, kind, height, frame.up, true};
+    };
+    for (const RampDescriptor& ramp : MonumentalSite::ramps())
+        if (MonumentalSite::rampActive(ramp, constructionProgress))
+        {
+            topFace(ramp, SupportSurfaceKind::RampSurface);
+            if (std::string(ramp.id).find("MainHauling") == 0)
+            {
+                topFace(transportRampToe(ramp), SupportSurfaceKind::RampSurface);
+                // The visible transverse timbers also carry the runners.
+                const RampFrame frame = MonumentalSite::rampFrame(ramp);
+                const glm::vec2 along = glm::normalize(glm::vec2{frame.forward.x, frame.forward.z});
+                for (int sleeper = 1; sleeper < 11; ++sleeper)
+                {
+                    const glm::vec3 center = MonumentalSite::rampSurfacePoint(ramp, sleeper / 11.0f);
+                    const glm::vec2 delta = point - glm::vec2{center.x, center.z};
+                    const float radial = glm::dot(delta, along);
+                    const float side = glm::dot(delta, glm::vec2{frame.right.x, frame.right.z});
+                    if (std::abs(radial) <= 0.11f && std::abs(side) <= 0.5f * ramp.width - 0.35f)
+                    {
+                        const float height = center.y + std::sqrt(std::max(0.0f, 0.0121f - radial * radial));
+                        if (height >= terrain.height && (!explicitSurface.valid || height > explicitSurface.height))
+                            explicitSurface = {ramp.id, SupportSurfaceKind::RampSurface, height,
+                                {0.0f, 1.0f, 0.0f}, true};
+                    }
+                }
+            }
+        }
+    const auto platform = [&](const char* id, glm::vec2 center, glm::vec2 half, float height,
+                              SupportSurfaceKind kind)
+    {
+        if (footprintContains({center, half, 0.0f}, point) &&
+            height >= terrain.height - 0.001f &&
+            (!explicitSurface.valid || height > explicitSurface.height))
+            explicitSurface = {id, kind, height, {0.0f, 1.0f, 0.0f}, true};
+    };
+    platform("QuarryWorkFloor", {-128.0f, -15.0f}, {21.0f, 17.0f}, -7.45f,
+             SupportSurfaceKind::QuarryFloor);
+    platform("QuarryPitBase", {-128.0f, -15.0f}, {30.0f, 32.0f}, -7.48f,
+             SupportSurfaceKind::QuarryFloor);
+    platform("QuarryStagingDeck", {-109.0f, 8.5f}, {5.0f, 2.5f}, -6.80f,
+             SupportSurfaceKind::WorkPlatform);
+    platform("LoadingDeck", {-10.0f, 42.0f}, {7.0f, 4.5f}, 0.44f,
+             SupportSurfaceKind::WorkPlatform);
+    platform("PulleyReceivingDeck", {-111.0f, -10.0f}, {2.8f, 2.6f}, -2.60f,
+             SupportSurfaceKind::WorkPlatform);
+    if (explicitSurface.valid)
+        return explicitSurface;
+    const RampDescriptor quarryRoad{
+        "QuarryHaulRoad", {-91.0f, 0.04f, 9.0f}, {-10.0f, 0.04f, 42.0f},
+        8.0f, 0.08f, MaterialId::RampEarth, false};
+    const RampDescriptor loadingRoad{
+        "LoadingToRamp", {-10.0f, 0.045f, 42.0f}, {0.0f, 0.045f, 45.0f},
+        8.0f, 0.09f, MaterialId::RampEarth, false};
+    topFace(quarryRoad, SupportSurfaceKind::Road);
+    topFace(loadingRoad, SupportSurfaceKind::Road);
+    return explicitSurface.valid ? explicitSurface : terrain;
+}
+
 void setTerrainSource(const SandSimulation* terrain)
 {
     liveTerrain = terrain;
@@ -242,6 +329,8 @@ const char* surfaceKindName(SupportSurfaceKind kind)
     case SupportSurfaceKind::WorkPlatform: return "work platform";
     case SupportSurfaceKind::Sledge: return "sledge";
     case SupportSurfaceKind::LiftingRig: return "lifting rig";
+    case SupportSurfaceKind::Road: return "road";
+    case SupportSurfaceKind::RampSurface: return "ramp surface";
     default: return "none";
     }
 }
@@ -333,6 +422,23 @@ bool validatePhase12_6Supports(std::ostream& output)
     const HorizontalFootprint footprint{{3.0f, -2.0f}, {4.0f, 2.0f}, 25.0f};
     valid = valid && SceneSupport::footprintContains(footprint, {3.0f, -2.0f}) &&
             !SceneSupport::footprintContains(footprint, {20.0f, 20.0f});
+
+    const SupportSurface road = SceneSupport::transportAt({-50.5f, 25.5f});
+    const SupportSurface openSand = SceneSupport::transportAt({-70.0f, 50.0f});
+    const SupportSurface loading = SceneSupport::transportAt({-10.0f, 42.0f});
+    const RampDescriptor* lowRamp = MonumentalSite::findRamp("MainHaulingLow");
+    const glm::vec3 rampPoint = MonumentalSite::rampSurfacePoint(*lowRamp, 0.4f);
+    const SupportSurface rampTop = SceneSupport::transportAt({rampPoint.x, rampPoint.z});
+    const bool actualTransportSurfaces = road.kind == SupportSurfaceKind::Road &&
+        std::abs(road.height - 0.08f) < 1.0e-5f &&
+        openSand.kind == SupportSurfaceKind::DesertGround &&
+        loading.kind == SupportSurfaceKind::WorkPlatform &&
+        std::abs(loading.height - 0.44f) < 1.0e-5f &&
+        rampTop.kind == SupportSurfaceKind::RampSurface &&
+        std::abs(rampTop.height - rampPoint.y) < 1.0e-5f;
+    valid = valid && actualTransportSurfaces;
+    output << "  transport support follows visible top faces: "
+           << (actualTransportSurfaces ? "PASS\n" : "FAIL\n");
 
     output << (valid ? "Support-surface checks passed.\n"
                      : "Support-surface checks failed.\n");

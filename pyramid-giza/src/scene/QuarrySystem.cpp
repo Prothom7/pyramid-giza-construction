@@ -21,7 +21,11 @@ void QuarrySystem::initDeposits()
 {
     deposits_.clear();
 
-    const glm::vec3 quarryStagingPos{-108.0f, -6.2f, -5.0f};
+    // The old staging center lay inside the east lower quarry wall and stored
+    // stones. This clear floor bay connects to the north opening.
+    // Deposit position is the floor contact; the authoritative block center
+    // receives half the deposit height in updateExtraction().
+    const glm::vec3 quarryStagingPos{-121.0f, -7.45f, -3.0f};
 
     // Primary extraction bays (Bay A through Bay D)
     const std::vector<ExtractionBayDescriptor>& bays = IndustrialLandscape::extractionBays();
@@ -47,7 +51,7 @@ void QuarrySystem::initDeposits()
         dep.shapingProgress = (i == 0) ? 0.0f : (i == 1) ? 0.5f : 1.0f;
         dep.seamWidth = (i == 0) ? 0.12f : 0.22f;
         dep.separationOffset = (i >= 1) ? 0.22f : 0.0f;
-        dep.stagedPosition = quarryStagingPos + glm::vec3{static_cast<float>(i) * 3.2f, 0.0f, 0.0f};
+        dep.stagedPosition = quarryStagingPos;
         deposits_.push_back(dep);
     }
 

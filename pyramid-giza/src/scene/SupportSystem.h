@@ -25,7 +25,9 @@ enum class SupportSurfaceKind
     ScaffoldPlatform,
     WorkPlatform,
     Sledge,
-    LiftingRig
+    LiftingRig,
+    Road,
+    RampSurface
 };
 
 struct SupportSurface
@@ -71,6 +73,10 @@ float transformedBottomY(const glm::mat4& model,
 bool footprintContains(const HorizontalFootprint& support,
                        const glm::vec2& point, float margin = 0.0f);
 SupportSurface terrainAt(const glm::vec2& point);
+// Visible top faces only: ramps/platforms, then roads, then live terrain.
+// Operational/grading zones do not constitute support geometry.
+SupportSurface transportAt(const glm::vec2& point, float constructionProgress = 0.0f);
+RampDescriptor transportRampToe(const RampDescriptor& ramp);
 SupportSurface rampFillAt(const RampDescriptor& ramp, float rampProgress);
 float rampUndersideY(const RampDescriptor& ramp, float rampProgress);
 float verticalGap(float objectBottom, const SupportSurface& support);

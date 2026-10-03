@@ -21,7 +21,7 @@ enum class BlockState
     RampAscent,
     LiftPrep,
     Lifting,
-    UpperStaging,
+    QuarryPlatformTransfer,
     Placement,
     Settling,
     Settled

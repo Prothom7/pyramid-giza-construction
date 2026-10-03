@@ -14,10 +14,10 @@ std::vector<ObjectPart> Sledge::create(bool loadedStone)
 {
     std::vector<ObjectPart> parts;
     parts.reserve(loadedStone ? loadedPartCount() : unloadedPartCount());
-    add(parts, "LeftRunner", ScenePrimitive::Cube, {-0.62f, 0.16f, 0.0f}, {},
-        {0.24f, 0.22f, 2.75f}, MaterialId::DarkWood, "SledgeRoot");
-    add(parts, "RightRunner", ScenePrimitive::Cube, {0.62f, 0.16f, 0.0f}, {},
-        {0.24f, 0.22f, 2.75f}, MaterialId::DarkWood, "SledgeRoot");
+    add(parts, "LeftRunner", ScenePrimitive::Cube, {-0.62f, runnerCenterY, 0.0f}, {},
+        {0.24f, runnerHeight, 2.75f}, MaterialId::DarkWood, "SledgeRoot");
+    add(parts, "RightRunner", ScenePrimitive::Cube, {0.62f, runnerCenterY, 0.0f}, {},
+        {0.24f, runnerHeight, 2.75f}, MaterialId::DarkWood, "SledgeRoot");
     for (int brace = 0; brace < 3; ++brace)
         add(parts, brace == 0 ? "RearBrace" : (brace == 1 ? "MiddleBrace" : "FrontBrace"),
             ScenePrimitive::Cube, {0.0f, 0.32f, -0.86f + brace * 0.86f}, {},

@@ -378,6 +378,28 @@ void StaticGizaScene::buildRampNetwork()
         const std::string id = ramp.id;
         addStaged(ScenePrimitive::Cube, MonumentalSite::rampModel(ramp),
                   ramp.material, ramp);
+        if (id.find("MainHauling") == 0)
+        {
+            const RampDescriptor toe = SceneSupport::transportRampToe(ramp);
+            addStaged(ScenePrimitive::Cube, MonumentalSite::rampModel(toe),
+                      toe.material, ramp);
+            // Earth grading under the toe, rather than an unsupported thin slab.
+            constexpr int toeFillSegments = 16;
+            const RampFrame toeFrame = MonumentalSite::rampFrame(toe);
+            const float toeRun = glm::length(glm::vec2{toe.top.x - toe.base.x, toe.top.z - toe.base.z});
+            for (int segment = 0; segment < toeFillSegments; ++segment)
+            {
+                const float t = (segment + 0.5f) / toeFillSegments;
+                const glm::vec3 underside = glm::mix(toe.base, toe.top, t) - toeFrame.up * (0.5f * toe.thickness);
+                const float ground = sand_.terrainHeightAt(underside.x, underside.z) - 0.02f;
+                const float height = underside.y - ground;
+                if (height > 0.01f)
+                    addStaged(ScenePrimitive::Cube,
+                        makeTransform({underside.x, ground + 0.5f * height, underside.z}, {},
+                            {toe.width, height, toeRun / toeFillSegments + 0.02f}),
+                        MaterialId::RampEarth, ramp);
+            }
+        }
 
         // Large ramps are stepped earthworks, not suspended slabs. Each fill
         // segment reaches from the declared terrain/floor to the ramp underside.
@@ -671,6 +693,20 @@ void StaticGizaScene::buildQuarryPulleyRig()
     addObject(ScenePrimitive::Cube,
               makeTransform(deckCenter, {}, {5.6f, 0.30f, 5.2f}),
               MaterialId::DarkWood);
+    // Two short loading skids rise from the receiving deck to the sledge bed.
+    // They carry the block's outer underside without occupying the sledge.
+    constexpr float skidRun = 2.05f;
+    constexpr float skidRise = 0.525f;
+    const float skidAngle = glm::degrees(std::atan2(skidRise, skidRun));
+    const float skidLength = std::sqrt(skidRun * skidRun + skidRise * skidRise);
+    const float skidCenterY = -2.60f + 0.5f * skidRise -
+        0.05f / std::cos(glm::radians(skidAngle));
+    for (float z : {-11.10f, -8.90f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({-109.975f, skidCenterY, z},
+                                {0.0f, 0.0f, skidAngle},
+                                {skidLength, 0.10f, 0.16f}),
+                  MaterialId::DarkWood);
     const float deckBottom = deckCenter.y - 0.15f;
     const float postHeight = deckBottom - floorY;
     for (float x : {deckCenter.x - 2.2f, deckCenter.x + 2.2f})
@@ -1646,13 +1682,20 @@ void StaticGizaScene::update(float deltaTime)
     const float simulationMultiplier = constructionTimeline_.playing() ? constructionTimeline_.speed() * 60.0f : 1.0f;
     const float simDelta = deltaTime * simulationMultiplier;
     quarry_.update(simDelta, simulation_);
+    // Staged geometry is rendered with this same timeline value.
+    logistics_.setSupportProgress(constructionTimeline_.progress());
     logistics_.update(simDelta, simulation_, quarry_, constructionTimeline_,
                       quarryPulleyController_, physicalConstructionMode());
     const LogisticsSnapshot transport = logistics_.snapshot();
+    const glm::vec3 runnerCenter{ConstructionLogistics::physicalSledgeRoot(transport) *
+        glm::vec4{0.0f, Sledge::runnerBottomLocalY, 0.0f, 1.0f}};
+    const SupportSurface transportSupport = SceneSupport::transportAt(
+        {runnerCenter.x, runnerCenter.z}, transport.supportProgress);
     const bool sandContact = physicalConstructionMode() &&
-        transport.state == LogisticsState::Hauling &&
-        std::abs(transport.sledgePosition.y - sand_.terrainHeightAt(
-            transport.sledgePosition.x, transport.sledgePosition.z)) <= 0.08f;
+        ConstructionLogistics::isPhysicalHaulingState(transport.state) &&
+        transport.state != LogisticsState::SledgeLoading &&
+        transportSupport.kind == SupportSurfaceKind::DesertGround &&
+        std::abs(runnerCenter.y - sand_.terrainHeightAt(runnerCenter.x, runnerCenter.z)) <= 0.08f;
     const std::uint64_t previousSandRevision = sand_.revision();
     sand_.update(deltaTime, transport.sledgePosition,
                  transport.sledgeHeading, sandContact);
@@ -2385,13 +2428,19 @@ void StaticGizaScene::collectFrameObjects()
     const LogisticsSnapshot logSnap = logistics_.snapshot();
     const bool physicalHaulingCrew =
         physicalConstructionMode() &&
-        ConstructionLogistics::isPhysicalHaulingState(logSnap.state);
+        (logSnap.state == LogisticsState::Hauling ||
+         logSnap.state == LogisticsState::RampApproach ||
+         logSnap.state == LogisticsState::RampAscent);
     std::vector<Worker::EvaluatedPose> evaluatedWorkers(workers_.size());
     for (std::size_t index = 0; index < workers_.size(); ++index)
     {
         const WorkerInstance& worker = workers_[index];
         if (constructionProgress < worker.minimumConstructionProgress ||
             constructionProgress > worker.maximumConstructionProgress)
+            continue;
+        if (physicalConstructionMode() && !physicalHaulingCrew &&
+            (index == static_cast<std::size_t>(WorkerRole::PullerLeft) ||
+             index == static_cast<std::size_t>(WorkerRole::PullerRight)))
             continue;
         glm::mat4 root = worker.root;
         WorkerJointAngles angles = worker.jointAngles;

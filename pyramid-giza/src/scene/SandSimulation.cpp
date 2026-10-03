@@ -8,6 +8,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "scene/MonumentalSite.h"
 #include "scene/SupportSystem.h"
+#include "scene/IndustrialLandscape.h"
 
 
 
@@ -65,6 +66,35 @@ float mobilityAt(const glm::vec2& point)
         protection = std::max(protection,
             capsuleMask(point, {ramp.base.x, ramp.base.z}, {ramp.top.x, ramp.top.z},
                         0.5f * ramp.width + 4.0f, 6.0f));
+    // These southern depot shoulders and the north pit exit are graded desert,
+    // not foundations. Keep the original masks everywhere else. Within this
+    // open corridor, only actual structures and stored stones immobilize sand.
+    if (point.x >= -135.0f && point.x <= 5.0f && point.y > 28.0f && point.y <= 64.0f)
+    {
+        protection = 0.0f;
+        for (const RepositoryDescriptor& repository : IndustrialLandscape::repositories())
+        {
+            const glm::vec2 half{
+                0.5f * (repository.columns * repository.blockScale.x + (repository.columns - 1) * repository.spacing),
+                0.5f * (repository.rows * repository.blockScale.z + (repository.rows - 1) * repository.spacing)};
+            protection = std::max(protection, roundedBoxMask(point,
+                {repository.center.x, repository.center.z}, half + glm::vec2{2.0f}, 2.0f));
+        }
+        protection = std::max(protection, roundedBoxMask(point, {-10.0f, 42.0f}, {9.0f, 6.5f}, 2.0f));
+        protection = std::max(protection, roundedBoxMask(point, {-30.0f, 51.0f}, {6.0f, 4.9f}, 2.0f));
+        protection = std::max(protection, roundedBoxMask(point, {-13.5f, 48.5f}, {7.8f, 3.2f}, 2.0f));
+        for (const RampDescriptor& ramp : MonumentalSite::ramps())
+        {
+            protection = std::max(protection, capsuleMask(point,
+                {ramp.base.x, ramp.base.z}, {ramp.top.x, ramp.top.z}, 0.5f * ramp.width + 2.0f, 2.0f));
+            if (std::string(ramp.id).find("MainHauling") == 0)
+            {
+                const RampDescriptor toe = SceneSupport::transportRampToe(ramp);
+                protection = std::max(protection, capsuleMask(point,
+                    {toe.base.x, toe.base.z}, {toe.top.x, toe.top.z}, 0.5f * toe.width + 2.0f, 2.0f));
+            }
+        }
+    }
     return 1.0f - protection;
 }
 
