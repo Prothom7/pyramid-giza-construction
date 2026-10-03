@@ -404,7 +404,8 @@ void StaticGizaScene::buildRampNetwork()
         // Large ramps are stepped earthworks, not suspended slabs. Each fill
         // segment reaches from the declared terrain/floor to the ramp underside.
         const int fillSegments = id == "MainLanding" ? 1 :
-            (id == "QuarryDeckConnector" || id == "QuarryExitDeckExtension") ? 0 : 64;
+            (id == "QuarryDeckConnector" || id == "QuarryExitDeckExtension" ||
+             id == "UpperRampA") ? 0 : 64;
         const glm::vec3 horizontalDelta{ramp.top.x - ramp.base.x, 0.0f,
                                         ramp.top.z - ramp.base.z};
         const float horizontalLength = glm::length(horizontalDelta);
@@ -465,7 +466,7 @@ void StaticGizaScene::buildRampNetwork()
         }
 
         const bool needsSupports = id != "QuarryExitRamp" &&
-                                   id != "MainLanding";
+                                   id != "MainLanding" && id != "UpperRampA";
         if (needsSupports)
             for (float t : {0.25f, 0.50f, 0.75f})
             {
@@ -491,6 +492,31 @@ void StaticGizaScene::buildRampNetwork()
                         surface - frame.right * (0.5f * ramp.width - 0.30f),
                         surface + frame.right * (0.5f * ramp.width - 0.30f), 0.22f),
                     MaterialId::DarkWood, ramp);
+            }
+
+        if (id == "UpperRampA")
+            for (int bent = 1; bent <= 6; ++bent)
+            {
+                const glm::vec3 surface = MonumentalSite::rampSurfacePoint(
+                    ramp, static_cast<float>(bent) / 7.0f);
+                for (float side : {-1.0f, 1.0f})
+                {
+                    const glm::vec3 edge = surface + frame.right * side * 3.05f;
+                    const float underside = edge.y - frame.up.y * ramp.thickness;
+                    const float ground = sand_.terrainHeightAt(edge.x, edge.z);
+                    const float height = underside - ground;
+                    if (height > 0.1f)
+                        addStaged(ScenePrimitive::Cylinder,
+                                  makeTransform({edge.x, ground + 0.5f * height, edge.z},
+                                                {}, {0.38f, height, 0.38f}),
+                                  MaterialId::DarkWood, ramp);
+                }
+                const glm::vec3 underside = surface - frame.up * ramp.thickness;
+                addStaged(ScenePrimitive::Cylinder,
+                    ConstructionAnimationController::cylinderBetween(
+                        underside - frame.right * 3.05f,
+                        underside + frame.right * 3.05f, 0.16f),
+                    MaterialId::Wood, ramp);
             }
 
     }
@@ -1533,6 +1559,25 @@ void StaticGizaScene::buildUpperPlatformDetails()
     for (const UpperWorkDeckPanel& panel : MonumentalSite::upperWorkDeckPanels())
         add(ScenePrimitive::Cube, makeTransform(panel.center, {}, panel.size),
             MaterialId::Wood);
+    const UpperAccessLayout& access = MonumentalSite::upperAccessLayout();
+    for (const UpperWorkDeckPanel& panel : {access.apron, access.turningLanding})
+        add(ScenePrimitive::Cube, makeTransform(panel.center, {}, panel.size),
+            MaterialId::Wood);
+    const auto post = [&](float x, float z, float underside)
+    {
+        const float ground = sand_.terrainHeightAt(x, z);
+        const float height = underside - ground;
+        if (height > 0.1f)
+            add(ScenePrimitive::Cylinder,
+                makeTransform({x, ground + 0.5f * height, z}, {},
+                              {0.42f, height, 0.42f}), MaterialId::DarkWood);
+    };
+    for (float x : {-16.5f, -8.0f})
+        post(x, 12.5f, access.apron.center.y - 0.5f * access.apron.size.y);
+    for (float x : {-53.0f, -46.0f})
+        for (float z : {-1.0f, 13.0f})
+            post(x, z, access.turningLanding.center.y -
+                        0.5f * access.turningLanding.size.y);
     for (float x : {-14.0f, -6.0f, 4.0f, 10.0f})
         for (float z : {0.0f, 5.0f})
             add(ScenePrimitive::Cylinder,
@@ -2451,7 +2496,8 @@ void StaticGizaScene::collectFrameObjects()
         physicalConstructionMode() &&
         (logSnap.state == LogisticsState::Hauling ||
          logSnap.state == LogisticsState::RampApproach ||
-         logSnap.state == LogisticsState::RampAscent);
+         logSnap.state == LogisticsState::RampAscent ||
+         logSnap.state == LogisticsState::UpperTransfer);
     std::vector<Worker::EvaluatedPose> evaluatedWorkers(workers_.size());
     for (std::size_t index = 0; index < workers_.size(); ++index)
     {

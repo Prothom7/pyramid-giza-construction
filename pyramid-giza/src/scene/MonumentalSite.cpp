@@ -62,6 +62,7 @@ const std::vector<RampDescriptor>& MonumentalSite::ramps()
         {"MainLanding", {0.0f, 8.35f, -4.10f}, {0.0f, 8.35f, -5.25f},
          7.8f, 0.40f, MaterialId::RampEarth, false,
          0.62f, 0.90f, 0.25f, 0.0f, true, "Controlled pyramid-face landing"},
+        upperRampA(),
         {"WestAccessRamp", {-63.0f, 0.30f, -25.0f}, {-40.0f, 4.30f, -25.0f},
          4.5f, 0.60f, MaterialId::RampEarth, false,
          0.05f, 0.62f, 1.40f, 0.0f, false, "West worker access"},
@@ -133,6 +134,35 @@ const std::vector<UpperWorkDeckPanel>& MonumentalSite::upperWorkDeckPanels()
         {{8.25f, 8.375f, 0.95f}, {9.50f, 0.35f, 10.10f}}
     };
     return panels;
+}
+
+const UpperAccessLayout& MonumentalSite::upperAccessLayout()
+{
+    // The flat landing begins at the ramp's high end. Extending it east to
+    // x=-42 would put a level deck above the final sloping ramp section.
+    static const UpperAccessLayout layout{
+        {{-12.75f, 8.375f, 9.25f}, {11.5f, 0.35f, 8.5f}},
+        {{-49.5f, 12.80976f, 6.0f}, {9.0f, 0.35f, 16.0f}},
+        {-9.0f, 0.0f}, {-14.5f, 5.5f}, 5.5f,
+        {-45.0f, 5.5f}, 5.5f, glm::radians(108.14056f)
+    };
+    return layout;
+}
+
+const RampDescriptor& MonumentalSite::upperRampA()
+{
+    // RampDescriptor endpoints are slab centers. The declared endpoints here
+    // yield visible top heights of 8.55 and 12.98476 metres.
+    constexpr float rise = 4.4347643f;
+    // A 20 cm slab overlap closes the numerical end-face seam at the landing.
+    const float centerOffset = 0.35f * std::cos(std::atan(rise / 28.2f));
+    static const RampDescriptor ramp{
+        "UpperRampA", {-17.0f, 8.55f - centerOffset, 11.0f},
+        {-45.2f, 8.55f + rise - centerOffset, 11.0f},
+        7.0f, 0.70f, MaterialId::Wood, false,
+        0.62f, 0.90f, 0.30f, 0.0f, false, "Westward upper sledge ramp"
+    };
+    return ramp;
 }
 
 const std::vector<SiteZoneDescriptor>& MonumentalSite::zones()

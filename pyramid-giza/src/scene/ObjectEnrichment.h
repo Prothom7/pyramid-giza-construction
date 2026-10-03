@@ -72,7 +72,7 @@ public:
     static constexpr std::size_t inspectionStations = 1;
     static constexpr std::size_t riverLandings = 1;
     static constexpr std::size_t accessWalkways = 4;
-    static constexpr std::size_t expectedStaticInstances = 365;
+    static constexpr std::size_t expectedStaticInstances = 373;
     static constexpr std::size_t addedSupportWorkers = 4;
     static constexpr std::size_t expectedAddedDrawCalls = 417;
     static constexpr std::size_t maximumAddedDrawCalls = 420;

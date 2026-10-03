@@ -206,11 +206,25 @@ SupportSurface transportAt(const glm::vec2& point, float constructionProgress)
     platform("QuarryExitDeckLip", {-107.9f, -9.8f}, {0.3f, 1.8f}, -2.60f,
              SupportSurfaceKind::WorkPlatform);
     if (SceneSupport::stageActive(constructionProgress, 0.62f, 0.90f))
+    {
         for (const UpperWorkDeckPanel& panel : MonumentalSite::upperWorkDeckPanels())
             platform("UpperWorkDeck", {panel.center.x, panel.center.z},
                      {0.5f * panel.size.x, 0.5f * panel.size.z},
                      panel.center.y + 0.5f * panel.size.y,
                      SupportSurfaceKind::WorkPlatform);
+        const UpperAccessLayout& access = MonumentalSite::upperAccessLayout();
+        platform("UpperTurnApron", {access.apron.center.x, access.apron.center.z},
+                 {0.5f * access.apron.size.x, 0.5f * access.apron.size.z},
+                 access.apron.center.y + 0.5f * access.apron.size.y,
+                 SupportSurfaceKind::WorkPlatform);
+        platform("UpperTurningLanding",
+                 {access.turningLanding.center.x, access.turningLanding.center.z},
+                 {0.5f * access.turningLanding.size.x,
+                  0.5f * access.turningLanding.size.z},
+                 access.turningLanding.center.y +
+                     0.5f * access.turningLanding.size.y,
+                 SupportSurfaceKind::WorkPlatform);
+    }
     if (explicitSurface.valid)
         return explicitSurface;
     const RampDescriptor quarryRoad{

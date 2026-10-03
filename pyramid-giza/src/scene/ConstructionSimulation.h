@@ -19,6 +19,7 @@ enum class BlockState
     Hauling,
     RampApproach,
     RampAscent,
+    UpperTransfer,
     LiftPrep,
     Lifting,
     QuarryPlatformTransfer,
