@@ -65,9 +65,18 @@ const std::vector<RampDescriptor>& MonumentalSite::ramps()
         {"WestAccessRamp", {-63.0f, 0.30f, -25.0f}, {-40.0f, 4.30f, -25.0f},
          4.5f, 0.60f, MaterialId::RampEarth, false,
          0.05f, 0.62f, 1.40f, 0.0f, false, "West worker access"},
-        {"QuarryExitRamp", {-103.0f, -6.2f, -8.0f}, {-91.0f, 0.35f, 9.0f},
+        // A short timber bridge joins the receiving deck to the stepped east
+        // quarry wall. The exit then follows that wall's crest and emerges
+        // north of the rough-stone repository.
+        {"QuarryExitDeckExtension", {-107.6f, -2.70f, -9.0f}, {-106.2f, -2.40f, -9.4f},
+         3.0f, 0.20f, MaterialId::DarkWood, false,
+         0.0f, 1.01f, 0.10f, -7.5f, false, "Receiving-deck exit skid"},
+        {"QuarryDeckConnector", {-106.2f, -2.44f, -9.4f}, {-102.5f, 0.36f, -2.0f},
+         3.4f, 0.28f, MaterialId::Wood, false,
+         0.0f, 1.01f, 0.25f, -7.5f, false, "Receiving deck bridge"},
+        {"QuarryExitRamp", {-102.5f, 0.17f, -2.0f}, {-97.0f, -0.33f, 25.0f},
          7.5f, 0.65f, MaterialId::RampEarth, false,
-         0.0f, 1.01f, 0.40f, -7.5f, false, "Quarry terrace exit"}
+         0.0f, 1.01f, 0.40f, 0.0f, false, "East-wall quarry exit"}
     };
     return values;
 }

@@ -203,6 +203,8 @@ SupportSurface transportAt(const glm::vec2& point, float constructionProgress)
              SupportSurfaceKind::WorkPlatform);
     platform("PulleyReceivingDeck", {-111.0f, -10.0f}, {2.8f, 2.6f}, -2.60f,
              SupportSurfaceKind::WorkPlatform);
+    platform("QuarryExitDeckLip", {-107.9f, -9.8f}, {0.3f, 1.8f}, -2.60f,
+             SupportSurfaceKind::WorkPlatform);
     if (explicitSurface.valid)
         return explicitSurface;
     const RampDescriptor quarryRoad{

@@ -643,6 +643,7 @@ int main(int argc, char** argv)
     bool entranceValidationOnly = false;
     bool quarryValidationOnly = false;
     bool logisticsValidationOnly = false;
+    bool haulRouteValidationOnly = false;
     bool sandValidationOnly = false;
     bool waterValidationOnly = false;
     bool sphinxValidationOnly = false;
@@ -761,6 +762,8 @@ int main(int argc, char** argv)
             quarryValidationOnly = true;
         else if (option == "--validate-logistics")
             logisticsValidationOnly = true;
+        else if (option == "--validate-haul-route")
+            haulRouteValidationOnly = true;
         else if (option == "--validate-sand")
             sandValidationOnly = true;
         else if (option == "--validate-water")
@@ -1117,6 +1120,8 @@ int main(int argc, char** argv)
         return QuarrySystem::validateQuarry(std::cout) ? 0 : 1;
     if (logisticsValidationOnly)
         return ConstructionLogistics::validateConstructionLogistics(std::cout) ? 0 : 1;
+    if (haulRouteValidationOnly)
+        return ConstructionLogistics::validatePhysicalRoute(std::cout) ? 0 : 1;
     if (sandValidationOnly)
         return SandSimulation::validateSandSimulation(std::cout) ? 0 : 1;
     if (waterValidationOnly)

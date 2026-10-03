@@ -403,7 +403,8 @@ void StaticGizaScene::buildRampNetwork()
 
         // Large ramps are stepped earthworks, not suspended slabs. Each fill
         // segment reaches from the declared terrain/floor to the ramp underside.
-        const int fillSegments = id == "MainLanding" ? 1 : 64;
+        const int fillSegments = id == "MainLanding" ? 1 :
+            (id == "QuarryDeckConnector" || id == "QuarryExitDeckExtension") ? 0 : 64;
         const glm::vec3 horizontalDelta{ramp.top.x - ramp.base.x, 0.0f,
                                         ramp.top.z - ramp.base.z};
         const float horizontalLength = glm::length(horizontalDelta);
@@ -693,6 +694,16 @@ void StaticGizaScene::buildQuarryPulleyRig()
     addObject(ScenePrimitive::Cube,
               makeTransform(deckCenter, {}, {5.6f, 0.30f, 5.2f}),
               MaterialId::DarkWood);
+    // A short supported continuation carries the loaded sledge from the
+    // receiving deck onto the quarry-exit bridge.
+    addObject(ScenePrimitive::Cube,
+              makeTransform({-107.9f, -2.75f, -9.8f}, {}, {0.6f, 0.30f, 3.6f}),
+              MaterialId::DarkWood);
+    for (float z : {-11.1f, -8.5f})
+        addObject(ScenePrimitive::Cube,
+                  makeTransform({-106.7f, 0.5f * (-2.90f + floorY), z}, {},
+                                {0.28f, -2.90f - floorY, 0.28f}),
+                  MaterialId::DarkWood);
     // Two short loading skids rise from the receiving deck to the sledge bed.
     // They carry the block's outer underside without occupying the sledge.
     constexpr float skidRun = 2.05f;
