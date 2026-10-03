@@ -432,6 +432,9 @@ void StaticGizaScene::buildRampNetwork()
 
         for (float sign : {-1.0f, 1.0f})
         {
+            // Leave a west-side exit from the landing onto the work deck.
+            if (id == "MainLanding" && sign > 0.0f)
+                continue;
             RampDescriptor rail = ramp;
             const glm::vec3 offset =
                 frame.right * sign * (0.5f * ramp.width + ramp.sideClearance);
@@ -439,6 +442,8 @@ void StaticGizaScene::buildRampNetwork()
             rail.top += offset;
             rail.width = 0.20f;
             rail.thickness = 0.24f;
+            if (id == "MainHaulingRamp" && sign > 0.0f)
+                rail.top = glm::mix(rail.base, rail.top, 0.94f);
             addStaged(ScenePrimitive::Cube, MonumentalSite::rampModel(rail),
                       MaterialId::DarkWood, ramp);
         }
@@ -1525,26 +1530,30 @@ void StaticGizaScene::buildUpperPlatformDetails()
 
     // The former Phase 12.5 props hovered at Y=8-11. A visible deck, continuous
     // ground-founded posts, and crossbeams now carry the entire work cluster.
-    add(ScenePrimitive::Cube,
-        makeTransform({-2.0f, 8.375f, 0.0f}, {}, {30.0f, 0.35f, 12.0f}),
-        MaterialId::Wood);
-    for (float x : {-14.0f, -6.0f, 2.0f, 10.0f})
+    for (const UpperWorkDeckPanel& panel : MonumentalSite::upperWorkDeckPanels())
+        add(ScenePrimitive::Cube, makeTransform(panel.center, {}, panel.size),
+            MaterialId::Wood);
+    for (float x : {-14.0f, -6.0f, 4.0f, 10.0f})
         for (float z : {0.0f, 5.0f})
             add(ScenePrimitive::Cylinder,
                 makeTransform({x, 4.10f, z}, {}, {0.42f, 8.20f, 0.42f}),
                 MaterialId::DarkWood);
     for (float z : {0.0f, 5.0f})
-        add(ScenePrimitive::Cube,
-            makeTransform({-2.0f, 8.10f, z}, {}, {29.0f, 0.30f, 0.36f}),
-            MaterialId::DarkWood);
+        for (const UpperWorkDeckPanel& wing :
+             {MonumentalSite::upperWorkDeckPanels()[1],
+              MonumentalSite::upperWorkDeckPanels()[2]})
+            add(ScenePrimitive::Cube,
+                makeTransform({wing.center.x, 8.10f, z}, {},
+                              {wing.size.x - 0.5f, 0.30f, 0.36f}),
+                MaterialId::DarkWood);
 
-    for (float x : {-10.5f, -8.5f, 8.5f, 10.5f})
+    for (float x : {-16.0f, -14.0f, 8.5f, 10.5f})
         add(ScenePrimitive::Cylinder,
             makeTransform({x, 9.95f, -2.0f}, {}, {0.12f, 2.8f, 0.12f}),
             MaterialId::Wood);
     add(ScenePrimitive::Cylinder,
         ConstructionAnimationController::cylinderBetween(
-            {-10.5f, 10.8f, -2.0f}, {-8.5f, 10.8f, -2.0f}, 0.045f),
+            {-16.0f, 10.8f, -2.0f}, {-14.0f, 10.8f, -2.0f}, 0.045f),
         MaterialId::Rope);
     add(ScenePrimitive::Cylinder,
         ConstructionAnimationController::cylinderBetween(
@@ -1553,26 +1562,27 @@ void StaticGizaScene::buildUpperPlatformDetails()
 
     for (int block = 0; block < 4; ++block)
         add(ScenePrimitive::Cube,
-            makeTransform({-14.0f + block * 2.75f, 9.25f, -4.5f}, {},
+            makeTransform({6.0f + (block % 2) * 3.0f, 9.25f,
+                           1.0f + (block / 2) * 3.5f}, {},
                           {2.45f, 1.35f, 2.30f}), MaterialId::PreparedStone);
-    for (float x : {-6.0f, 6.0f})
+    for (float x : {6.0f, 12.0f})
         for (float z : {-3.8f, -1.0f})
             add(ScenePrimitive::Cube,
                 makeTransform({x, 8.725f, z}, {}, {0.30f, 0.35f, 3.2f}),
                 MaterialId::DarkWood);
 
     // Upper lever rack remains outside the x=0 animated arrival lane.
-    for (float x : {-13.0f, -8.0f})
+    for (float x : {-15.0f, -12.0f})
         add(ScenePrimitive::Cube,
             makeTransform({x, 9.45f, 3.8f}, {}, {0.28f, 1.8f, 2.0f}),
             MaterialId::DarkWood);
     for (float y : {9.10f, 10.10f})
         add(ScenePrimitive::Cube,
-            makeTransform({-10.5f, y, 3.8f}, {}, {5.2f, 0.18f, 0.24f}),
+            makeTransform({-13.5f, y, 3.8f}, {}, {5.2f, 0.18f, 0.24f}),
             MaterialId::DarkWood);
     for (int lever = 0; lever < 5; ++lever)
         add(ScenePrimitive::Cylinder,
-            makeTransform({-10.5f, 9.15f + lever * 0.25f,
+            makeTransform({-13.5f, 9.15f + lever * 0.25f,
                            3.25f + (lever % 2) * 1.1f},
                           {0.0f, 0.0f, 90.0f}, {0.16f, 5.4f, 0.16f}),
             MaterialId::Wood);

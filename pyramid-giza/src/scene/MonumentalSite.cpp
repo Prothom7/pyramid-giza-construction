@@ -59,7 +59,7 @@ const std::vector<RampDescriptor>& MonumentalSite::ramps()
         {"MainHaulingRamp", {0.0f, 0.35f, 45.0f}, {0.0f, 8.20f, -4.20f},
          scale().mainRampWidth, 0.70f, MaterialId::RampEarth, true,
          0.62f, 0.90f, 1.35f, 0.0f, false, "Hero and upper-middle haul"},
-        {"MainLanding", {0.0f, 8.35f, -4.20f}, {0.0f, 8.35f, -5.25f},
+        {"MainLanding", {0.0f, 8.35f, -4.10f}, {0.0f, 8.35f, -5.25f},
          7.8f, 0.40f, MaterialId::RampEarth, false,
          0.62f, 0.90f, 0.25f, 0.0f, true, "Controlled pyramid-face landing"},
         {"WestAccessRamp", {-63.0f, 0.30f, -25.0f}, {-40.0f, 4.30f, -25.0f},
@@ -121,6 +121,18 @@ const std::vector<ScaffoldPlacement>& MonumentalSite::scaffolds()
          "Ground-founded hero-ramp landing access", 0.62f, 0.90f}
     };
     return values;
+}
+
+const std::vector<UpperWorkDeckPanel>& MonumentalSite::upperWorkDeckPanels()
+{
+    // The center opening leaves headroom for a loaded sledge on the rising
+    // ramp. The end panel joins the ramp landing to the two work-deck wings.
+    static const std::vector<UpperWorkDeckPanel> panels{
+        {{-2.0f, 8.375f, -5.05f}, {30.0f, 0.35f, 1.90f}},
+        {{-10.25f, 8.375f, 0.95f}, {13.50f, 0.35f, 10.10f}},
+        {{8.25f, 8.375f, 0.95f}, {9.50f, 0.35f, 10.10f}}
+    };
+    return panels;
 }
 
 const std::vector<SiteZoneDescriptor>& MonumentalSite::zones()

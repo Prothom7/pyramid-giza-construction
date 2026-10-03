@@ -133,7 +133,7 @@ RampDescriptor transportRampToe(const RampDescriptor& ramp)
 {
     const glm::vec3 surface = MonumentalSite::rampSurfacePoint(ramp, 0.0f);
     RampDescriptor toe{"TransportRampToe", {0.0f, 0.04f, 52.0f},
-        {surface.x, surface.y - 0.04f, surface.z}, ramp.width, 0.08f,
+        {surface.x, surface.y - 0.04f, surface.z - 0.10f}, ramp.width, 0.08f,
         MaterialId::RampEarth, false};
     toe.minimumProgress = ramp.minimumProgress;
     toe.maximumProgress = ramp.maximumProgress;
@@ -205,6 +205,12 @@ SupportSurface transportAt(const glm::vec2& point, float constructionProgress)
              SupportSurfaceKind::WorkPlatform);
     platform("QuarryExitDeckLip", {-107.9f, -9.8f}, {0.3f, 1.8f}, -2.60f,
              SupportSurfaceKind::WorkPlatform);
+    if (SceneSupport::stageActive(constructionProgress, 0.62f, 0.90f))
+        for (const UpperWorkDeckPanel& panel : MonumentalSite::upperWorkDeckPanels())
+            platform("UpperWorkDeck", {panel.center.x, panel.center.z},
+                     {0.5f * panel.size.x, 0.5f * panel.size.z},
+                     panel.center.y + 0.5f * panel.size.y,
+                     SupportSurfaceKind::WorkPlatform);
     if (explicitSurface.valid)
         return explicitSurface;
     const RampDescriptor quarryRoad{

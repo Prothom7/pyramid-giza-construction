@@ -66,6 +66,12 @@ struct ScaffoldPlacement
     float maximumProgress = 1.01f;
 };
 
+struct UpperWorkDeckPanel
+{
+    glm::vec3 center;
+    glm::vec3 size;
+};
+
 struct SiteZoneDescriptor
 {
     const char* id;
@@ -84,6 +90,7 @@ public:
     static RampFrame rampFrame(const RampDescriptor& ramp);
     static bool rampActive(const RampDescriptor& ramp, float progress);
     static const std::vector<ScaffoldPlacement>& scaffolds();
+    static const std::vector<UpperWorkDeckPanel>& upperWorkDeckPanels();
     static const std::vector<SiteZoneDescriptor>& zones();
 
     static glm::mat4 rampModel(const RampDescriptor& ramp);
