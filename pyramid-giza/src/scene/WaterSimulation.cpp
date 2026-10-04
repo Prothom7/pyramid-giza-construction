@@ -18,6 +18,16 @@
 WaterSimulation::WaterSimulation()
 {
     initBoats();
+    baseSurfaceMesh_ = IndustrialLandscape::nileSurfaceMesh();
+    surfaceVertices_ = baseSurfaceMesh_.vertices;
+    const glm::mat4 model = IndustrialLandscape::nileSurfaceModel();
+    surfaceWorldXZ_.reserve(surfaceVertices_.size());
+    for (const Vertex& vertex : baseSurfaceMesh_.vertices)
+    {
+        const glm::vec3 world{model * glm::vec4{vertex.position, 1.0f}};
+        surfaceWorldXZ_.emplace_back(world.x, world.z);
+    }
+    updateSurface();
 }
 
 void WaterSimulation::initBoats()
@@ -31,6 +41,7 @@ void WaterSimulation::reset()
 {
     simulationTime_ = 0.0f;
     updateBoats();
+    updateSurface();
 }
 
 void WaterSimulation::update(float deltaTime)
@@ -40,6 +51,79 @@ void WaterSimulation::update(float deltaTime)
 
     simulationTime_ += deltaTime;
     updateBoats();
+    updateSurface();
+}
+
+float WaterSimulation::attenuatedWaveHeightAt(float x, float z) const
+{
+    // The existing wave field drives both the VBO and the bounded query.
+    // A smooth 6 m bank fade keeps troughs above the shallow terminal bed
+    // while leaving the deep central channel's wave field unchanged.
+    constexpr float bankFadeWidth = 6.0f;
+    const float distance = IndustrialLandscape::nileSurface().signedBankDistance(x, z);
+    const float fraction = glm::clamp(distance / bankFadeWidth, 0.0f, 1.0f);
+    const float attenuation = fraction * fraction * (3.0f - 2.0f * fraction);
+    return attenuation * waveHeightAt(x, z);
+}
+
+void WaterSimulation::updateSurface()
+{
+    constexpr float normalProbe = 0.20f;
+    for (std::size_t i = 0; i < surfaceVertices_.size(); ++i)
+    {
+        const glm::vec2 point = surfaceWorldXZ_[i];
+        const float height = attenuatedWaveHeightAt(point.x, point.y);
+        const float dx = (attenuatedWaveHeightAt(point.x + normalProbe, point.y) -
+                          attenuatedWaveHeightAt(point.x - normalProbe, point.y)) /
+                         (2.0f * normalProbe);
+        const float dz = (attenuatedWaveHeightAt(point.x, point.y + normalProbe) -
+                          attenuatedWaveHeightAt(point.x, point.y - normalProbe)) /
+                         (2.0f * normalProbe);
+        surfaceVertices_[i].position.y = height;
+        surfaceVertices_[i].normal = glm::normalize(glm::vec3{-dx, 1.0f, -dz});
+    }
+}
+
+bool WaterSimulation::waterSurfaceAt(float x, float z, float& height) const
+{
+    const NileSurfaceBounds nile = IndustrialLandscape::nileSurface();
+    if (!nile.contains(x, z))
+        return false;
+
+    // Interpolate the current CPU vertices with the exact triangles uploaded
+    // to the VBO. This makes future buoyancy queries match the visible mesh.
+    const glm::vec2 point{x, z};
+    constexpr float edgeTolerance = 1.0e-5f;
+    for (std::size_t i = 0; i + 2 < baseSurfaceMesh_.indices.size(); i += 3)
+    {
+        const auto ia = baseSurfaceMesh_.indices[i];
+        const auto ib = baseSurfaceMesh_.indices[i + 1];
+        const auto ic = baseSurfaceMesh_.indices[i + 2];
+        const glm::vec2 a = surfaceWorldXZ_[ia];
+        const glm::vec2 b = surfaceWorldXZ_[ib];
+        const glm::vec2 c = surfaceWorldXZ_[ic];
+        if (point.x < std::min({a.x, b.x, c.x}) - edgeTolerance ||
+            point.x > std::max({a.x, b.x, c.x}) + edgeTolerance ||
+            point.y < std::min({a.y, b.y, c.y}) - edgeTolerance ||
+            point.y > std::max({a.y, b.y, c.y}) + edgeTolerance)
+            continue;
+        const float denominator =
+            (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+        if (std::abs(denominator) <= 1.0e-9f)
+            continue;
+        const float wa = ((b.y - c.y) * (point.x - c.x) +
+                          (c.x - b.x) * (point.y - c.y)) / denominator;
+        const float wb = ((c.y - a.y) * (point.x - c.x) +
+                          (a.x - c.x) * (point.y - c.y)) / denominator;
+        const float wc = 1.0f - wa - wb;
+        if (wa < -edgeTolerance || wb < -edgeTolerance || wc < -edgeTolerance)
+            continue;
+        height = nile.waterY + wa * surfaceVertices_[ia].position.y +
+                 wb * surfaceVertices_[ib].position.y +
+                 wc * surfaceVertices_[ic].position.y;
+        return true;
+    }
+    return false;
 }
 
 float WaterSimulation::waveHeightAt(float x, float z) const
@@ -174,7 +258,12 @@ bool WaterSimulation::validateWaterSimulation(std::ostream& output)
     float renderedMaxX = std::numeric_limits<float>::lowest();
     float renderedMinZ = std::numeric_limits<float>::max();
     float renderedMaxZ = std::numeric_limits<float>::lowest();
-    bool renderedLevel = mesh.vertices.size() == 24 && mesh.indices.size() == 66;
+    bool renderedLevel = mesh.vertices.size() ==
+        static_cast<std::size_t>((IndustrialLandscape::NileLengthSegments + 1) *
+                                 (IndustrialLandscape::NileWidthSegments + 1)) &&
+        mesh.indices.size() ==
+        static_cast<std::size_t>(IndustrialLandscape::NileLengthSegments *
+                                 IndustrialLandscape::NileWidthSegments * 6);
     std::vector<glm::vec2> outline;
     outline.reserve(mesh.vertices.size());
     for (const Vertex& vertex : mesh.vertices)
@@ -329,10 +418,148 @@ bool WaterSimulation::validateWaterSimulation(std::ostream& output)
         near(firstRippleY, nile.waterY + 0.015f +
              0.02f * std::sin(-42.0f * 0.4f));
 
+    WaterSimulation motion;
+    WaterSimulation repeat;
+    float minimumDisplacement = std::numeric_limits<float>::max();
+    float maximumDisplacement = std::numeric_limits<float>::lowest();
+    float maximumTiltDegrees = 0.0f;
+    float maximumShoreDisplacement = 0.0f;
+    bool finiteMotion = motion.surfaceVertices().size() == mesh.vertices.size();
+    bool repeatable = true;
+    for (int frame = 0; frame < 120; ++frame)
+    {
+        motion.update(1.0f / 60.0f);
+        repeat.update(1.0f / 60.0f);
+        for (std::size_t i = 0; i < motion.surfaceVertices().size(); ++i)
+        {
+            const Vertex& vertex = motion.surfaceVertices()[i];
+            const Vertex& repeated = repeat.surfaceVertices()[i];
+            const glm::vec2 point = outline[i];
+            minimumDisplacement = std::min(minimumDisplacement, vertex.position.y);
+            maximumDisplacement = std::max(maximumDisplacement, vertex.position.y);
+            maximumTiltDegrees = std::max(maximumTiltDegrees,
+                glm::degrees(std::acos(glm::clamp(vertex.normal.y, -1.0f, 1.0f))));
+            finiteMotion = finiteMotion &&
+                std::isfinite(vertex.position.y) &&
+                std::isfinite(vertex.normal.x) &&
+                std::isfinite(vertex.normal.y) &&
+                std::isfinite(vertex.normal.z) &&
+                vertex.normal.y > 0.90f &&
+                std::abs(glm::length(vertex.normal) - 1.0f) < 1.0e-4f;
+            repeatable = repeatable &&
+                vertex.position.y == repeated.position.y &&
+                vertex.normal.x == repeated.normal.x &&
+                vertex.normal.y == repeated.normal.y &&
+                vertex.normal.z == repeated.normal.z;
+            if (nile.signedBankDistance(point.x, point.y) < 1.0e-3f)
+                maximumShoreDisplacement = std::max(maximumShoreDisplacement,
+                                                     std::abs(vertex.position.y));
+        }
+    }
+    const bool boundedMotion = minimumDisplacement >= -0.201f &&
+                               maximumDisplacement <= 0.201f &&
+                               maximumDisplacement - minimumDisplacement > 0.05f &&
+                               maximumTiltDegrees < 20.0f &&
+                               maximumShoreDisplacement < 1.0e-3f;
+    WaterSimulation thirtyFps;
+    WaterSimulation sixtyFps;
+    for (int frame = 0; frame < 60; ++frame)
+        thirtyFps.update(1.0f / 30.0f);
+    for (int frame = 0; frame < 120; ++frame)
+        sixtyFps.update(1.0f / 60.0f);
+    float maximumEqualTimeDifference = 0.0f;
+    for (std::size_t i = 0; i < mesh.vertices.size(); ++i)
+    {
+        maximumEqualTimeDifference = std::max(maximumEqualTimeDifference,
+            std::abs(thirtyFps.surfaceVertices()[i].position.y -
+                     sixtyFps.surfaceVertices()[i].position.y));
+    }
+    const bool equalTimeAgreement = maximumEqualTimeDifference < 1.0e-4f;
+    float maximumQueryError = 0.0f;
+    bool dynamicQueryAgreement = true;
+    for (int column = 1; column < IndustrialLandscape::NileLengthSegments; column += 7)
+        for (int across : {3, 7, 10})
+        {
+            const std::size_t index = static_cast<std::size_t>(
+                column * (IndustrialLandscape::NileWidthSegments + 1) + across);
+            float queried = -999.0f;
+            const glm::vec2 point = outline[index];
+            const bool wet = motion.waterSurfaceAt(point.x, point.y, queried);
+            const float rendered = nile.waterY +
+                motion.surfaceVertices()[index].position.y;
+            maximumQueryError = std::max(maximumQueryError,
+                                         std::abs(queried - rendered));
+            dynamicQueryAgreement = dynamicQueryAgreement && wet &&
+                                    std::abs(queried - rendered) < 1.0e-4f;
+        }
+    for (std::size_t triangle = 0; triangle + 2 < mesh.indices.size();
+         triangle += 3 * 37)
+    {
+        const auto a = mesh.indices[triangle];
+        const auto b = mesh.indices[triangle + 1];
+        const auto c = mesh.indices[triangle + 2];
+        const glm::vec2 point = (outline[a] + outline[b] + outline[c]) / 3.0f;
+        const float rendered = nile.waterY +
+            (motion.surfaceVertices()[a].position.y +
+             motion.surfaceVertices()[b].position.y +
+             motion.surfaceVertices()[c].position.y) / 3.0f;
+        float queried = -999.0f;
+        const bool wet = motion.waterSurfaceAt(point.x, point.y, queried);
+        maximumQueryError = std::max(maximumQueryError,
+                                     std::abs(queried - rendered));
+        dynamicQueryAgreement = dynamicQueryAgreement && wet &&
+                                std::abs(queried - rendered) < 1.0e-4f;
+    }
+    float dryHeight = -999.0f;
+    dynamicQueryAgreement = dynamicQueryAgreement &&
+        !motion.waterSurfaceAt(nile.minX, nile.minZ, dryHeight) &&
+        !motion.waterSurfaceAt(nile.maxX, nile.maxZ, dryHeight) &&
+        dryHeight == -999.0f;
+    for (float x : {nile.minX, nile.minX + 2.5f, nile.minX + 12.5f,
+                    0.0f, nile.maxX - 12.5f, nile.maxX - 2.5f, nile.maxX})
+    {
+        for (float z : {nile.southBankAt(x), nile.northBankAt(x)})
+        {
+            float shoreY = -999.0f;
+            dynamicQueryAgreement = dynamicQueryAgreement &&
+                motion.waterSurfaceAt(x, z, shoreY) &&
+                std::abs(shoreY - nile.waterY) < 1.0e-3f;
+        }
+    }
+    WaterSimulation shoreCheck;
+    float minimumEndBedClearance = std::numeric_limits<float>::max();
+    bool endBedCovered = true;
+    for (int timeSample = 0; timeSample < 33; ++timeSample)
+    {
+        if (timeSample > 0)
+            shoreCheck.update(0.25f);
+        for (int end = 0; end < 2; ++end)
+            for (int station = 0; station <= 20; ++station)
+            {
+                const float offset = 1.25f * static_cast<float>(station);
+                const float x = end == 0 ? nile.minX + offset : nile.maxX - offset;
+                for (int across = 0; across <= 10; ++across)
+                {
+                    const float fraction = static_cast<float>(across) / 10.0f;
+                    const float z = glm::mix(nile.southBankAt(x),
+                                             nile.northBankAt(x), fraction);
+                    float surfaceY = -999.0f;
+                    const bool wet = shoreCheck.waterSurfaceAt(x, z, surfaceY);
+                    const float clearance = surfaceY -
+                        SandSimulation::staticTerrainHeightAt(x, z);
+                    minimumEndBedClearance = std::min(minimumEndBedClearance,
+                                                       clearance);
+                    endBedCovered = endBedCovered && wet && clearance > -0.01f;
+                }
+            }
+    }
+
     const bool valid = boatsBounded && normalsUpward && finiteBounds &&
                        renderQueryAgreement && boundaries && denseShapeAgreement && floodplainJoins &&
                        bedSubmerged && endsGraded && quayAdjacent && boatsInside &&
-                       waterSimulationLevel;
+                       waterSimulationLevel && finiteMotion && repeatable &&
+                       boundedMotion && equalTimeAgreement && dynamicQueryAgreement &&
+                       endBedCovered;
 
     output << "Phase 13 Water Simulation Validation\n"
            << "  all boats vertically bounded in water surface (+/- 0.35m): "
@@ -352,6 +579,20 @@ bool WaterSimulation::validateWaterSimulation(std::ostream& output)
            << (boatsInside ? "PASS" : "FAIL") << '\n'
            << "  ripple objects use the same water level: "
            << (waterSimulationLevel ? "PASS" : "FAIL") << '\n'
+           << "  finite, bounded animated vertices/normals and stable banks: "
+           << ((finiteMotion && boundedMotion) ? "PASS" : "FAIL") << '\n'
+           << "  deterministic update and 30/60 FPS equal-time agreement: "
+           << ((repeatable && equalTimeAgreement) ? "PASS" : "FAIL")
+           << " (max difference " << maximumEqualTimeDifference << " m)\n"
+           << "  dynamic query matches rendered vertices: "
+           << (dynamicQueryAgreement ? "PASS" : "FAIL")
+           << " (max error " << maximumQueryError << " m)\n"
+           << "  measured displacement / normal tilt: "
+           << minimumDisplacement << " ... " << maximumDisplacement
+           << " m / " << maximumTiltDegrees << " degrees\n"
+           << "  shaped-end water covers graded bed: "
+           << (endBedCovered ? "PASS" : "FAIL")
+           << " (minimum clearance " << minimumEndBedClearance << " m)\n"
            << (valid ? "Water simulation validation passed.\n"
                      : "Water simulation validation failed.\n");
 

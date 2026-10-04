@@ -47,6 +47,7 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
       sphere_(PrimitiveGenerator::createSphere()),
       particles_(particleCapacity)
 {
+    nileSurface_.updateVertices(water_.surfaceVertices());
     GLint maximumVertexAttributes = 0;
     glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maximumVertexAttributes);
     if (maximumVertexAttributes < 11)
@@ -1915,6 +1916,7 @@ void StaticGizaScene::update(float deltaTime)
     if (sand_.revision() != previousSandRevision)
         sandMesh_.updateVertices(sand_.generateTerrainMesh().vertices);
     water_.update(deltaTime);
+    nileSurface_.updateVertices(water_.surfaceVertices());
     if (deltaTime > 1.0e-5f)
         currentFps_ = 0.9f * currentFps_ + 0.1f * (1.0f / deltaTime);
 
@@ -2182,6 +2184,7 @@ void StaticGizaScene::resetAnimation()
     sand_.reset();
     sandMesh_.updateVertices(sand_.generateTerrainMesh().vertices);
     water_.reset();
+    nileSurface_.updateVertices(water_.surfaceVertices());
     demoPose_ = WorkerPose::Standing;
     articulationTime_ = 0.0f;
     particles_.clear();

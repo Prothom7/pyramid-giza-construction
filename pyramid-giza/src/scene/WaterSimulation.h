@@ -6,6 +6,7 @@
 
 #include <glm/glm.hpp>
 
+#include "graphics/Mesh.h"
 #include "scene/ObjectEnrichment.h"
 #include "scene/SceneTypes.h"
 
@@ -38,6 +39,8 @@ public:
     float waveHeightAt(float x, float z) const;
     glm::vec3 waveNormalAt(float x, float z) const;
     glm::vec2 flowVelocityAt(float x, float z) const;
+    bool waterSurfaceAt(float x, float z, float& height) const;
+    const std::vector<Vertex>& surfaceVertices() const { return surfaceVertices_; }
 
     const std::vector<SimulatedBoatState>& boatStates() const { return boatStates_; }
 
@@ -49,9 +52,14 @@ public:
 private:
     void initBoats();
     void updateBoats();
+    void updateSurface();
+    float attenuatedWaveHeightAt(float x, float z) const;
 
     float simulationTime_ = 0.0f;
     bool enabled_ = true;
     std::vector<SimulatedBoatState> boatStates_;
     std::vector<BoatDescriptor> baseBoats_;
+    MeshData baseSurfaceMesh_{"NileSurface"};
+    std::vector<Vertex> surfaceVertices_;
+    std::vector<glm::vec2> surfaceWorldXZ_;
 };

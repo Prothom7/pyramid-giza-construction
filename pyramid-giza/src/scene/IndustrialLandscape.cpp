@@ -174,32 +174,38 @@ MeshData IndustrialLandscape::nileSurfaceMesh()
     const float width = surface.maxX - surface.minX;
     const float length = surface.maxZ - surface.minZ;
     MeshData mesh{"NileSurface"};
-    std::array<float, 12> columns{};
-    for (int station = 0; station <= 5; ++station)
+    for (int station = 0; station <= NileLengthSegments; ++station)
     {
-        const float offset = surface.endTaperLength *
-                             static_cast<float>(station) / 5.0f;
-        columns[station] = surface.minX + offset;
-        columns[11 - station] = surface.maxX - offset;
-    }
-    for (float x : columns)
-    {
-        for (float z : {surface.southBankAt(x), surface.northBankAt(x)})
+        const float u = static_cast<float>(station) /
+                        static_cast<float>(NileLengthSegments);
+        const float x = glm::mix(surface.minX, surface.maxX, u);
+        const float south = surface.southBankAt(x);
+        const float north = surface.northBankAt(x);
+        for (int across = 0; across <= NileWidthSegments; ++across)
+        {
+            const float v = static_cast<float>(across) /
+                            static_cast<float>(NileWidthSegments);
+            const float z = glm::mix(south, north, v);
             mesh.vertices.push_back({
                 {(x - centerX) / width, 0.0f, (z - centerZ) / length},
                 {0.0f, 1.0f, 0.0f},
                 {(x - surface.minX) / width, (z - surface.minZ) / length}});
+        }
     }
-    for (std::uint32_t station = 0; station + 1 < columns.size(); ++station)
+    for (int station = 0; station < NileLengthSegments; ++station)
     {
-        const std::uint32_t south = 2 * station;
-        const std::uint32_t north = south + 1;
-        const std::uint32_t nextSouth = south + 2;
-        const std::uint32_t nextNorth = south + 3;
-        // +Z then +X is counter-clockwise when viewed from above (+Y).
-        mesh.indices.insert(mesh.indices.end(),
-                            {south, north, nextSouth,
-                             north, nextNorth, nextSouth});
+        for (int across = 0; across < NileWidthSegments; ++across)
+        {
+            const auto south = static_cast<std::uint32_t>(
+                station * (NileWidthSegments + 1) + across);
+            const auto north = south + 1;
+            const auto nextSouth = south + NileWidthSegments + 1;
+            const auto nextNorth = nextSouth + 1;
+            // +Z then +X is counter-clockwise when viewed from above (+Y).
+            mesh.indices.insert(mesh.indices.end(),
+                                {south, north, nextSouth,
+                                 north, nextNorth, nextSouth});
+        }
     }
     return mesh;
 }

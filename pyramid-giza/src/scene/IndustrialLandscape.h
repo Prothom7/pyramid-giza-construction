@@ -95,6 +95,8 @@ struct NileSurfaceBounds
 class IndustrialLandscape
 {
 public:
+    static constexpr int NileLengthSegments = 66; // 5 m stations preserve every taper control point.
+    static constexpr int NileWidthSegments = 13;  // 2 m across the full-width channel.
     static const QuarryConfig& quarry();
     static const std::vector<QuarryTerraceDescriptor>& terraces();
     static const std::vector<ExtractionBayDescriptor>& extractionBays();
