@@ -1617,48 +1617,30 @@ void StaticGizaScene::buildRiverLanding()
               makeTransform({-24.0f, 0.10f, -143.0f}, {}, {8.0f, 0.14f, 17.0f}),
               MaterialId::RampEarth);
 
-    for (const BoatDescriptor& boat : ObjectEnrichment::boats())
+    const auto& boats = ObjectEnrichment::boats();
+    for (std::size_t boatIndex = 0; boatIndex < boats.size(); ++boatIndex)
     {
+        const BoatDescriptor& boat = boats[boatIndex];
         const glm::mat4 root = makeTransform(
             boat.center, {0.0f, boat.yawDegrees, 0.0f}, {1.0f, 1.0f, 1.0f});
-        addObject(ScenePrimitive::Cube,
-                  root * makeTransform({0.0f, 0.26f, 0.0f}, {},
-                                       {boat.width * 0.68f, 0.42f, boat.length * 0.82f}),
-                  MaterialId::DarkWood);
-        for (float sign : {-1.0f, 1.0f})
-            addObject(ScenePrimitive::Cube,
-                      root * makeTransform({sign * boat.width * 0.43f, 0.72f, 0.0f},
-                                           {0.0f, 0.0f, -sign * 12.0f},
-                                           {0.34f, 0.80f, boat.length}),
-                      MaterialId::Wood);
-        for (float sign : {-1.0f, 1.0f})
-            addObject(ScenePrimitive::Cube,
-                      root * makeTransform({0.0f, 0.82f, sign * boat.length * 0.45f},
-                                           {sign * 22.0f, 0.0f, 0.0f},
-                                           {boat.width * 0.82f, 0.62f, 1.45f}),
-                      MaterialId::Wood);
-        for (float z : {-0.25f * boat.length, 0.0f, 0.25f * boat.length})
-            addObject(ScenePrimitive::Cube,
-                      root * makeTransform({0.0f, 0.88f, z}, {},
-                                           {boat.width * 0.72f, 0.18f, 0.34f}),
-                      MaterialId::DarkWood);
-        addObject(ScenePrimitive::Cylinder,
-                  root * makeTransform({0.0f, 2.1f, 0.8f}, {},
-                                       {0.16f, 3.5f, 0.16f}), MaterialId::Wood);
-        addObject(ScenePrimitive::Cube,
-                  root * makeTransform({0.0f, 3.0f, 0.8f}, {0.0f, 0.0f, 8.0f},
-                                       {2.4f, 0.10f, 1.6f}), MaterialId::ClothingLinen);
-
-        if (boat.mooredAtLanding)
+        for (const SceneObject& local : ObjectEnrichment::boatLocalParts(boat))
         {
-            const glm::vec3 bow{root * glm::vec4{0.0f, 0.8f, 0.45f * boat.length, 1.0f}};
-            const glm::vec3 stern{root * glm::vec4{0.0f, 0.8f, -0.45f * boat.length, 1.0f}};
+            const std::size_t objectIndex = objects_.size();
+            addObject(local.primitive, root * local.model, local.material);
+            boatVisualParts_.push_back({boatIndex, objectIndex, local.model});
+        }
+        for (const BoatMooringDescriptor& mooring :
+             ObjectEnrichment::boatMoorings(boat))
+        {
+            const glm::vec3 boatEnd{root *
+                glm::vec4{mooring.boatAttachmentLocal, 1.0f}};
+            const std::size_t objectIndex = objects_.size();
             addObject(ScenePrimitive::Cylinder,
                       ConstructionAnimationController::cylinderBetween(
-                          bow, {-30.0f, 1.9f, -153.0f}, 0.055f), MaterialId::Rope);
-            addObject(ScenePrimitive::Cylinder,
-                      ConstructionAnimationController::cylinderBetween(
-                          stern, {-42.0f, 1.9f, -153.0f}, 0.055f), MaterialId::Rope);
+                          boatEnd, mooring.shoreAnchor, 0.055f), MaterialId::Rope);
+            boatMooringParts_.push_back({boatIndex, objectIndex,
+                                        mooring.boatAttachmentLocal,
+                                        mooring.shoreAnchor});
         }
     }
 
@@ -2540,6 +2522,22 @@ void StaticGizaScene::collectFrameObjects()
                 glm::translate(glm::mat4{1.0f}, -part.pivot);
             frameObjects_[part.objectIndex].model = pivotedSway * part.baseModel;
         }
+    }
+    for (std::size_t boatIndex = 0; boatIndex < water_.boatStates().size(); ++boatIndex)
+    {
+        const glm::mat4 root = water_.boatRootTransform(boatIndex);
+        for (const BoatVisualPart& part : boatVisualParts_)
+            if (part.boatIndex == boatIndex)
+                frameObjects_[part.objectIndex].model = root * part.localModel;
+        for (const BoatMooringPart& mooring : boatMooringParts_)
+            if (mooring.boatIndex == boatIndex)
+            {
+                const glm::vec3 boatEnd{root *
+                    glm::vec4{mooring.boatAttachmentLocal, 1.0f}};
+                frameObjects_[mooring.objectIndex].model =
+                    ConstructionAnimationController::cylinderBetween(
+                        boatEnd, mooring.shoreAnchor, 0.055f);
+            }
     }
     const float constructionProgress = constructionTimeline_.progress();
     for (const StagedSceneObject& staged : stagedObjects_)

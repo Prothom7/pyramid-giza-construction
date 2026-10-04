@@ -20,6 +20,11 @@ struct SimulatedBoatState
     float swayDegrees = 0.0f;
     glm::vec3 wakeOrigin{0.0f};
     bool moored = false;
+    float centerWaterY = 0.0f;
+    float bowWaterY = 0.0f;
+    float sternWaterY = 0.0f;
+    float portWaterY = 0.0f;
+    float starboardWaterY = 0.0f;
 };
 
 class WaterSimulation
@@ -43,11 +48,13 @@ public:
     const std::vector<Vertex>& surfaceVertices() const { return surfaceVertices_; }
 
     const std::vector<SimulatedBoatState>& boatStates() const { return boatStates_; }
+    glm::mat4 boatRootTransform(std::size_t index) const;
 
     // Visual geometry generation (boat dynamic transforms, wake ripples, shoreline foam strips)
     void collectSceneObjects(std::vector<SceneObject>& objects) const;
 
     static bool validateWaterSimulation(std::ostream& output);
+    static bool validateBoatWaterCoupling(std::ostream& output);
 
 private:
     void initBoats();

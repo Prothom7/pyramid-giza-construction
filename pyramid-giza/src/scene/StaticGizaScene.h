@@ -282,6 +282,21 @@ private:
         glm::vec3 pivot{0.0f};
     };
 
+    struct BoatVisualPart
+    {
+        std::size_t boatIndex = 0;
+        std::size_t objectIndex = 0;
+        glm::mat4 localModel{1.0f};
+    };
+
+    struct BoatMooringPart
+    {
+        std::size_t boatIndex = 0;
+        std::size_t objectIndex = 0;
+        glm::vec3 boatAttachmentLocal{0.0f};
+        glm::vec3 shoreAnchor{0.0f};
+    };
+
     void addObject(ScenePrimitive primitive, const glm::mat4& model, MaterialId material);
     void addComposite(const glm::mat4& root, const std::vector<ObjectPart>& parts);
     void addWorker(const glm::vec3& position, float rotationY, WorkerPose pose,
@@ -357,6 +372,8 @@ private:
     std::vector<StagedSceneObject> stagedObjects_;
     std::vector<DynamicPulleyWheel> dynamicPulleyWheels_;
     std::vector<TreeMotionPart> treeMotionParts_;
+    std::vector<BoatVisualPart> boatVisualParts_;
+    std::vector<BoatMooringPart> boatMooringParts_;
     std::vector<WorkerInstance> workers_;
     std::vector<ObjectPart> loadedSledgeParts_;
     ConstructionAnimationController animationController_;

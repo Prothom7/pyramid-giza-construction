@@ -6,6 +6,8 @@
 
 #include <glm/glm.hpp>
 
+#include "scene/SceneTypes.h"
+
 enum class RopeRigType
 {
     HorizontalRedirection,
@@ -51,12 +53,26 @@ struct LadderDescriptor
 
 struct BoatDescriptor
 {
+    static constexpr float hullCenterLocalY = 0.26f;
+    static constexpr float hullHeight = 0.42f;
+    static constexpr float draft = 0.16f;
+    static constexpr float waterlineLocalY =
+        hullCenterLocalY - 0.5f * hullHeight + draft;
+    static constexpr float bowSampleFraction = 0.32f;
+    static constexpr float sideSampleFraction = 0.25f;
+
     const char* id;
     glm::vec3 center;
     float yawDegrees;
     float length;
     float width;
     bool mooredAtLanding;
+};
+
+struct BoatMooringDescriptor
+{
+    glm::vec3 boatAttachmentLocal;
+    glm::vec3 shoreAnchor;
 };
 
 class ObjectEnrichment
@@ -66,6 +82,8 @@ public:
     static const std::vector<AnchorPostDescriptor>& anchorPosts();
     static const std::vector<LadderDescriptor>& ladders();
     static const std::vector<BoatDescriptor>& boats();
+    static std::vector<SceneObject> boatLocalParts(const BoatDescriptor& boat);
+    static std::vector<BoatMooringDescriptor> boatMoorings(const BoatDescriptor& boat);
 
     static constexpr std::size_t workshopClusters = 1;
     static constexpr std::size_t repairStations = 1;

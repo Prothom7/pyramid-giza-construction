@@ -1,10 +1,12 @@
 #include "scene/WaterSimulation.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iomanip>
 #include <limits>
 #include <ostream>
+#include <stdexcept>
 #include <utility>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -12,12 +14,12 @@
 #include "scene/IndustrialLandscape.h"
 #include "scene/SandSimulation.h"
 #include "graphics/Mesh.h"
+#include "animation/ConstructionAnimation.h"
 
 
 
 WaterSimulation::WaterSimulation()
 {
-    initBoats();
     baseSurfaceMesh_ = IndustrialLandscape::nileSurfaceMesh();
     surfaceVertices_ = baseSurfaceMesh_.vertices;
     const glm::mat4 model = IndustrialLandscape::nileSurfaceModel();
@@ -28,6 +30,7 @@ WaterSimulation::WaterSimulation()
         surfaceWorldXZ_.emplace_back(world.x, world.z);
     }
     updateSurface();
+    initBoats();
 }
 
 void WaterSimulation::initBoats()
@@ -40,8 +43,8 @@ void WaterSimulation::initBoats()
 void WaterSimulation::reset()
 {
     simulationTime_ = 0.0f;
-    updateBoats();
     updateSurface();
+    updateBoats();
 }
 
 void WaterSimulation::update(float deltaTime)
@@ -50,8 +53,8 @@ void WaterSimulation::update(float deltaTime)
         return;
 
     simulationTime_ += deltaTime;
-    updateBoats();
     updateSurface();
+    updateBoats();
 }
 
 float WaterSimulation::attenuatedWaveHeightAt(float x, float z) const
@@ -165,27 +168,55 @@ void WaterSimulation::updateBoats()
     {
         const BoatDescriptor& base = baseBoats_[i];
         SimulatedBoatState& state = boatStates_[i];
+        const glm::mat4 horizontalRoot = makeTransform(
+            {base.center.x, 0.0f, base.center.z},
+            {0.0f, base.yawDegrees, 0.0f}, {1.0f, 1.0f, 1.0f});
+        const auto sample = [&](float localX, float localZ)
+        {
+            const glm::vec3 world{horizontalRoot *
+                glm::vec4{localX, 0.0f, localZ, 1.0f}};
+            float surfaceY = 0.0f;
+            if (!waterSurfaceAt(world.x, world.z, surfaceY))
+                throw std::runtime_error(std::string("Boat footprint leaves Nile: ") +
+                                         base.id);
+            return surfaceY;
+        };
+        const float bowSpan = BoatDescriptor::bowSampleFraction * base.length;
+        const float sideSpan = BoatDescriptor::sideSampleFraction * base.width;
+        state.centerWaterY = sample(0.0f, 0.0f);
+        state.bowWaterY = sample(0.0f, bowSpan);
+        state.sternWaterY = sample(0.0f, -bowSpan);
+        state.portWaterY = sample(-sideSpan, 0.0f);
+        state.starboardWaterY = sample(sideSpan, 0.0f);
 
-        const float wave = waveHeightAt(base.center.x, base.center.z);
-        state.verticalDisplacement = wave;
-
-        // Slopes for pitch and roll
-        const float dx = (waveHeightAt(base.center.x + 1.0f, base.center.z) -
-                          waveHeightAt(base.center.x - 1.0f, base.center.z)) * 0.5f;
-        const float dz = (waveHeightAt(base.center.x, base.center.z + 1.0f) -
-                          waveHeightAt(base.center.x, base.center.z - 1.0f)) * 0.5f;
-
-        state.pitchDegrees = glm::clamp(std::atan2(dz, 1.0f) * 57.29578f * 1.5f, -8.0f, 8.0f);
-        state.rollDegrees = glm::clamp(std::atan2(dx, 1.0f) * 57.29578f * 1.5f, -8.0f, 8.0f);
-        state.swayDegrees = std::sin(simulationTime_ * 1.2f + static_cast<float>(i)) * 2.2f;
-
-        state.position = base.center + glm::vec3{0.0f, wave, 0.0f};
-        state.rotationDegrees = glm::vec3{state.pitchDegrees,
-                                          base.yawDegrees + state.swayDegrees,
-                                          state.rollDegrees};
-        state.wakeOrigin = base.center + glm::vec3{base.length * 0.45f, wave, 0.0f};
+        // Local +Z is the bow. Positive X rotation lowers it, while positive
+        // Z rotation raises the local +X (starboard) side.
+        state.pitchDegrees = glm::clamp(-glm::degrees(std::atan2(
+            state.bowWaterY - state.sternWaterY, 2.0f * bowSpan)), -5.0f, 5.0f);
+        state.rollDegrees = glm::clamp(glm::degrees(std::atan2(
+            state.starboardWaterY - state.portWaterY, 2.0f * sideSpan)),
+            -5.0f, 5.0f);
+        state.swayDegrees = 0.0f;
+        state.verticalDisplacement = state.centerWaterY -
+            IndustrialLandscape::nileSurface().waterY;
+        state.position = {base.center.x,
+                          state.centerWaterY - BoatDescriptor::waterlineLocalY,
+                          base.center.z};
+        state.rotationDegrees = {state.pitchDegrees, base.yawDegrees,
+                                 state.rollDegrees};
+        // Preserve the existing decorative wake coordinates and timing.
+        const float oldWave = waveHeightAt(base.center.x, base.center.z);
+        state.wakeOrigin = base.center +
+            glm::vec3{base.length * 0.45f, oldWave, 0.0f};
         state.moored = base.mooredAtLanding;
     }
+}
+
+glm::mat4 WaterSimulation::boatRootTransform(std::size_t index) const
+{
+    const SimulatedBoatState& state = boatStates_.at(index);
+    return makeTransform(state.position, state.rotationDegrees,
+                         {1.0f, 1.0f, 1.0f});
 }
 
 void WaterSimulation::collectSceneObjects(std::vector<SceneObject>& objects) const
@@ -596,5 +627,193 @@ bool WaterSimulation::validateWaterSimulation(std::ostream& output)
            << (valid ? "Water simulation validation passed.\n"
                      : "Water simulation validation failed.\n");
 
+    return valid;
+}
+
+bool WaterSimulation::validateBoatWaterCoupling(std::ostream& output)
+{
+    const auto& boats = ObjectEnrichment::boats();
+    WaterSimulation sim;
+    WaterSimulation repeat;
+    const auto initialStates = sim.boatStates();
+    struct Metrics
+    {
+        float minRootY = std::numeric_limits<float>::max();
+        float maxRootY = std::numeric_limits<float>::lowest();
+        float maxBob = 0.0f;
+        float maxPitch = 0.0f;
+        float maxRoll = 0.0f;
+        float maxWaterlineError = 0.0f;
+        float minDraft = std::numeric_limits<float>::max();
+        float maxDraft = std::numeric_limits<float>::lowest();
+    };
+    std::array<Metrics, 2> metrics{};
+    bool finiteAndStationary = boats.size() == metrics.size();
+    bool samplesValid = true;
+    bool partsRigid = true;
+    bool mooringsFollow = true;
+    bool wakeUnchanged = true;
+    bool repeatable = true;
+    float maxRigidError = 0.0f;
+    float maxPositionDrift = 0.0f;
+    float maxYawDrift = 0.0f;
+    for (int frame = 0; frame <= 240; ++frame)
+    {
+        if (frame > 0)
+        {
+            sim.update(1.0f / 30.0f);
+            repeat.update(1.0f / 30.0f);
+        }
+        for (std::size_t i = 0; i < boats.size(); ++i)
+        {
+            const BoatDescriptor& boat = boats[i];
+            const SimulatedBoatState& state = sim.boatStates()[i];
+            const SimulatedBoatState& second = repeat.boatStates()[i];
+            const glm::mat4 root = sim.boatRootTransform(i);
+            finiteAndStationary = finiteAndStationary &&
+                isFiniteNonSingularTransform(root) &&
+                std::isfinite(state.pitchDegrees) &&
+                std::isfinite(state.rollDegrees) &&
+                std::abs(state.pitchDegrees) <= 5.0f &&
+                std::abs(state.rollDegrees) <= 5.0f &&
+                state.moored == boat.mooredAtLanding;
+            maxPositionDrift = std::max(maxPositionDrift,
+                glm::length(glm::vec2{state.position.x - boat.center.x,
+                                       state.position.z - boat.center.z}));
+            maxYawDrift = std::max(maxYawDrift,
+                                   std::abs(state.rotationDegrees.y - boat.yawDegrees));
+            repeatable = repeatable && state.position.y == second.position.y &&
+                         state.pitchDegrees == second.pitchDegrees &&
+                         state.rollDegrees == second.rollDegrees;
+
+            Metrics& m = metrics[i];
+            m.minRootY = std::min(m.minRootY, state.position.y);
+            m.maxRootY = std::max(m.maxRootY, state.position.y);
+            m.maxBob = std::max(m.maxBob, std::abs(state.verticalDisplacement));
+            m.maxPitch = std::max(m.maxPitch, std::abs(state.pitchDegrees));
+            m.maxRoll = std::max(m.maxRoll, std::abs(state.rollDegrees));
+
+            const float bow = BoatDescriptor::bowSampleFraction * boat.length;
+            const float side = BoatDescriptor::sideSampleFraction * boat.width;
+            const std::array<glm::vec2, 5> localPoints{{
+                {0.0f, 0.0f}, {0.0f, bow}, {0.0f, -bow},
+                {-side, 0.0f}, {side, 0.0f}}};
+            for (const glm::vec2 local : localPoints)
+            {
+                const glm::vec3 world{root * glm::vec4{
+                    local.x, BoatDescriptor::waterlineLocalY, local.y, 1.0f}};
+                float surfaceY = 0.0f;
+                const bool wet = sim.waterSurfaceAt(world.x, world.z, surfaceY);
+                samplesValid = samplesValid && wet;
+                if (wet)
+                    m.maxWaterlineError = std::max(m.maxWaterlineError,
+                                                   std::abs(world.y - surfaceY));
+            }
+            const glm::vec3 hullBottom{root * glm::vec4{
+                0.0f, BoatDescriptor::hullCenterLocalY -
+                      0.5f * BoatDescriptor::hullHeight, 0.0f, 1.0f}};
+            const float draft = state.centerWaterY - hullBottom.y;
+            m.minDraft = std::min(m.minDraft, draft);
+            m.maxDraft = std::max(m.maxDraft, draft);
+
+            const auto parts = ObjectEnrichment::boatLocalParts(boat);
+            partsRigid = partsRigid && parts.size() == 10;
+            const glm::mat4 inverseRoot = glm::inverse(root);
+            for (const SceneObject& part : parts)
+            {
+                const glm::mat4 recovered = inverseRoot * (root * part.model);
+                for (int column = 0; column < 4; ++column)
+                    for (int row = 0; row < 4; ++row)
+                        maxRigidError = std::max(maxRigidError,
+                            std::abs(recovered[column][row] -
+                                     part.model[column][row]));
+            }
+            const auto moorings = ObjectEnrichment::boatMoorings(boat);
+            mooringsFollow = mooringsFollow &&
+                moorings.size() == (boat.mooredAtLanding ? 2u : 0u);
+            for (const BoatMooringDescriptor& mooring : moorings)
+            {
+                const glm::vec3 boatEnd{root *
+                    glm::vec4{mooring.boatAttachmentLocal, 1.0f}};
+                const glm::mat4 rope = ConstructionAnimationController::cylinderBetween(
+                    boatEnd, mooring.shoreAnchor, 0.055f);
+                const glm::vec3 ropeStart{rope * glm::vec4{0.0f, -0.5f, 0.0f, 1.0f}};
+                const glm::vec3 ropeEnd{rope * glm::vec4{0.0f, 0.5f, 0.0f, 1.0f}};
+                mooringsFollow = mooringsFollow &&
+                    glm::length(ropeStart - boatEnd) < 1.0e-4f &&
+                    glm::length(ropeEnd - mooring.shoreAnchor) < 1.0e-4f;
+            }
+            const float oldWave = sim.waveHeightAt(boat.center.x, boat.center.z);
+            const glm::vec3 oldWake = boat.center +
+                glm::vec3{boat.length * 0.45f, oldWave, 0.0f};
+            wakeUnchanged = wakeUnchanged &&
+                glm::length(state.wakeOrigin - oldWake) < 1.0e-6f;
+        }
+    }
+    WaterSimulation thirty;
+    WaterSimulation sixty;
+    for (int frame = 0; frame < 60; ++frame)
+        thirty.update(1.0f / 30.0f);
+    for (int frame = 0; frame < 120; ++frame)
+        sixty.update(1.0f / 60.0f);
+    float maxEqualPositionDifference = 0.0f;
+    float maxEqualAngleDifference = 0.0f;
+    bool resetDeterministic = true;
+    sim.reset();
+    for (std::size_t i = 0; i < boats.size(); ++i)
+    {
+        maxEqualPositionDifference = std::max(maxEqualPositionDifference,
+            std::abs(thirty.boatStates()[i].position.y -
+                     sixty.boatStates()[i].position.y));
+        maxEqualAngleDifference = std::max(maxEqualAngleDifference,
+            std::max(std::abs(thirty.boatStates()[i].pitchDegrees -
+                              sixty.boatStates()[i].pitchDegrees),
+                     std::abs(thirty.boatStates()[i].rollDegrees -
+                              sixty.boatStates()[i].rollDegrees)));
+        resetDeterministic = resetDeterministic &&
+            sim.boatStates()[i].position.y == initialStates[i].position.y &&
+            sim.boatStates()[i].pitchDegrees == initialStates[i].pitchDegrees &&
+            sim.boatStates()[i].rollDegrees == initialStates[i].rollDegrees;
+    }
+    bool draftAndWaterline = true;
+    for (const Metrics& m : metrics)
+        draftAndWaterline = draftAndWaterline &&
+            m.minDraft > 0.15f && m.maxDraft < 0.17f &&
+            m.maxWaterlineError < 0.15f;
+    const bool valid = finiteAndStationary && samplesValid && partsRigid &&
+        mooringsFollow && wakeUnchanged && repeatable && resetDeterministic &&
+        draftAndWaterline && maxPositionDrift < 1.0e-6f &&
+        maxYawDrift < 1.0e-6f && maxRigidError < 1.0e-4f &&
+        maxEqualPositionDifference < 1.0e-4f &&
+        maxEqualAngleDifference < 1.0e-3f;
+    output << "Phase 13 boat/water coupling validation\n";
+    for (std::size_t i = 0; i < boats.size(); ++i)
+    {
+        const Metrics& m = metrics[i];
+        const SimulatedBoatState& state = thirty.boatStates()[i];
+        output << "  " << boats[i].id << ": root Y " << m.minRootY
+               << " ... " << m.maxRootY << ", max bob/pitch/roll "
+               << m.maxBob << " m / " << m.maxPitch << " / " << m.maxRoll
+               << " deg, draft " << m.minDraft << " ... " << m.maxDraft
+               << " m, max waterline error " << m.maxWaterlineError << " m\n"
+               << "    water center/bow/stern/port/starboard: "
+               << state.centerWaterY << " / " << state.bowWaterY << " / "
+               << state.sternWaterY << " / " << state.portWaterY << " / "
+               << state.starboardWaterY << " m\n";
+    }
+    output << "  finite roots, fixed X/Z/yaw and five wet samples: "
+           << ((finiteAndStationary && samplesValid && maxPositionDrift < 1.0e-6f &&
+                maxYawDrift < 1.0e-6f) ? "PASS" : "FAIL") << '\n'
+           << "  draft/waterline, rigid parts and mooring endpoints: "
+           << ((draftAndWaterline && partsRigid && mooringsFollow &&
+                maxRigidError < 1.0e-4f) ? "PASS" : "FAIL") << '\n'
+           << "  deterministic repeat/reset, preserved wake: "
+           << ((repeatable && resetDeterministic && wakeUnchanged) ? "PASS" : "FAIL")
+           << '\n'
+           << "  30/60 FPS max position/angle difference: "
+           << maxEqualPositionDifference << " m / "
+           << maxEqualAngleDifference << " deg\n"
+           << (valid ? "Boat/water coupling validation passed.\n"
+                     : "Boat/water coupling validation failed.\n");
     return valid;
 }

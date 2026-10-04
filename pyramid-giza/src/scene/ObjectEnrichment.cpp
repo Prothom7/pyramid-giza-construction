@@ -102,6 +102,47 @@ const std::vector<BoatDescriptor>& ObjectEnrichment::boats()
     return values;
 }
 
+std::vector<SceneObject> ObjectEnrichment::boatLocalParts(const BoatDescriptor& boat)
+{
+    std::vector<SceneObject> parts;
+    parts.reserve(10);
+    parts.emplace_back(ScenePrimitive::Cube,
+        makeTransform({0.0f, BoatDescriptor::hullCenterLocalY, 0.0f}, {},
+                      {boat.width * 0.68f, BoatDescriptor::hullHeight,
+                       boat.length * 0.82f}), MaterialId::DarkWood);
+    for (float sign : {-1.0f, 1.0f})
+        parts.emplace_back(ScenePrimitive::Cube,
+            makeTransform({sign * boat.width * 0.43f, 0.72f, 0.0f},
+                          {0.0f, 0.0f, -sign * 12.0f},
+                          {0.34f, 0.80f, boat.length}), MaterialId::Wood);
+    for (float sign : {-1.0f, 1.0f})
+        parts.emplace_back(ScenePrimitive::Cube,
+            makeTransform({0.0f, 0.82f, sign * boat.length * 0.45f},
+                          {sign * 22.0f, 0.0f, 0.0f},
+                          {boat.width * 0.82f, 0.62f, 1.45f}), MaterialId::Wood);
+    for (float z : {-0.25f * boat.length, 0.0f, 0.25f * boat.length})
+        parts.emplace_back(ScenePrimitive::Cube,
+            makeTransform({0.0f, 0.88f, z}, {},
+                          {boat.width * 0.72f, 0.18f, 0.34f}), MaterialId::DarkWood);
+    parts.emplace_back(ScenePrimitive::Cylinder,
+        makeTransform({0.0f, 2.1f, 0.8f}, {}, {0.16f, 3.5f, 0.16f}), MaterialId::Wood);
+    parts.emplace_back(ScenePrimitive::Cube,
+        makeTransform({0.0f, 3.0f, 0.8f}, {0.0f, 0.0f, 8.0f},
+                      {2.4f, 0.10f, 1.6f}), MaterialId::ClothingLinen);
+    return parts;
+}
+
+std::vector<BoatMooringDescriptor> ObjectEnrichment::boatMoorings(
+    const BoatDescriptor& boat)
+{
+    if (!boat.mooredAtLanding)
+        return {};
+    return {
+        {{0.0f, 0.8f, 0.45f * boat.length}, {-30.0f, 1.9f, -153.0f}},
+        {{0.0f, 0.8f, -0.45f * boat.length}, {-42.0f, 1.9f, -153.0f}}
+    };
+}
+
 const char* ropeRigTypeName(RopeRigType type)
 {
     switch (type)
