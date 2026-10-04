@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <array>
 #include <iosfwd>
 #include <vector>
 
@@ -18,13 +19,22 @@ struct SimulatedBoatState
     float pitchDegrees = 0.0f;
     float rollDegrees = 0.0f;
     float swayDegrees = 0.0f;
-    glm::vec3 wakeOrigin{0.0f};
+    glm::vec2 horizontalVelocity{0.0f}; // world X/Z, navigation only
     bool moored = false;
     float centerWaterY = 0.0f;
     float bowWaterY = 0.0f;
     float sternWaterY = 0.0f;
     float portWaterY = 0.0f;
     float starboardWaterY = 0.0f;
+};
+
+struct PropulsionWake
+{
+    glm::vec2 position{0.0f}; // Fixed world X/Z after emission.
+    glm::vec2 direction{0.0f, 1.0f};
+    float birthTime = 0.0f;
+    float emissionDistance = 0.0f;
+    bool active = false;
 };
 
 class WaterSimulation
@@ -49,24 +59,32 @@ public:
 
     const std::vector<SimulatedBoatState>& boatStates() const { return boatStates_; }
     glm::mat4 boatRootTransform(std::size_t index) const;
+    const std::array<PropulsionWake, 16>& propulsionWakes() const { return wakes_; }
+    std::size_t propulsionEmissionCount() const { return wakeEmissionCount_; }
 
-    // Visual geometry generation (boat dynamic transforms, wake ripples, shoreline foam strips)
+    // Shared-mesh quay ripples and emitted supply-boat propulsion wakes.
     void collectSceneObjects(std::vector<SceneObject>& objects) const;
 
     static bool validateWaterSimulation(std::ostream& output);
     static bool validateBoatWaterCoupling(std::ostream& output);
     static bool validateBoatNavigation(std::ostream& output);
+    static bool validateBoatWake(std::ostream& output);
 
 private:
     void initBoats();
     void updateBoats();
     void updateSurface();
+    void updatePropulsionWake(float previousDistance, float currentDistance,
+                              float previousTime);
     float attenuatedWaveHeightAt(float x, float z) const;
 
     float simulationTime_ = 0.0f;
     bool enabled_ = true;
     std::vector<SimulatedBoatState> boatStates_;
     std::vector<BoatDescriptor> baseBoats_;
+    std::array<PropulsionWake, 16> wakes_{};
+    float nextWakeDistance_ = 1.5f;
+    std::size_t wakeEmissionCount_ = 0;
     MeshData baseSurfaceMesh_{"NileSurface"};
     std::vector<Vertex> surfaceVertices_;
     std::vector<glm::vec2> surfaceWorldXZ_;

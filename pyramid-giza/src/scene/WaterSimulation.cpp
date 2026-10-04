@@ -27,6 +27,11 @@ constexpr float SupplyTurnRadius = 7.0f;
 constexpr float SupplyEndX = 55.0f;
 constexpr float SupplyCruiseSpeed = 2.0f;
 constexpr float SupplyEaseSeconds = 3.0f;
+constexpr float WakeSpacing = 1.5f;
+constexpr float WakeSpeedThreshold = 0.15f;
+constexpr float WakeLifetime = 5.5f;
+constexpr float WakeSurfaceOffset = 0.008f;
+constexpr float WakeThickness = 0.012f;
 
 struct SupplyRoutePose
 {
@@ -71,6 +76,18 @@ float supplyDistanceAt(const BoatDescriptor& boat, float elapsed)
            SupplyCruiseSpeed * (t - SupplyEaseSeconds);
 }
 
+float supplySpeedAt(const BoatDescriptor& boat, float elapsed)
+{
+    const float duration = supplyTravelTime(boat);
+    if (elapsed <= 0.0f || elapsed >= duration)
+        return 0.0f;
+    const float rampTime = std::min(elapsed, duration - elapsed);
+    if (rampTime >= SupplyEaseSeconds)
+        return SupplyCruiseSpeed;
+    const float u = rampTime / SupplyEaseSeconds;
+    return SupplyCruiseSpeed * (3.0f * u * u - 2.0f * u * u * u);
+}
+
 SupplyRoutePose supplyRoutePose(const BoatDescriptor& boat, float distance)
 {
     const float startYaw = glm::radians(boat.yawDegrees);
@@ -89,6 +106,25 @@ SupplyRoutePose supplyRoutePose(const BoatDescriptor& boat, float distance)
                  (s - arcLength),
              boat.center.z + SupplyTurnRadius * (1.0f - std::sin(startYaw))},
             90.0f};
+}
+
+glm::vec2 supplyVelocityAt(const BoatDescriptor& boat, float elapsed)
+{
+    const SupplyRoutePose pose = supplyRoutePose(
+        boat, supplyDistanceAt(boat, elapsed));
+    const float yaw = glm::radians(pose.yawDegrees);
+    return supplySpeedAt(boat, elapsed) * glm::vec2{std::sin(yaw), std::cos(yaw)};
+}
+
+glm::vec3 sternLocal(const BoatDescriptor& boat)
+{
+    // The end board, not the shorter central hull box, is the rearmost part.
+    // Its 1.45 m fore/aft length and 0.62 m height are rotated 22 degrees.
+    const float boardHalfExtent = 0.5f *
+        (1.45f * std::cos(glm::radians(22.0f)) +
+         0.62f * std::sin(glm::radians(22.0f)));
+    return {0.0f, BoatDescriptor::waterlineLocalY,
+            -0.45f * boat.length - boardHalfExtent};
 }
 } // namespace
 
@@ -118,6 +154,9 @@ void WaterSimulation::initBoats()
 void WaterSimulation::reset()
 {
     simulationTime_ = 0.0f;
+    wakes_ = {};
+    nextWakeDistance_ = WakeSpacing;
+    wakeEmissionCount_ = 0;
     updateSurface();
     updateBoats();
 }
@@ -127,9 +166,18 @@ void WaterSimulation::update(float deltaTime)
     if (!enabled_ || !std::isfinite(deltaTime) || deltaTime <= 0.0f)
         return;
 
+    const float previousTime = simulationTime_;
+    float previousDistance = 0.0f;
+    for (const BoatDescriptor& boat : baseBoats_)
+        if (std::strcmp(boat.id, "SupplyBoatOffshore") == 0)
+            previousDistance = supplyDistanceAt(boat, previousTime);
     simulationTime_ += deltaTime;
     updateSurface();
     updateBoats();
+    for (const BoatDescriptor& boat : baseBoats_)
+        if (std::strcmp(boat.id, "SupplyBoatOffshore") == 0)
+            updatePropulsionWake(previousDistance,
+                                 supplyDistanceAt(boat, simulationTime_), previousTime);
 }
 
 float WaterSimulation::attenuatedWaveHeightAt(float x, float z) const
@@ -276,6 +324,8 @@ void WaterSimulation::updateBoats()
             state.starboardWaterY - state.portWaterY, 2.0f * sideSpan)),
             -5.0f, 5.0f);
         state.swayDegrees = 0.0f;
+        state.horizontalVelocity = navigating
+            ? supplyVelocityAt(base, simulationTime_) : glm::vec2{0.0f};
         state.verticalDisplacement = state.centerWaterY -
             IndustrialLandscape::nileSurface().waterY;
         state.position = {navigation.position.x,
@@ -283,10 +333,6 @@ void WaterSimulation::updateBoats()
                           navigation.position.y};
         state.rotationDegrees = {state.pitchDegrees, navigation.yawDegrees,
                                  state.rollDegrees};
-        // Preserve the existing decorative wake coordinates and timing.
-        const float oldWave = waveHeightAt(base.center.x, base.center.z);
-        state.wakeOrigin = base.center +
-            glm::vec3{base.length * 0.45f, oldWave, 0.0f};
         state.moored = base.mooredAtLanding;
     }
 }
@@ -296,6 +342,51 @@ glm::mat4 WaterSimulation::boatRootTransform(std::size_t index) const
     const SimulatedBoatState& state = boatStates_.at(index);
     return makeTransform(state.position, state.rotationDegrees,
                          {1.0f, 1.0f, 1.0f});
+}
+
+void WaterSimulation::updatePropulsionWake(float previousDistance,
+                                            float currentDistance,
+                                            float previousTime)
+{
+    for (PropulsionWake& wake : wakes_)
+        if (wake.active && simulationTime_ - wake.birthTime >= WakeLifetime)
+            wake.active = false;
+    if (currentDistance <= previousDistance)
+        return;
+    for (std::size_t boatIndex = 0; boatIndex < baseBoats_.size(); ++boatIndex)
+    {
+        const BoatDescriptor& boat = baseBoats_[boatIndex];
+        if (std::strcmp(boat.id, "SupplyBoatOffshore") != 0)
+            continue;
+        while (nextWakeDistance_ <= currentDistance + 1.0e-5f)
+        {
+            const float fraction = glm::clamp(
+                (nextWakeDistance_ - previousDistance) /
+                    (currentDistance - previousDistance), 0.0f, 1.0f);
+            const float birthTime = glm::mix(previousTime, simulationTime_, fraction);
+            const glm::vec2 velocity = supplyVelocityAt(boat, birthTime);
+            const float speed = glm::length(velocity);
+            if (speed > WakeSpeedThreshold)
+            {
+                const SupplyRoutePose pose = supplyRoutePose(boat, nextWakeDistance_);
+                const SimulatedBoatState& state = boatStates_[boatIndex];
+                const glm::mat4 root = makeTransform(
+                    {pose.position.x, state.position.y, pose.position.y},
+                    {state.pitchDegrees, pose.yawDegrees, state.rollDegrees},
+                    {1.0f, 1.0f, 1.0f});
+                const glm::vec3 stern{root * glm::vec4{sternLocal(boat), 1.0f}};
+                if (!IndustrialLandscape::isInsideNile(stern.x, stern.z))
+                    throw std::runtime_error("Supply wake stern leaves Nile");
+                PropulsionWake& wake = wakes_[wakeEmissionCount_ % wakes_.size()];
+                if (wake.active)
+                    throw std::runtime_error("Supply wake pool exhausted");
+                wake = {{stern.x, stern.z}, velocity / speed,
+                        birthTime, nextWakeDistance_, true};
+                ++wakeEmissionCount_;
+            }
+            nextWakeDistance_ += WakeSpacing;
+        }
+    }
 }
 
 void WaterSimulation::collectSceneObjects(std::vector<SceneObject>& objects) const
@@ -312,20 +403,29 @@ void WaterSimulation::collectSceneObjects(std::vector<SceneObject>& objects) con
                            MaterialId::Water});
     }
 
-    // Dynamic boat wake ripples
-    for (const auto& boat : boatStates_)
+    // Propulsion ripples stay at their emitted world X/Z while riding the
+    // animated surface. The moored boat has no propulsion-wake state.
+    for (const PropulsionWake& wake : wakes_)
     {
-        for (int ring = 1; ring <= 3; ++ring)
-        {
-            const float progress = std::fmod(simulationTime_ * 0.8f + ring * 0.33f, 1.0f);
-            const float radius = 1.0f + progress * 3.5f;
-            const float wakeY = baseWaterLevel + 0.01f + (1.0f - progress) * 0.025f;
-
-            objects.push_back({ScenePrimitive::Cylinder,
-                               makeTransform(boat.wakeOrigin + glm::vec3{progress * 1.5f, wakeY - boat.wakeOrigin.y, 0.0f},
-                                             {}, {radius, 0.02f, radius * 0.6f}),
-                               MaterialId::Water});
-        }
+        if (!wake.active)
+            continue;
+        float surfaceY = 0.0f;
+        if (!waterSurfaceAt(wake.position.x, wake.position.y, surfaceY))
+            throw std::runtime_error("Supply wake leaves Nile surface");
+        const float progress = glm::clamp(
+            (simulationTime_ - wake.birthTime) / WakeLifetime, 0.0f, 1.0f);
+        const float fade = glm::clamp((1.0f - progress) / 0.20f, 0.0f, 1.0f);
+        const float yaw = glm::degrees(std::atan2(wake.direction.x,
+                                                 wake.direction.y));
+        objects.push_back({ScenePrimitive::Cylinder,
+                           makeTransform({wake.position.x,
+                                          surfaceY + WakeSurfaceOffset,
+                                          wake.position.y},
+                                         {0.0f, yaw, 0.0f},
+                                         {(0.55f + 0.85f * progress) * fade,
+                                          WakeThickness,
+                                          (0.35f + 0.50f * progress) * fade}),
+                           MaterialId::Water});
     }
 }
 
@@ -524,7 +624,8 @@ bool WaterSimulation::validateWaterSimulation(std::ostream& output)
     std::vector<SceneObject> waterObjects;
     initial.collectSceneObjects(waterObjects);
     const float firstRippleY = waterObjects.front().model[3].y;
-    const bool waterSimulationLevel = waterObjects.size() == 14 &&
+    const bool waterSimulationLevel = waterObjects.size() == 8 &&
+        initial.propulsionEmissionCount() == 0 &&
         near(firstRippleY, nile.waterY + 0.015f +
              0.02f * std::sin(-42.0f * 0.4f));
 
@@ -687,7 +788,7 @@ bool WaterSimulation::validateWaterSimulation(std::ostream& output)
                    ? "PASS" : "FAIL") << '\n'
            << "  authored boats remain inside shaped water: "
            << (boatsInside ? "PASS" : "FAIL") << '\n'
-           << "  ripple objects use the same water level: "
+           << "  eight quay ripples and no initial boat wake: "
            << (waterSimulationLevel ? "PASS" : "FAIL") << '\n'
            << "  finite, bounded animated vertices/normals and stable banks: "
            << ((finiteMotion && boundedMotion) ? "PASS" : "FAIL") << '\n'
@@ -731,7 +832,6 @@ bool WaterSimulation::validateBoatWaterCoupling(std::ostream& output)
     bool samplesValid = true;
     bool partsRigid = true;
     bool mooringsFollow = true;
-    bool wakeUnchanged = true;
     bool repeatable = true;
     float maxRigidError = 0.0f;
     float maxPositionDrift = 0.0f;
@@ -825,11 +925,6 @@ bool WaterSimulation::validateBoatWaterCoupling(std::ostream& output)
                     glm::length(ropeStart - boatEnd) < 1.0e-4f &&
                     glm::length(ropeEnd - mooring.shoreAnchor) < 1.0e-4f;
             }
-            const float oldWave = sim.waveHeightAt(boat.center.x, boat.center.z);
-            const glm::vec3 oldWake = boat.center +
-                glm::vec3{boat.length * 0.45f, oldWave, 0.0f};
-            wakeUnchanged = wakeUnchanged &&
-                glm::length(state.wakeOrigin - oldWake) < 1.0e-6f;
         }
     }
     WaterSimulation thirty;
@@ -863,7 +958,7 @@ bool WaterSimulation::validateBoatWaterCoupling(std::ostream& output)
             m.minDraft > 0.15f && m.maxDraft < 0.17f &&
             m.maxWaterlineError < 0.15f;
     const bool valid = finiteAndStationary && samplesValid && partsRigid &&
-        mooringsFollow && wakeUnchanged && repeatable && resetDeterministic &&
+        mooringsFollow && repeatable && resetDeterministic &&
         draftAndWaterline && maxPositionDrift < 1.0e-6f &&
         maxYawDrift < 1.0e-6f && maxRigidError < 1.0e-4f &&
         maxEqualPositionDifference < 1.0e-4f &&
@@ -889,8 +984,8 @@ bool WaterSimulation::validateBoatWaterCoupling(std::ostream& output)
            << "  draft/waterline, rigid parts and mooring endpoints: "
            << ((draftAndWaterline && partsRigid && mooringsFollow &&
                 maxRigidError < 1.0e-4f) ? "PASS" : "FAIL") << '\n'
-           << "  deterministic repeat/reset, preserved wake: "
-           << ((repeatable && resetDeterministic && wakeUnchanged) ? "PASS" : "FAIL")
+           << "  deterministic repeat/reset: "
+           << ((repeatable && resetDeterministic) ? "PASS" : "FAIL")
            << '\n'
            << "  30/60 FPS max position/angle difference: "
            << maxEqualPositionDifference << " m / "
@@ -1097,5 +1192,186 @@ bool WaterSimulation::validateBoatNavigation(std::ostream& output)
            << " m / " << equalOrientation << " deg\n"
            << (valid ? "Supply navigation validation passed.\n"
                      : "Supply navigation validation failed.\n");
+    return valid;
+}
+
+bool WaterSimulation::validateBoatWake(std::ostream& output)
+{
+    WaterSimulation sim;
+    WaterSimulation repeat;
+    const BoatDescriptor& supply = ObjectEnrichment::boats()[1];
+    const BoatDescriptor& cargo = ObjectEnrichment::boats()[0];
+    const float travelTime = supplyTravelTime(supply);
+    bool deterministic = true;
+    bool sternOwned = true;
+    bool velocityOwned = true;
+    bool insideWater = true;
+    bool shorePreserved = true;
+    bool noStoppedEmission = true;
+    bool cargoNoPropulsion = true;
+    bool leftBehind = true;
+    float maxSternOriginError = 0.0f;
+    float maxDirectionError = 0.0f;
+    float maxSurfaceError = 0.0f;
+    std::size_t maxActive = 0;
+    std::size_t stoppedEmissionCount = 0;
+    for (int frame = 0; frame <= 1350; ++frame)
+    {
+        if (frame > 0)
+        {
+            sim.update(1.0f / 30.0f);
+            repeat.update(1.0f / 30.0f);
+        }
+        deterministic = deterministic &&
+            sim.propulsionEmissionCount() == repeat.propulsionEmissionCount();
+        const auto& wakes = sim.propulsionWakes();
+        const auto& repeated = repeat.propulsionWakes();
+        std::size_t active = 0;
+        const glm::vec2 boatPosition{sim.boatStates()[1].position.x,
+                                     sim.boatStates()[1].position.z};
+        const glm::vec2 currentVelocity = sim.boatStates()[1].horizontalVelocity;
+        cargoNoPropulsion = cargoNoPropulsion &&
+            glm::length(sim.boatStates()[0].horizontalVelocity) == 0.0f &&
+            sim.boatStates()[0].position.x == cargo.center.x &&
+            sim.boatStates()[0].position.z == cargo.center.z;
+        for (std::size_t i = 0; i < wakes.size(); ++i)
+        {
+            const PropulsionWake& wake = wakes[i];
+            const PropulsionWake& other = repeated[i];
+            deterministic = deterministic && wake.active == other.active &&
+                wake.emissionDistance == other.emissionDistance &&
+                wake.birthTime == other.birthTime &&
+                glm::all(glm::equal(wake.position, other.position)) &&
+                glm::all(glm::equal(wake.direction, other.direction));
+            if (!wake.active)
+                continue;
+            ++active;
+            const SupplyRoutePose eventPose = supplyRoutePose(
+                supply, wake.emissionDistance);
+            const float yaw = glm::radians(eventPose.yawDegrees);
+            const glm::vec3 localStern = sternLocal(supply);
+            const glm::vec2 expectedStern{
+                eventPose.position.x + std::sin(yaw) * localStern.z,
+                eventPose.position.y + std::cos(yaw) * localStern.z};
+            maxSternOriginError = std::max(maxSternOriginError,
+                glm::length(wake.position - expectedStern));
+            sternOwned = sternOwned && wake.emissionDistance > 0.0f &&
+                wake.emissionDistance <= supplyRouteLength(supply);
+            const glm::vec2 eventVelocity = supplyVelocityAt(
+                supply, wake.birthTime);
+            const float eventSpeed = glm::length(eventVelocity);
+            velocityOwned = velocityOwned && eventSpeed > WakeSpeedThreshold;
+            if (eventSpeed > 0.0f)
+                maxDirectionError = std::max(maxDirectionError,
+                    glm::degrees(std::acos(glm::clamp(
+                        glm::dot(wake.direction, eventVelocity / eventSpeed),
+                        -1.0f, 1.0f))));
+            float surfaceY = 0.0f;
+            insideWater = insideWater &&
+                sim.waterSurfaceAt(wake.position.x, wake.position.y, surfaceY);
+            if (glm::length(currentVelocity) > 0.3f &&
+                sim.simulationTime_ - wake.birthTime > 0.15f)
+                leftBehind = leftBehind &&
+                    glm::dot(glm::normalize(boatPosition - wake.position),
+                             glm::normalize(currentVelocity)) > 0.25f;
+        }
+        maxActive = std::max(maxActive, active);
+        if (frame < 10)
+            noStoppedEmission = noStoppedEmission &&
+                sim.propulsionEmissionCount() == 0;
+        if (sim.simulationTime_ >= travelTime + 0.1f)
+        {
+            if (stoppedEmissionCount == 0)
+                stoppedEmissionCount = sim.propulsionEmissionCount();
+            noStoppedEmission = noStoppedEmission &&
+                sim.propulsionEmissionCount() == stoppedEmissionCount;
+        }
+        if (frame % 30 == 0)
+        {
+            std::vector<SceneObject> objects;
+            sim.collectSceneObjects(objects);
+            shorePreserved = shorePreserved && objects.size() == 8 + active;
+            for (int shore = 0; shore < 8; ++shore)
+            {
+                const float x = -42.0f + static_cast<float>(shore) * 5.0f;
+                const float expectedY = IndustrialLandscape::nileSurface().waterY +
+                    0.015f + 0.02f * std::sin(sim.simulationTime_ * 3.5f + x * 0.4f);
+                shorePreserved = shorePreserved &&
+                    objects[shore].primitive == ScenePrimitive::Cube &&
+                    std::abs(objects[shore].model[3].x - x) < 1.0e-5f &&
+                    std::abs(objects[shore].model[3].y - expectedY) < 1.0e-5f;
+            }
+            std::size_t rendered = 8;
+            for (const PropulsionWake& wake : wakes)
+            {
+                if (!wake.active)
+                    continue;
+                float surfaceY = 0.0f;
+                if (!sim.waterSurfaceAt(wake.position.x, wake.position.y,
+                                        surfaceY))
+                    insideWater = false;
+                else
+                    maxSurfaceError = std::max(maxSurfaceError,
+                        std::abs(objects[rendered].model[3].y -
+                                 (surfaceY + WakeSurfaceOffset)));
+                ++rendered;
+            }
+        }
+    }
+    const std::size_t totalEmitted = sim.propulsionEmissionCount();
+    const bool expiredAfterStop = std::all_of(
+        sim.propulsionWakes().begin(), sim.propulsionWakes().end(),
+        [](const PropulsionWake& wake) { return !wake.active; });
+    sim.reset();
+    const bool resetCleared = sim.propulsionEmissionCount() == 0 &&
+        std::all_of(sim.propulsionWakes().begin(), sim.propulsionWakes().end(),
+            [](const PropulsionWake& wake) { return !wake.active; });
+    WaterSimulation thirty;
+    WaterSimulation sixty;
+    for (int frame = 0; frame < 600; ++frame)
+        thirty.update(1.0f / 30.0f);
+    for (int frame = 0; frame < 1200; ++frame)
+        sixty.update(1.0f / 60.0f);
+    float maxEqualOriginError = 0.0f;
+    float maxEqualAgeError = 0.0f;
+    bool equalEmissionOrder =
+        thirty.propulsionEmissionCount() == sixty.propulsionEmissionCount();
+    for (std::size_t i = 0; i < thirty.propulsionWakes().size(); ++i)
+    {
+        const auto& a = thirty.propulsionWakes()[i];
+        const auto& b = sixty.propulsionWakes()[i];
+        equalEmissionOrder = equalEmissionOrder && a.active == b.active &&
+            a.emissionDistance == b.emissionDistance;
+        if (a.active && b.active)
+        {
+            maxEqualOriginError = std::max(maxEqualOriginError,
+                glm::length(a.position - b.position));
+            maxEqualAgeError = std::max(maxEqualAgeError,
+                std::abs(a.birthTime - b.birthTime));
+        }
+    }
+    const bool valid = deterministic && sternOwned && velocityOwned &&
+        insideWater && shorePreserved && noStoppedEmission &&
+        cargoNoPropulsion && leftBehind && expiredAfterStop && resetCleared &&
+        equalEmissionOrder && totalEmitted == 46 && maxActive <= 16 &&
+        maxSternOriginError < 0.03f && maxDirectionError < 0.05f &&
+        maxSurfaceError < 1.0e-5f && maxEqualOriginError < 0.02f &&
+        maxEqualAgeError < 0.01f;
+    output << "Phase 13 supply propulsion-wake validation\n"
+           << "  pool/spacing/threshold/lifetime: " << sim.propulsionWakes().size()
+           << " / " << WakeSpacing << " m / " << WakeSpeedThreshold
+           << " m/s / " << WakeLifetime << " s\n"
+           << "  emitted / max active: " << totalEmitted << " / " << maxActive
+           << ", stern-origin/direction error: " << maxSternOriginError
+           << " m / " << maxDirectionError << " deg\n"
+           << "  surface error: " << maxSurfaceError
+           << " m, 30/60 FPS origin/age error: " << maxEqualOriginError
+           << " m / " << maxEqualAgeError << " s\n"
+           << "  deterministic/reset/shore/cargo/stop: "
+           << ((deterministic && resetCleared && shorePreserved &&
+                cargoNoPropulsion && noStoppedEmission) ? "PASS" : "FAIL")
+           << '\n'
+           << (valid ? "Propulsion-wake validation passed.\n"
+                     : "Propulsion-wake validation failed.\n");
     return valid;
 }
