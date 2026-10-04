@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <iomanip>
 #include <limits>
 #include <ostream>
@@ -10,12 +11,86 @@
 #include <utility>
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/constants.hpp>
 
 #include "scene/IndustrialLandscape.h"
 #include "scene/SandSimulation.h"
 #include "graphics/Mesh.h"
 #include "animation/ConstructionAnimation.h"
 
+namespace
+{
+// The supply boat starts bow-first at its authored heading, makes one rolling
+// turn in the open channel, then proceeds east. No navigation state is shared
+// with the moored cargo boat or with the decorative wake objects.
+constexpr float SupplyTurnRadius = 7.0f;
+constexpr float SupplyEndX = 55.0f;
+constexpr float SupplyCruiseSpeed = 2.0f;
+constexpr float SupplyEaseSeconds = 3.0f;
+
+struct SupplyRoutePose
+{
+    glm::vec2 position{0.0f}; // x, z
+    float yawDegrees = 0.0f;
+};
+
+float supplyArcLength(const BoatDescriptor& boat)
+{
+    return SupplyTurnRadius *
+        (glm::half_pi<float>() - glm::radians(boat.yawDegrees));
+}
+
+float supplyRouteLength(const BoatDescriptor& boat)
+{
+    const float startYaw = glm::radians(boat.yawDegrees);
+    const float arcEndX = boat.center.x + SupplyTurnRadius * std::cos(startYaw);
+    return supplyArcLength(boat) + SupplyEndX - arcEndX;
+}
+
+float supplyTravelTime(const BoatDescriptor& boat)
+{
+    return supplyRouteLength(boat) / SupplyCruiseSpeed + SupplyEaseSeconds;
+}
+
+float supplyDistanceAt(const BoatDescriptor& boat, float elapsed)
+{
+    const float length = supplyRouteLength(boat);
+    const float duration = supplyTravelTime(boat);
+    const float t = glm::clamp(elapsed, 0.0f, duration);
+    const auto easedDistance = [](float phaseSeconds)
+    {
+        const float u = phaseSeconds / SupplyEaseSeconds;
+        return SupplyCruiseSpeed * SupplyEaseSeconds *
+            (u * u * u - 0.5f * u * u * u * u);
+    };
+    if (t < SupplyEaseSeconds)
+        return easedDistance(t);
+    if (t > duration - SupplyEaseSeconds)
+        return length - easedDistance(duration - t);
+    return 0.5f * SupplyCruiseSpeed * SupplyEaseSeconds +
+           SupplyCruiseSpeed * (t - SupplyEaseSeconds);
+}
+
+SupplyRoutePose supplyRoutePose(const BoatDescriptor& boat, float distance)
+{
+    const float startYaw = glm::radians(boat.yawDegrees);
+    const float arcLength = supplyArcLength(boat);
+    const float s = glm::clamp(distance, 0.0f, supplyRouteLength(boat));
+    if (s <= arcLength)
+    {
+        const float yaw = startYaw + s / SupplyTurnRadius;
+        return {{boat.center.x + SupplyTurnRadius *
+                    (std::cos(startYaw) - std::cos(yaw)),
+                 boat.center.z + SupplyTurnRadius *
+                    (std::sin(yaw) - std::sin(startYaw))},
+                glm::degrees(yaw)};
+    }
+    return {{boat.center.x + SupplyTurnRadius * std::cos(startYaw) +
+                 (s - arcLength),
+             boat.center.z + SupplyTurnRadius * (1.0f - std::sin(startYaw))},
+            90.0f};
+}
+} // namespace
 
 
 WaterSimulation::WaterSimulation()
@@ -168,9 +243,13 @@ void WaterSimulation::updateBoats()
     {
         const BoatDescriptor& base = baseBoats_[i];
         SimulatedBoatState& state = boatStates_[i];
+        const bool navigating = std::strcmp(base.id, "SupplyBoatOffshore") == 0;
+        const SupplyRoutePose navigation = navigating
+            ? supplyRoutePose(base, supplyDistanceAt(base, simulationTime_))
+            : SupplyRoutePose{{base.center.x, base.center.z}, base.yawDegrees};
         const glm::mat4 horizontalRoot = makeTransform(
-            {base.center.x, 0.0f, base.center.z},
-            {0.0f, base.yawDegrees, 0.0f}, {1.0f, 1.0f, 1.0f});
+            {navigation.position.x, 0.0f, navigation.position.y},
+            {0.0f, navigation.yawDegrees, 0.0f}, {1.0f, 1.0f, 1.0f});
         const auto sample = [&](float localX, float localZ)
         {
             const glm::vec3 world{horizontalRoot *
@@ -199,10 +278,10 @@ void WaterSimulation::updateBoats()
         state.swayDegrees = 0.0f;
         state.verticalDisplacement = state.centerWaterY -
             IndustrialLandscape::nileSurface().waterY;
-        state.position = {base.center.x,
+        state.position = {navigation.position.x,
                           state.centerWaterY - BoatDescriptor::waterlineLocalY,
-                          base.center.z};
-        state.rotationDegrees = {state.pitchDegrees, base.yawDegrees,
+                          navigation.position.y};
+        state.rotationDegrees = {state.pitchDegrees, navigation.yawDegrees,
                                  state.rollDegrees};
         // Preserve the existing decorative wake coordinates and timing.
         const float oldWave = waveHeightAt(base.center.x, base.center.z);
@@ -677,11 +756,14 @@ bool WaterSimulation::validateBoatWaterCoupling(std::ostream& output)
                 std::abs(state.pitchDegrees) <= 5.0f &&
                 std::abs(state.rollDegrees) <= 5.0f &&
                 state.moored == boat.mooredAtLanding;
-            maxPositionDrift = std::max(maxPositionDrift,
-                glm::length(glm::vec2{state.position.x - boat.center.x,
-                                       state.position.z - boat.center.z}));
-            maxYawDrift = std::max(maxYawDrift,
-                                   std::abs(state.rotationDegrees.y - boat.yawDegrees));
+            if (boat.mooredAtLanding)
+            {
+                maxPositionDrift = std::max(maxPositionDrift,
+                    glm::length(glm::vec2{state.position.x - boat.center.x,
+                                           state.position.z - boat.center.z}));
+                maxYawDrift = std::max(maxYawDrift,
+                    std::abs(state.rotationDegrees.y - boat.yawDegrees));
+            }
             repeatable = repeatable && state.position.y == second.position.y &&
                          state.pitchDegrees == second.pitchDegrees &&
                          state.rollDegrees == second.rollDegrees;
@@ -801,7 +883,7 @@ bool WaterSimulation::validateBoatWaterCoupling(std::ostream& output)
                << state.sternWaterY << " / " << state.portWaterY << " / "
                << state.starboardWaterY << " m\n";
     }
-    output << "  finite roots, fixed X/Z/yaw and five wet samples: "
+    output << "  finite roots, fixed cargo X/Z/yaw and five wet samples: "
            << ((finiteAndStationary && samplesValid && maxPositionDrift < 1.0e-6f &&
                 maxYawDrift < 1.0e-6f) ? "PASS" : "FAIL") << '\n'
            << "  draft/waterline, rigid parts and mooring endpoints: "
@@ -815,5 +897,205 @@ bool WaterSimulation::validateBoatWaterCoupling(std::ostream& output)
            << maxEqualAngleDifference << " deg\n"
            << (valid ? "Boat/water coupling validation passed.\n"
                      : "Boat/water coupling validation failed.\n");
+    return valid;
+}
+
+bool WaterSimulation::validateBoatNavigation(std::ostream& output)
+{
+    const auto& boats = ObjectEnrichment::boats();
+    if (boats.size() != 2 || std::strcmp(boats[1].id, "SupplyBoatOffshore") != 0)
+        return false;
+    const BoatDescriptor& cargo = boats[0];
+    const BoatDescriptor& supply = boats[1];
+    const NileSurfaceBounds nile = IndustrialLandscape::nileSurface();
+    constexpr float halfHullLength = 4.8f; // Exceeds the longest visible bow/stern part.
+    constexpr float halfHullWidth = 1.85f; // Includes outer side planks and margin.
+    const float routeLength = supplyRouteLength(supply);
+    const float travelTime = supplyTravelTime(supply);
+    const SupplyRoutePose endpoint = supplyRoutePose(supply, routeLength);
+    float minBank = std::numeric_limits<float>::max();
+    float minQuay = minBank;
+    float minCargo = minBank;
+    bool footprintWet = true;
+    bool finiteRoute = true;
+    // Prevalidate the entire swept conservative hull, including the curved turn.
+    for (int sample = 0; sample <= 1000; ++sample)
+    {
+        const float distance = routeLength * static_cast<float>(sample) / 1000.0f;
+        const SupplyRoutePose pose = supplyRoutePose(supply, distance);
+        const float yaw = glm::radians(pose.yawDegrees);
+        finiteRoute = finiteRoute && std::isfinite(pose.position.x) &&
+            std::isfinite(pose.position.y) && std::isfinite(pose.yawDegrees);
+        const float centerDistance = glm::length(pose.position -
+            glm::vec2{cargo.center.x, cargo.center.z});
+        const float cargoRadius = std::hypot(0.5f * cargo.length, 0.5f * cargo.width);
+        const float supplyRadius = std::hypot(halfHullLength, halfHullWidth);
+        minCargo = std::min(minCargo, centerDistance - cargoRadius - supplyRadius);
+        for (float side : {-halfHullWidth, 0.0f, halfHullWidth})
+            for (float end : {-halfHullLength, 0.0f, halfHullLength})
+            {
+                const float x = pose.position.x + std::cos(yaw) * side +
+                    std::sin(yaw) * end;
+                const float z = pose.position.y - std::sin(yaw) * side +
+                    std::cos(yaw) * end;
+                footprintWet = footprintWet && nile.contains(x, z);
+                minBank = std::min(minBank, nile.signedBankDistance(x, z));
+                // The eight existing quay slabs span this exact outer AABB.
+                const float quayDx = std::max({-44.35f - x, 0.0f, x + 4.65f});
+                const float quayDz = std::max({-155.95f - z, 0.0f, z + 150.45f});
+                minQuay = std::min(minQuay, std::hypot(quayDx, quayDz));
+            }
+    }
+    WaterSimulation motion;
+    WaterSimulation repeat;
+    const SimulatedBoatState initial = motion.boatStates()[1];
+    const int frames = static_cast<int>(std::ceil((travelTime + 3.0f) * 30.0f));
+    float minY = std::numeric_limits<float>::max();
+    float maxY = std::numeric_limits<float>::lowest();
+    float maxPitch = 0.0f;
+    float maxRoll = 0.0f;
+    float maxWaterlineError = 0.0f;
+    float maxHorizontalStep = 0.0f;
+    float maxVerticalStep = 0.0f;
+    float maxYawStep = 0.0f;
+    float maxHeadingError = 0.0f;
+    float maxRigidError = 0.0f;
+    int invalidWaterSamples = 0;
+    bool cargoFixed = true;
+    bool repeatable = true;
+    bool sampleDerivedAttitude = true;
+    bool stopped = true;
+    SimulatedBoatState previous = motion.boatStates()[1];
+    for (int frame = 0; frame <= frames; ++frame)
+    {
+        if (frame > 0)
+        {
+            motion.update(1.0f / 30.0f);
+            repeat.update(1.0f / 30.0f);
+        }
+        const SimulatedBoatState& state = motion.boatStates()[1];
+        const SimulatedBoatState& moored = motion.boatStates()[0];
+        cargoFixed = cargoFixed && moored.position.x == cargo.center.x &&
+            moored.position.z == cargo.center.z &&
+            moored.rotationDegrees.y == cargo.yawDegrees;
+        const SimulatedBoatState& second = repeat.boatStates()[1];
+        repeatable = repeatable &&
+            glm::all(glm::equal(state.position, second.position)) &&
+            glm::all(glm::equal(state.rotationDegrees, second.rotationDegrees));
+        minY = std::min(minY, state.position.y);
+        maxY = std::max(maxY, state.position.y);
+        maxPitch = std::max(maxPitch, std::abs(state.pitchDegrees));
+        maxRoll = std::max(maxRoll, std::abs(state.rollDegrees));
+        const glm::mat4 root = motion.boatRootTransform(1);
+        const glm::mat4 inverseRoot = glm::inverse(root);
+        for (const SceneObject& part : ObjectEnrichment::boatLocalParts(supply))
+        {
+            const glm::mat4 recovered = inverseRoot * (root * part.model);
+            for (int column = 0; column < 4; ++column)
+                for (int row = 0; row < 4; ++row)
+                    maxRigidError = std::max(maxRigidError,
+                        std::abs(recovered[column][row] - part.model[column][row]));
+        }
+        const float bow = BoatDescriptor::bowSampleFraction * supply.length;
+        const float side = BoatDescriptor::sideSampleFraction * supply.width;
+        for (const glm::vec2 local : std::array<glm::vec2, 5>{{
+                 {0.0f, 0.0f}, {0.0f, bow}, {0.0f, -bow},
+                 {-side, 0.0f}, {side, 0.0f}}})
+        {
+            const glm::vec3 world{root * glm::vec4{
+                local.x, BoatDescriptor::waterlineLocalY, local.y, 1.0f}};
+            float waterY = 0.0f;
+            if (!motion.waterSurfaceAt(world.x, world.z, waterY))
+                ++invalidWaterSamples;
+            else
+                maxWaterlineError = std::max(maxWaterlineError,
+                    std::abs(world.y - waterY));
+        }
+        const float expectedPitch = glm::clamp(-glm::degrees(std::atan2(
+            state.bowWaterY - state.sternWaterY, 2.0f * bow)), -5.0f, 5.0f);
+        const float expectedRoll = glm::clamp(glm::degrees(std::atan2(
+            state.starboardWaterY - state.portWaterY, 2.0f * side)), -5.0f, 5.0f);
+        sampleDerivedAttitude = sampleDerivedAttitude &&
+            std::abs(state.pitchDegrees - expectedPitch) < 1.0e-5f &&
+            std::abs(state.rollDegrees - expectedRoll) < 1.0e-5f;
+        if (frame > 0)
+        {
+            const glm::vec2 delta{state.position.x - previous.position.x,
+                                  state.position.z - previous.position.z};
+            const float step = glm::length(delta);
+            maxHorizontalStep = std::max(maxHorizontalStep, step);
+            maxVerticalStep = std::max(maxVerticalStep,
+                std::abs(state.position.y - previous.position.y));
+            maxYawStep = std::max(maxYawStep,
+                std::abs(state.rotationDegrees.y - previous.rotationDegrees.y));
+            if (step > 1.0e-4f)
+            {
+                const glm::vec2 forward{
+                    std::sin(glm::radians(state.rotationDegrees.y)),
+                    std::cos(glm::radians(state.rotationDegrees.y))};
+                const glm::vec2 velocityDirection = delta / step;
+                maxHeadingError = std::max(maxHeadingError, glm::degrees(std::acos(
+                    glm::clamp(glm::dot(forward, velocityDirection), -1.0f, 1.0f))));
+            }
+            if (motion.simulationTime_ >= travelTime + 0.1f)
+                stopped = stopped && step < 1.0e-5f;
+        }
+        previous = state;
+    }
+    const SimulatedBoatState final = motion.boatStates()[1];
+    const bool reachedEnd = glm::length(glm::vec2{final.position.x,
+        final.position.z} - endpoint.position) < 1.0e-4f &&
+        std::abs(final.rotationDegrees.y - 90.0f) < 1.0e-4f;
+    motion.reset();
+    const SimulatedBoatState reset = motion.boatStates()[1];
+    bool resetCorrect = glm::all(glm::equal(reset.position, initial.position)) &&
+        glm::all(glm::equal(reset.rotationDegrees, initial.rotationDegrees));
+    for (int frame = 0; frame < 300; ++frame)
+        motion.update(1.0f / 30.0f);
+    WaterSimulation fresh;
+    for (int frame = 0; frame < 300; ++frame)
+        fresh.update(1.0f / 30.0f);
+    resetCorrect = resetCorrect &&
+        glm::all(glm::equal(motion.boatStates()[1].position,
+                            fresh.boatStates()[1].position)) &&
+        glm::all(glm::equal(motion.boatStates()[1].rotationDegrees,
+                            fresh.boatStates()[1].rotationDegrees));
+    WaterSimulation thirty;
+    WaterSimulation sixty;
+    for (int frame = 0; frame < 600; ++frame)
+        thirty.update(1.0f / 30.0f);
+    for (int frame = 0; frame < 1200; ++frame)
+        sixty.update(1.0f / 60.0f);
+    const auto& a = thirty.boatStates()[1];
+    const auto& b = sixty.boatStates()[1];
+    const float equalPosition = glm::length(a.position - b.position);
+    const float equalOrientation = glm::length(a.rotationDegrees - b.rotationDegrees);
+    const bool valid = finiteRoute && footprintWet && minBank > 3.0f &&
+        minQuay > 1.5f && minCargo > 10.0f && cargoFixed && repeatable &&
+        sampleDerivedAttitude && invalidWaterSamples == 0 &&
+        maxWaterlineError < 0.15f && maxRigidError < 1.0e-4f &&
+        maxHeadingError < 1.0f && maxHorizontalStep < 0.08f &&
+        maxVerticalStep < 0.05f && maxYawStep < 0.7f && stopped &&
+        reachedEnd && resetCorrect && equalPosition < 1.0e-3f &&
+        equalOrientation < 1.0e-3f;
+    output << "Phase 13 one-way supply boat navigation\n"
+           << "  start/end XZ: (" << supply.center.x << ", " << supply.center.z
+           << ") -> (" << endpoint.position.x << ", " << endpoint.position.y
+           << "), arc/total length: " << supplyArcLength(supply) << " / "
+           << routeLength << " m, time: " << travelTime << " s\n"
+           << "  minimum bank/quay/cargo clearance: " << minBank << " / "
+           << minQuay << " / " << minCargo << " m\n"
+           << "  supply Y range: " << minY << " ... " << maxY
+           << ", max pitch/roll: " << maxPitch << " / " << maxRoll
+           << " deg, max waterline error: " << maxWaterlineError << " m\n"
+           << "  max horizontal/vertical/yaw frame step: "
+           << maxHorizontalStep << " m / " << maxVerticalStep << " m / "
+           << maxYawStep << " deg, heading error: " << maxHeadingError
+           << " deg, rigid error: " << maxRigidError << '\n'
+           << "  invalid water samples: " << invalidWaterSamples
+           << ", 30/60 FPS position/angle error: " << equalPosition
+           << " m / " << equalOrientation << " deg\n"
+           << (valid ? "Supply navigation validation passed.\n"
+                     : "Supply navigation validation failed.\n");
     return valid;
 }

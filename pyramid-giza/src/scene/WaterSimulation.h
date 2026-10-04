@@ -55,6 +55,7 @@ public:
 
     static bool validateWaterSimulation(std::ostream& output);
     static bool validateBoatWaterCoupling(std::ostream& output);
+    static bool validateBoatNavigation(std::ostream& output);
 
 private:
     void initBoats();
