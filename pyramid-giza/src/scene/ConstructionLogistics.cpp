@@ -27,7 +27,6 @@ constexpr glm::vec3 physicalBlockScale{2.6f, 1.6f, 2.4f};
 constexpr float placementPositionTolerance = 1.0e-3f;
 constexpr float placementOrientationToleranceDegrees = 0.05f;
 constexpr float placementScaleTolerance = 1.0e-3f;
-constexpr std::size_t postLiftWaypointCount = 10;
 constexpr std::array<glm::vec3, 2> pullingWorkerOffsets{{
     {-0.72f, 0.0f, -4.70f},
     {0.72f, 0.0f, -4.70f}}};
@@ -40,6 +39,18 @@ bool finiteVector(const glm::vec3& value)
 {
     return std::isfinite(value.x) && std::isfinite(value.y) &&
            std::isfinite(value.z);
+}
+
+float blockHalfExtentAlong(const glm::vec3& scale,
+                           const glm::vec3& rotationDegrees,
+                           const glm::vec2& direction)
+{
+    const glm::mat4 orientation = makeTransform(
+        {}, rotationDegrees, {1.0f, 1.0f, 1.0f});
+    return 0.5f * scale.x * std::abs(glm::dot(direction,
+               glm::vec2{orientation[0].x, orientation[0].z})) +
+           0.5f * scale.z * std::abs(glm::dot(direction,
+               glm::vec2{orientation[2].x, orientation[2].z}));
 }
 
 float headingDegreesFor(const glm::vec3& direction)
@@ -132,140 +143,6 @@ glm::vec3 quarryLoadingSledgePosition()
         LogisticsState::SledgeLoading, 0.0f).sledgePosition;
 }
 
-struct PostLiftRoute
-{
-    std::array<glm::vec3, postLiftWaypointCount> points{};
-    std::array<float, postLiftWaypointCount> cumulativeDistance{};
-    float length = 0.0f;
-};
-
-struct PostLiftRouteSample
-{
-    glm::vec3 position{0.0f};
-    std::size_t segment = 0;
-    float segmentProgress = 0.0f;
-};
-
-glm::vec3 rampCargoCenter(const RampDescriptor& ramp, float progress)
-{
-    return MonumentalSite::rampSurfacePoint(ramp, progress) +
-           glm::vec3{0.0f, 0.5f * physicalBlockScale.y, 0.0f};
-}
-
-glm::vec3 targetLevelAccessPoint(const PyramidBlockPlacement& target)
-{
-    if (target.level == 0)
-    {
-        const PyramidLayoutConfig config;
-        const float zStep = config.blockDepth + config.horizontalSpacing;
-        const unsigned int side = config.baseBlocksPerSide - target.level;
-        const float halfDepth = 0.5f * static_cast<float>(side - 1) * zStep +
-                                0.5f * config.blockDepth;
-        const float supportY = target.position.y - 0.5f * target.scale.y;
-        return {config.origin.x,
-                supportY + 0.5f * physicalBlockScale.y,
-                config.origin.z + halfDepth + 4.0f};
-    }
-
-    const float targetSupportY =
-        target.position.y - 0.5f * target.scale.y;
-    const char* rampId = targetSupportY <= 2.35f
-                             ? "MainHaulingLow"
-                             : targetSupportY <= 5.25f
-                                   ? "MainHaulingMiddle"
-                                   : "MainHaulingRamp";
-    const RampDescriptor* ramp = MonumentalSite::findRamp(rampId);
-    if (ramp == nullptr)
-        throw std::runtime_error("Post-lift route cannot find its target-level ramp");
-
-    float low = 0.0f;
-    float high = 1.0f;
-    for (int iteration = 0; iteration < 20; ++iteration)
-    {
-        const float middle = 0.5f * (low + high);
-        if (MonumentalSite::rampSurfacePoint(*ramp, middle).y < targetSupportY)
-            low = middle;
-        else
-            high = middle;
-    }
-    return rampCargoCenter(*ramp, 0.5f * (low + high));
-}
-
-PostLiftRoute makePostLiftRoute(const PyramidBlockPlacement& target)
-{
-    const PyramidLayoutConfig config;
-    if (target.level >= config.baseBlocksPerSide)
-        throw std::runtime_error("Post-lift target level is outside the pyramid");
-
-    const RampDescriptor* quarryExit =
-        MonumentalSite::findRamp("QuarryExitRamp");
-    if (quarryExit == nullptr)
-        throw std::runtime_error("Post-lift route cannot find QuarryExitRamp");
-
-    const float xStep = config.blockWidth + config.horizontalSpacing;
-    const float zStep = config.blockDepth + config.horizontalSpacing;
-    const unsigned int side = config.baseBlocksPerSide - target.level;
-    const float halfWidth = 0.5f * static_cast<float>(side - 1) * xStep +
-                            0.5f * config.blockWidth;
-    const float halfDepth = 0.5f * static_cast<float>(side - 1) * zStep +
-                            0.5f * config.blockDepth;
-    const float sideSign = target.position.x < config.origin.x ? -1.0f : 1.0f;
-    const float supportY = target.position.y - 0.5f * target.scale.y;
-    const float carriedCenterY = supportY + 0.5f * physicalBlockScale.y;
-    const float frontOutsideZ = config.origin.z + halfDepth + 4.0f;
-    const float sideOutsideX = config.origin.x +
-                               sideSign * (halfWidth + 4.0f);
-    const float approachOffset = 0.5f * target.scale.x +
-                                 0.5f * physicalBlockScale.x + 0.35f;
-
-    PostLiftRoute route;
-    route.points = {{
-        QuarryPulleyAnimationController::destinationLoadPosition(),
-        rampCargoCenter(*quarryExit, 0.0f),
-        rampCargoCenter(*quarryExit, 1.0f),
-        {-10.0f, 0.89f, 42.0f},
-        {0.0f, 0.89f, 45.0f},
-        targetLevelAccessPoint(target),
-        {sideOutsideX, carriedCenterY, frontOutsideZ},
-        {sideOutsideX, carriedCenterY, target.position.z},
-        {target.position.x + sideSign * approachOffset,
-         carriedCenterY, target.position.z},
-        target.position}};
-
-    route.cumulativeDistance[0] = 0.0f;
-    for (std::size_t index = 1; index < route.points.size(); ++index)
-    {
-        const float segmentLength =
-            glm::distance(route.points[index - 1], route.points[index]);
-        if (!std::isfinite(segmentLength) || segmentLength <= 1.0e-4f)
-            throw std::runtime_error("Post-lift route contains a degenerate segment");
-        route.length += segmentLength;
-        route.cumulativeDistance[index] = route.length;
-    }
-    return route;
-}
-
-PostLiftRouteSample samplePostLiftRoute(const PostLiftRoute& route,
-                                        float progress)
-{
-    const float distance =
-        std::clamp(progress, 0.0f, 1.0f) * route.length;
-    for (std::size_t index = 1; index < route.points.size(); ++index)
-    {
-        if (distance > route.cumulativeDistance[index] &&
-            index + 1 < route.points.size())
-            continue;
-        const float startDistance = route.cumulativeDistance[index - 1];
-        const float segmentLength =
-            route.cumulativeDistance[index] - startDistance;
-        const float local = std::clamp(
-            (distance - startDistance) / segmentLength, 0.0f, 1.0f);
-        return {glm::mix(route.points[index - 1], route.points[index], local),
-                index - 1, local};
-    }
-    return {route.points.back(), route.points.size() - 2, 1.0f};
-}
-
 const ConstructionBlock* findActiveBlock(const ConstructionSimulation& simulation,
                                          std::uint64_t blockId)
 {
@@ -296,7 +173,7 @@ float stateBaseDuration(LogisticsState state)
     case LogisticsState::LiftPrep: return 3.0f;
     case LogisticsState::Lifting: return 6.0f;
     case LogisticsState::QuarryPlatformTransfer: return 4.0f;
-    case LogisticsState::Placement: return 30.0f;
+    case LogisticsState::Placement: return 8.0f;
     case LogisticsState::Settled: return 2.0f;
     default: return 3.0f;
     }
@@ -330,6 +207,9 @@ void ConstructionLogistics::reset()
     previousPostLiftPosition_ = glm::vec3{0.0f};
     largestPostLiftDisplacement_ = 0.0f;
     hasPreviousPostLiftPosition_ = false;
+    placementStartPosition_ = glm::vec3{0.0f};
+    placementStartRotation_ = glm::vec3{0.0f};
+    detachCount_ = 0;
 }
 
 const char* ConstructionLogistics::stateName(LogisticsState state)
@@ -347,7 +227,7 @@ const char* ConstructionLogistics::stateName(LogisticsState state)
     case LogisticsState::LiftPrep: return "Lift Preparation";
     case LogisticsState::Lifting: return "Quarry Floor -> Receiving Platform Lift";
     case LogisticsState::QuarryPlatformTransfer: return "Quarry Platform Transfer";
-    case LogisticsState::Placement: return "Maneuvering to Target Cell";
+    case LogisticsState::Placement: return "Skidding Block to Target Cell";
     case LogisticsState::Settled: return "Block Settled -> Permanent Structure";
     default: return "Unknown";
     }
@@ -413,6 +293,13 @@ glm::mat4 ConstructionLogistics::physicalSledgeRoot(
     return makeTransform(snapshot.sledgePosition,
                          {snapshot.sledgePitch, snapshot.sledgeHeading, 0.0f},
                          {1.0f, 1.0f, 1.0f});
+}
+
+glm::vec3 ConstructionLogistics::physicalCargoPosition(
+    const LogisticsSnapshot& snapshot)
+{
+    return glm::vec3{physicalSledgeRoot(snapshot) *
+                     glm::vec4{cargoSocketOffset, 1.0f}};
 }
 
 glm::vec3 ConstructionLogistics::haulingDirection(
@@ -558,10 +445,19 @@ glm::mat4 ConstructionLogistics::physicalWorkerRoot(
                      glm::vec4{formationOffset(crewIndex), 1.0f}};
     float workerHeading = snapshot.sledgeHeading;
     if (snapshot.state == LogisticsState::RampAscent ||
-        snapshot.state == LogisticsState::UpperTransfer)
+        snapshot.state == LogisticsState::UpperTransfer ||
+        snapshot.state == LogisticsState::Placement ||
+        snapshot.state == LogisticsState::Settled)
     {
-        const auto route = physicalRouteWaypoints(snapshot.state);
-        const float distance = snapshot.stateProgress * horizontalRouteLength(route) + 4.70f;
+        const LogisticsState routeState =
+            snapshot.state == LogisticsState::Placement ||
+            snapshot.state == LogisticsState::Settled
+                ? LogisticsState::UpperTransfer : snapshot.state;
+        const auto route = physicalRouteWaypoints(routeState);
+        const float progress = routeState == LogisticsState::UpperTransfer &&
+            snapshot.state != LogisticsState::UpperTransfer ? 1.0f :
+            snapshot.stateProgress;
+        const float distance = progress * horizontalRouteLength(route) + 4.70f;
         const HorizontalRouteSample ahead = horizontalRouteAt(route, distance);
         const glm::vec2 side{-ahead.direction.y, ahead.direction.x};
         const float lateral = formationOffset(crewIndex).x;
@@ -615,15 +511,6 @@ glm::vec3 ConstructionLogistics::computeRampPosition(float progress) const
     return samplePhysicalRoute(LogisticsState::RampAscent, progress, supportProgress_).sledgePosition;
 }
 
-glm::vec3 ConstructionLogistics::computePlacementPosition(float progress, ConstructionSimulation& simulation) const
-{
-    const ConstructionBlock* block = findActiveBlock(simulation, activeBlockId_);
-    if (block == nullptr)
-        return QuarryPulleyAnimationController::destinationLoadPosition();
-    return samplePostLiftRoute(makePostLiftRoute(block->targetPlacement), progress)
-        .position;
-}
-
 void ConstructionLogistics::settlePlacementIfSpatiallyReady(
     ConstructionSimulation& simulation,
     ConstructionTimelineController& timeline)
@@ -664,11 +551,11 @@ void ConstructionLogistics::settlePlacementIfSpatiallyReady(
 
     if (activeBlockId_ == 1000)
     {
-        std::cout << "\n[POST-LIFT TRACE]\n"
+        std::cout << "\n[PLACEMENT TRACE]\n"
                   << "Block " << activeBlockId_ << "\n"
                   << "SETTLED: (" << blockPosition_.x << ", "
                   << blockPosition_.y << ", " << blockPosition_.z << ")\n"
-                  << "largest observed frame-to-frame displacement: "
+                  << "largest observed local frame-to-frame displacement: "
                   << largestPostLiftDisplacement_ << std::endl;
     }
 
@@ -747,8 +634,27 @@ void ConstructionLogistics::advanceState(ConstructionSimulation& simulation, Qua
         break;
 
     case LogisticsState::UpperTransfer:
-        // Stop with the block aboard on the supported target-course landing.
+    {
+        const LogisticsSnapshot parked = samplePhysicalRoute(
+            LogisticsState::UpperTransfer, 1.0f, supportProgress_);
+        sledgePosition_ = parked.sledgePosition;
+        sledgeHeading_ = parked.sledgeHeading;
+        sledgePitch_ = parked.sledgePitch;
+        placementStartPosition_ = physicalCargoPosition(parked);
+        placementStartRotation_ = {parked.sledgePitch, parked.sledgeHeading, 0.0f};
+        blockPosition_ = placementStartPosition_;
+        blockRotation_ = placementStartRotation_;
+        previousPostLiftPosition_ = placementStartPosition_;
+        largestPostLiftDisplacement_ = 0.0f;
+        hasPreviousPostLiftPosition_ = true;
+        ConstructionBlock* block = simulation.getBlock(activeBlockId_);
+        if (block == nullptr || block->sledgeId != 1 || detachCount_ != 0u)
+            throw std::runtime_error("Placement cannot detach an unmounted block twice");
+        ++detachCount_;
+        state_ = LogisticsState::Placement;
+        ropeTaut_ = false;
         break;
+    }
 
     case LogisticsState::LiftPrep:
         state_ = LogisticsState::Lifting;
@@ -794,11 +700,7 @@ void ConstructionLogistics::advanceState(ConstructionSimulation& simulation, Qua
         break;
 
     case LogisticsState::Settled:
-        state_ = LogisticsState::QuarryReady;
-        activeBlockId_ = 0;
-        blockScale_ = physicalBlockScale;
-        hasPreviousPostLiftPosition_ = false;
-        justSettled_ = false;
+        // The first physical cycle ends here. A later task may schedule another block.
         break;
     }
 
@@ -824,7 +726,7 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
 
     const float duration = stateBaseDuration(state_);
     // Consume transport-state boundaries exactly; retain all remaining time.
-    // Lift and placement timing are outside this repair.
+    // Preserve exact transport boundaries, including the unload handoff.
     if (state_ >= LogisticsState::Staged && state_ <= LogisticsState::UpperTransfer)
     {
         const float remaining = std::max(0.0f, duration - stateTimer_);
@@ -844,8 +746,8 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
     switch (state_) {
         case LogisticsState::QuarryReady:
         case LogisticsState::Extracting:
-        case LogisticsState::UpperTransfer:
         case LogisticsState::Placement:
+        case LogisticsState::Settled:
             shouldAdvance = false;
             break;
         default:
@@ -997,32 +899,42 @@ void ConstructionLogistics::update(float deltaTime, ConstructionSimulation& simu
 
     case LogisticsState::Placement:
     {
-        sledgePosition_ = quarryLoadingSledgePosition();
         const ConstructionBlock* active =
             findActiveBlock(simulation, activeBlockId_);
         if (active == nullptr)
             throw std::runtime_error("Placement lost its authoritative block");
-        const PostLiftRoute route = makePostLiftRoute(active->targetPlacement);
-        const PostLiftRouteSample sample =
-            samplePostLiftRoute(route, stateProgress_);
-        blockPosition_ = sample.position;
-        blockRotation_ = glm::vec3{0.0f};
-        blockScale_ = sample.segment + 2 == route.points.size()
-                          ? glm::mix(physicalBlockScale,
-                                     active->targetPlacement.scale,
-                                     glm::smoothstep(0.0f, 1.0f,
-                                                     sample.segmentProgress))
-                          : physicalBlockScale;
+        const LogisticsSnapshot parked = samplePhysicalRoute(
+            LogisticsState::UpperTransfer, 1.0f, supportProgress_);
+        const PlacementSkid skid = MonumentalSite::placementSkid(
+            placementStartPosition_, physicalBlockScale,
+            active->targetPlacement, physicalSledgeRoot(parked));
+        const float t = stateProgress_;
+        const glm::vec3 target = active->targetPlacement.position;
+        const glm::vec2 horizontal = glm::mix(
+            glm::vec2{placementStartPosition_.x, placementStartPosition_.z},
+            glm::vec2{target.x, target.z}, t);
+        blockScale_ = glm::mix(physicalBlockScale, active->targetPlacement.scale, t);
+        blockRotation_ = glm::mix(placementStartRotation_, glm::vec3{0.0f}, t);
+        const glm::vec2 direction = glm::normalize(glm::vec2{
+            target.x - placementStartPosition_.x,
+            target.z - placementStartPosition_.z});
+        const float halfExtent = blockHalfExtentAlong(
+            blockScale_, blockRotation_, direction);
+        const float surface = MonumentalSite::placementSupportHeight(
+            skid, horizontal, halfExtent);
+        blockPosition_ = {horizontal.x, surface + 0.5f * blockScale_.y,
+                          horizontal.y};
+        if (t >= 1.0f)
+        {
+            blockPosition_ = target;
+            blockRotation_ = glm::vec3{0.0f};
+            blockScale_ = active->targetPlacement.scale;
+        }
         break;
     }
 
     case LogisticsState::Settled:
-        sledgePosition_ = quarryLoadingSledgePosition();
-        blockPosition_ = computePlacementPosition(1.0f, simulation);
-        blockRotation_ = glm::vec3{0.0f};
-        if (const ConstructionBlock* active =
-                findActiveBlock(simulation, activeBlockId_))
-            blockScale_ = active->targetPlacement.scale;
+        // Keep the parked sledge and the settled block at their exact final poses.
         break;
     }
 
@@ -1436,202 +1348,6 @@ bool validatePhysicalHaulingCrewIntegration(std::ostream& output)
     return valid;
 }
 
-[[maybe_unused]] bool validatePostLiftRouteIntegration(std::ostream& output)
-{
-    ConstructionSimulation simulation;
-    QuarrySystem quarry;
-    ConstructionTimelineController timeline;
-    QuarryPulleyAnimationController pulley;
-    ConstructionLogistics logistics;
-
-    simulation.initialize(
-        PyramidLayout::generateComplete(PyramidLayoutConfig{}));
-    const std::size_t baselineOccupied = simulation.prebuiltCount();
-    timeline.setProgress(0.0f);
-    quarry.startExtraction(simulation, 0);
-    if (simulation.activeBlocks.empty())
-    {
-        output << "Phase 13 post-lift route validation\n"
-               << "  authoritative block creation: FAIL\n";
-        return false;
-    }
-
-    const std::uint64_t blockId = simulation.activeBlocks.back().id;
-    const std::size_t targetIndex =
-        simulation.activeBlocks.back().targetIndex;
-    const PyramidBlockPlacement target =
-        simulation.activeBlocks.back().targetPlacement;
-    const PostLiftRoute route = makePostLiftRoute(target);
-    const glm::vec3 liftTop =
-        QuarryPulleyAnimationController::raisedLoadPosition();
-    const glm::vec3 stagingDestination =
-        QuarryPulleyAnimationController::destinationLoadPosition();
-
-    constexpr float deltaTime = 0.05f;
-    constexpr int maximumSteps = 20000;
-    const float upperMaximumSpeed =
-        1.5f * glm::distance(liftTop,
-                             glm::vec3{stagingDestination.x, liftTop.y,
-                                       stagingDestination.z}) /
-        QuarryPulleyAnimationController::stateDuration(
-            QuarryPulleyState::GuideToPlatform);
-    const float placementSpeed =
-        route.length / stateBaseDuration(LogisticsState::Placement);
-    const float displacementBound =
-        std::max(upperMaximumSpeed, placementSpeed) * deltaTime + 0.03f;
-
-    LogisticsState previousState = logistics.state();
-    glm::vec3 previousPosition{0.0f};
-    bool havePreviousPostLift = false;
-    bool sameIdentity = true;
-    bool finiteAndBounded = true;
-    bool liftToStagingContinuous = false;
-    bool stagingToPlacementContinuous = false;
-    bool upperSampled = false;
-    bool placementSampled = false;
-    bool occupiedBefore = !simulation.isTargetOccupied(targetIndex);
-    bool occupiedAfter = false;
-    int settlementTransitions = 0;
-    float maximumDisplacement = 0.0f;
-    glm::vec3 upperStart{0.0f};
-    glm::vec3 upperEnd{0.0f};
-    glm::vec3 placementStart{0.0f};
-
-    for (int step = 0; step < maximumSteps; ++step)
-    {
-        quarry.update(deltaTime, simulation);
-        logistics.update(deltaTime, simulation, quarry, timeline, pulley, true);
-        ConstructionBlock* block = simulation.getBlock(blockId);
-        if (block == nullptr)
-        {
-            sameIdentity = false;
-            break;
-        }
-        sameIdentity = sameIdentity && block->id == blockId &&
-                       (logistics.activeBlockId() == blockId ||
-                        logistics.state() == LogisticsState::QuarryReady);
-
-        const LogisticsState state = logistics.state();
-        if (state == LogisticsState::QuarryPlatformTransfer ||
-            state == LogisticsState::Placement)
-        {
-            finiteAndBounded = finiteAndBounded && finiteVector(block->position) &&
-                std::abs(block->position.x) <=
-                    0.5f * MonumentalSite::scale().worldWidth + 10.0f &&
-                std::abs(block->position.z) <=
-                    0.5f * MonumentalSite::scale().worldDepth + 10.0f;
-            if (havePreviousPostLift)
-            {
-                const float displacement =
-                    glm::distance(previousPosition, block->position);
-                maximumDisplacement =
-                    std::max(maximumDisplacement, displacement);
-                finiteAndBounded = finiteAndBounded &&
-                                   displacement <= displacementBound;
-            }
-            previousPosition = block->position;
-            havePreviousPostLift = true;
-        }
-
-        if (state == LogisticsState::QuarryPlatformTransfer)
-        {
-            if (!upperSampled)
-            {
-                upperStart = block->position;
-                liftToStagingContinuous =
-                    glm::distance(upperStart, liftTop) <= 1.0e-3f;
-            }
-            upperEnd = block->position;
-            upperSampled = true;
-        }
-        else if (state == LogisticsState::Placement)
-        {
-            if (!placementSampled)
-            {
-                placementStart = block->position;
-                stagingToPlacementContinuous =
-                    glm::distance(placementStart, stagingDestination) <=
-                    1.0e-3f &&
-                    glm::distance(route.points.front(), stagingDestination) <=
-                    1.0e-6f;
-            }
-            placementSampled = true;
-        }
-
-        if (state == LogisticsState::Settled &&
-            previousState != LogisticsState::Settled)
-        {
-            ++settlementTransitions;
-            occupiedAfter = simulation.isTargetOccupied(targetIndex);
-            break;
-        }
-        previousState = state;
-    }
-
-    const ConstructionBlock* block = findActiveBlock(simulation, blockId);
-    const float finalPositionError = block == nullptr
-        ? std::numeric_limits<float>::infinity()
-        : glm::distance(block->position, target.position);
-    const float finalOrientationError = block == nullptr
-        ? std::numeric_limits<float>::infinity()
-        : glm::length(block->rotation);
-    const float finalScaleError = block == nullptr
-        ? std::numeric_limits<float>::infinity()
-        : glm::length(block->scale - target.scale);
-    bool waypointsFinite = route.length > 0.0f;
-    for (const glm::vec3& point : route.points)
-        waypointsFinite = waypointsFinite && finiteVector(point) &&
-            std::abs(point.x) <= 0.5f * MonumentalSite::scale().worldWidth + 10.0f &&
-            std::abs(point.z) <= 0.5f * MonumentalSite::scale().worldDepth + 10.0f;
-
-    const bool spatiallySettled = block != nullptr &&
-        block->state == BlockState::Settled &&
-        finalPositionError <= placementPositionTolerance &&
-        finalOrientationError <= placementOrientationToleranceDegrees &&
-        finalScaleError <= placementScaleTolerance;
-    const bool occupancyOnce = occupiedBefore && occupiedAfter &&
-        simulation.settledCount() == 1 &&
-        simulation.occupiedTargetCount() == baselineOccupied + 1 &&
-        settlementTransitions == 1;
-    const bool valid = upperSampled && placementSampled && sameIdentity &&
-        liftToStagingContinuous && stagingToPlacementContinuous &&
-        finiteAndBounded && waypointsFinite && spatiallySettled &&
-        occupancyOnce && maximumDisplacement <= displacementBound;
-
-    output << std::fixed << std::setprecision(4)
-           << "Phase 13 post-lift route validation\n"
-           << "  block/target: " << blockId << " / " << targetIndex << '\n'
-           << "  lift top: (" << liftTop.x << ", " << liftTop.y << ", "
-           << liftTop.z << ")\n"
-           << "  upper staging start: (" << upperStart.x << ", "
-           << upperStart.y << ", " << upperStart.z << ") "
-           << (liftToStagingContinuous ? "PASS" : "FAIL") << '\n'
-           << "  upper staging end sample: (" << upperEnd.x << ", "
-           << upperEnd.y << ", " << upperEnd.z << ")\n"
-           << "  placement start: (" << placementStart.x << ", "
-           << placementStart.y << ", " << placementStart.z << ") "
-           << (stagingToPlacementContinuous ? "PASS" : "FAIL") << '\n'
-           << "  target: (" << target.position.x << ", " << target.position.y
-           << ", " << target.position.z << ")\n"
-           << "  route length / waypoints: " << route.length << " / "
-           << route.points.size() << ' '
-           << (waypointsFinite ? "PASS" : "FAIL") << '\n'
-           << "  largest frame displacement / bound: "
-           << maximumDisplacement << " / " << displacementBound << ' '
-           << (maximumDisplacement <= displacementBound ? "PASS" : "FAIL")
-           << '\n'
-           << "  final position/orientation/scale error: "
-           << finalPositionError << " / " << finalOrientationError << " / "
-           << finalScaleError << ' '
-           << (spatiallySettled ? "PASS" : "FAIL") << '\n'
-           << "  same block identity and single settlement: "
-           << (sameIdentity && occupancyOnce ? "PASS" : "FAIL") << '\n'
-           << "  occupancy false -> true exactly once: "
-           << (occupancyOnce ? "PASS" : "FAIL") << '\n'
-           << (valid ? "Post-lift route checks passed.\n"
-                     : "Post-lift route checks failed.\n");
-    return valid;
-}
 bool validateQuarryHandoffIntegration(std::ostream& output)
 {
     ConstructionSimulation simulation;
@@ -2790,6 +2506,11 @@ bool validateUpperAccessStageTwoImpl(std::ostream& output)
         logistics.setSupportProgress(0.75f);
         logistics.update(0.05f, simulation, quarry, timeline, pulley, true);
         const LogisticsSnapshot pose = logistics.snapshot();
+        if (pose.state == LogisticsState::Placement)
+        {
+            reached = true; // Stage 2 ends at the exact unload boundary.
+            break;
+        }
         if (pose.state != LogisticsState::UpperTransfer) continue;
         const ConstructionBlock* block = findActiveBlock(simulation, blockId);
         sameBlock = sameBlock && block != nullptr && block->sledgeId == 1 &&
@@ -2809,7 +2530,6 @@ bool validateUpperAccessStageTwoImpl(std::ostream& output)
         }
         lastPosition = pose.sledgePosition;
         hadPrevious = true;
-        reached = pose.stateProgress >= 1.0f - 1.0e-5f;
     }
     const bool occupancy = simulation.occupiedTargetCount() == baselineOccupied &&
         simulation.settledCount() == 0 &&
@@ -2915,6 +2635,256 @@ bool ConstructionLogistics::validateUpperAccessStageOne(std::ostream& output)
 bool ConstructionLogistics::validateUpperAccessStageTwo(std::ostream& output)
 {
     return validateUpperAccessStageTwoImpl(output);
+}
+
+bool ConstructionLogistics::validatePhysicalPlacement(std::ostream& output)
+{
+    ConstructionSimulation simulation;
+    QuarrySystem quarry;
+    ConstructionTimelineController timeline;
+    QuarryPulleyAnimationController pulley;
+    ConstructionLogistics logistics;
+    simulation.initialize(PyramidLayout::generateComplete(PyramidLayoutConfig{}));
+    const std::size_t baseline = simulation.occupiedTargetCount();
+    timeline.setProgress(0.75f);
+    quarry.startExtraction(simulation, 0);
+    if (simulation.activeBlocks.empty()) return false;
+    const std::uint64_t id = simulation.activeBlocks.front().id;
+    const std::size_t targetIndex = simulation.activeBlocks.front().targetIndex;
+    const PyramidBlockPlacement target = simulation.activeBlocks.front().targetPlacement;
+    const bool initiallyOpen = !simulation.isTargetOccupied(targetIndex);
+    const LogisticsSnapshot parked = samplePhysicalRoute(
+        LogisticsState::UpperTransfer, 1.0f, 0.75f);
+    const glm::vec3 cargo = physicalCargoPosition(parked);
+    const PlacementSkid skid = MonumentalSite::placementSkid(
+        cargo, physicalBlockScale, target, physicalSledgeRoot(parked));
+    float deckTop = -std::numeric_limits<float>::infinity();
+    for (const ObjectPart& part : Sledge::create(false))
+        if (part.name == "Platform")
+        {
+            const glm::mat4 model = physicalSledgeRoot(parked) *
+                part.localTransform;
+            for (float x : {-0.5f, 0.5f})
+                for (float z : {-0.5f, 0.5f})
+                    deckTop = std::max(deckTop,
+                        glm::vec3{model * glm::vec4{x, 0.5f, z, 1.0f}}.y);
+        }
+    const float horizontalLength = glm::distance(
+        glm::vec2{cargo.x, cargo.z}, glm::vec2{target.position.x, target.position.z});
+    const float courseTop = target.position.y - 0.5f * target.scale.y;
+    float supportOverlap = 0.0f;
+    for (std::size_t i = 0; i < simulation.layout.size(); ++i)
+    {
+        const PyramidBlockPlacement& beneath = simulation.layout[i];
+        if (beneath.level + 1u != target.level || !simulation.isTargetOccupied(i))
+            continue;
+        const float xOverlap = std::max(0.0f,
+            std::min(target.position.x + 0.5f * target.scale.x,
+                     beneath.position.x + 0.5f * beneath.scale.x) -
+            std::max(target.position.x - 0.5f * target.scale.x,
+                     beneath.position.x - 0.5f * beneath.scale.x));
+        const float zOverlap = std::max(0.0f,
+            std::min(target.position.z + 0.5f * target.scale.z,
+                     beneath.position.z + 0.5f * beneath.scale.z) -
+            std::max(target.position.z - 0.5f * target.scale.z,
+                     beneath.position.z - 0.5f * beneath.scale.z));
+        supportOverlap += xOverlap * zOverlap;
+    }
+
+    bool sawPulley = false, sawLoad = false, sawHaul = false;
+    bool sawMainRamp = false, sawUpper = false, sawPlacement = false;
+    bool sameBlock = id == 1000 && targetIndex == 6218;
+    bool parkedSledge = true, detachOnce = true, supported = true;
+    bool finite = true, settled = false;
+    bool singleMovingRepresentation = true;
+    float maxStep = 0.0f, maxVerticalStep = 0.0f;
+    float maxSupportError = 0.0f, maxSledgeDrift = 0.0f;
+    float maxDeckPenetration = 0.0f, maxCoursePenetration = 0.0f;
+    float firstPlacementError = -1.0f;
+    glm::vec3 previousPlacement{0.0f};
+    bool hadPlacement = false;
+    constexpr float dt = 0.05f;
+    for (int step = 0; step < 6000; ++step)
+    {
+        if (logistics.activeBlockId() == 0)
+            quarry.update(dt, simulation);
+        logistics.setSupportProgress(0.75f);
+        logistics.update(dt, simulation, quarry, timeline, pulley, true);
+        const LogisticsSnapshot pose = logistics.snapshot();
+        const ConstructionBlock* block = simulation.getBlock(id);
+        if (block == nullptr) { sameBlock = false; break; }
+        sawPulley |= pose.state == LogisticsState::Lifting;
+        sawLoad |= pose.state == LogisticsState::SledgeLoading;
+        sawHaul |= pose.state == LogisticsState::Hauling;
+        sawMainRamp |= pose.state == LogisticsState::RampAscent;
+        sawUpper |= pose.state == LogisticsState::UpperTransfer;
+        sameBlock &= block->id == id && block->targetIndex == targetIndex;
+        if (pose.state == LogisticsState::Placement)
+        {
+            std::vector<SceneObject> moving;
+            simulation.collectSceneObjects(moving);
+            singleMovingRepresentation &= moving.size() == 1u;
+            sawPlacement = true;
+            parkedSledge &= glm::distance(pose.sledgePosition, parked.sledgePosition) < 0.001f;
+            maxSledgeDrift = std::max(maxSledgeDrift,
+                glm::distance(pose.sledgePosition, parked.sledgePosition));
+            detachOnce &= block->sledgeId == -1 && logistics.detachCount_ == 1u;
+            finite &= finiteVector(block->position) && finiteVector(block->rotation) &&
+                      finiteVector(block->scale);
+            const float bottom = block->position.y - 0.5f * block->scale.y;
+            const glm::vec2 direction = glm::normalize(glm::vec2{
+                target.position.x - cargo.x, target.position.z - cargo.z});
+            const float halfExtent = blockHalfExtentAlong(
+                block->scale, block->rotation, direction);
+            const float surface = MonumentalSite::placementSupportHeight(
+                skid, {block->position.x, block->position.z},
+                halfExtent);
+            const float rearDistance = glm::dot(
+                glm::vec2{block->position.x - cargo.x,
+                          block->position.z - cargo.z}, direction) - halfExtent;
+            const float flatLength = glm::distance(
+                glm::vec2{skid.start.x, skid.start.z},
+                glm::vec2{skid.gradeStart.x, skid.gradeStart.z});
+            if (rearDistance < flatLength - 0.05f)
+                maxDeckPenetration = std::max(maxDeckPenetration,
+                    std::max(0.0f, deckTop - bottom));
+            maxCoursePenetration = std::max(maxCoursePenetration,
+                std::max(0.0f, courseTop - bottom));
+            maxSupportError = std::max(maxSupportError, std::abs(bottom - surface));
+            supported &= std::abs(bottom - surface) < 0.002f &&
+                         !simulation.isTargetOccupied(targetIndex);
+            if (hadPlacement)
+            {
+                maxStep = std::max(maxStep,
+                    glm::distance(block->position, previousPlacement));
+                maxVerticalStep = std::max(maxVerticalStep,
+                    std::abs(block->position.y - previousPlacement.y));
+            }
+            else
+            {
+                firstPlacementError = glm::distance(block->position, cargo);
+                supported &= glm::distance(logistics.placementStartPosition_, cargo) <
+                    0.001f && firstPlacementError <
+                    horizontalLength / stateBaseDuration(LogisticsState::Placement) *
+                        dt + 0.01f;
+            }
+            previousPlacement = block->position;
+            hadPlacement = true;
+        }
+        if (pose.state == LogisticsState::Settled)
+        {
+            settled = true;
+            maxStep = std::max(maxStep,
+                glm::distance(block->position, previousPlacement));
+            maxVerticalStep = std::max(maxVerticalStep,
+                std::abs(block->position.y - previousPlacement.y));
+            break;
+        }
+    }
+    const ConstructionBlock* finalBlock = simulation.getBlock(id);
+    std::vector<SceneObject> afterSettlement;
+    simulation.collectSceneObjects(afterSettlement);
+    const bool cleanRenderHandoff = singleMovingRepresentation &&
+        afterSettlement.empty() && simulation.isTargetOccupied(targetIndex);
+    const float finalError = finalBlock == nullptr ?
+        std::numeric_limits<float>::infinity() :
+        glm::distance(finalBlock->position, target.position);
+    const float orientationError = finalBlock == nullptr ?
+        std::numeric_limits<float>::infinity() : glm::length(finalBlock->rotation);
+    const bool settledOnce = settled && simulation.isTargetOccupied(targetIndex) &&
+        simulation.occupiedTargetCount() == baseline + 1u &&
+        simulation.runtimeSettledCount() == 1u &&
+        !simulation.settleBlock(id);
+    for (int step = 0; step < 80; ++step)
+        logistics.update(dt, simulation, quarry, timeline, pulley, true);
+    const int heldState = static_cast<int>(logistics.state());
+    const std::size_t heldSettled = simulation.runtimeSettledCount();
+    const std::size_t heldOccupied = simulation.occupiedTargetCount();
+    const std::size_t heldActive = simulation.activeBlocks.size();
+    const bool remainsSettled = logistics.state() == LogisticsState::Settled &&
+        simulation.runtimeSettledCount() == 1u &&
+        simulation.occupiedTargetCount() == baseline + 1u &&
+        simulation.activeBlocks.size() == 1u &&
+        glm::distance(logistics.snapshot().sledgePosition,
+                      parked.sledgePosition) < 0.001f;
+    simulation.reset();
+    quarry.reset();
+    pulley.reset();
+    logistics.reset();
+    timeline.reset();
+    const bool reset = !simulation.isTargetOccupied(targetIndex) &&
+        simulation.occupiedTargetCount() == baseline &&
+        simulation.runtimeSettledCount() == 0u &&
+        simulation.activeBlocks.empty() &&
+        logistics.state() == LogisticsState::QuarryReady;
+    quarry.startExtraction(simulation, 0);
+    const bool secondRunReady = simulation.activeBlocks.size() == 1u &&
+        simulation.activeBlocks.front().id == id &&
+        simulation.activeBlocks.front().targetIndex == targetIndex;
+    bool secondSettled = false;
+    for (int step = 0; step < 6000 && secondRunReady; ++step)
+    {
+        if (logistics.activeBlockId() == 0)
+            quarry.update(dt, simulation);
+        logistics.setSupportProgress(0.75f);
+        logistics.update(dt, simulation, quarry, timeline, pulley, true);
+        if (logistics.state() == LogisticsState::Settled)
+        {
+            secondSettled = simulation.isTargetOccupied(targetIndex) &&
+                simulation.runtimeSettledCount() == 1u &&
+                simulation.occupiedTargetCount() == baseline + 1u &&
+                simulation.activeBlocks.size() == 1u;
+            break;
+        }
+    }
+    const bool valid = initiallyOpen && supportOverlap > 0.5f *
+        target.scale.x * target.scale.z &&
+        sawPulley && sawLoad && sawHaul && sawMainRamp && sawUpper &&
+        sawPlacement && sameBlock && parkedSledge && detachOnce &&
+        supported && finite && maxSupportError < 0.002f &&
+        maxDeckPenetration < 0.002f && maxCoursePenetration < 0.002f &&
+        maxStep < horizontalLength / stateBaseDuration(LogisticsState::Placement) *
+            dt + 0.05f && maxVerticalStep < 0.05f &&
+        settledOnce && remainsSettled && cleanRenderHandoff &&
+        finalError < 0.001f &&
+        orientationError < 0.001f && reset && secondRunReady && secondSettled;
+    output << std::fixed << std::setprecision(4)
+           << "Physical placement and full-cycle validation\n"
+           << "  block / target / initially open: " << id << " / " << targetIndex
+           << " / " << initiallyOpen << '\n'
+           << "  cargo / target: " << cargo.x << ',' << cargo.y << ',' << cargo.z
+           << " / " << target.position.x << ',' << target.position.y << ','
+           << target.position.z << '\n'
+           << "  rail start / grade start / course edge / taper end / course top: "
+           << skid.start.x << " / " << skid.gradeStart.x << " / "
+           << skid.courseEdge.x << " / " << skid.end.x << " / "
+           << courseTop << '\n'
+           << "  transfer length / drop / course overlap: " << horizontalLength
+           << " / " << cargo.y - target.position.y << " / " << supportOverlap << '\n'
+           << "  maximum step / vertical step / support error / sledge drift: "
+           << maxStep << " / " << maxVerticalStep << " / " << maxSupportError
+           << " / " << maxSledgeDrift << '\n'
+           << "  sledge deck / occupied course penetration: "
+           << maxDeckPenetration << " / " << maxCoursePenetration << '\n'
+           << "  first placement/cargo error: " << firstPlacementError << '\n'
+           << "  full chain / detach once / supported / settled once: "
+           << (sawPulley && sawLoad && sawHaul && sawMainRamp && sawUpper)
+           << " / " << detachOnce << " / " << supported << " / " << settledOnce << '\n'
+           << "  placement / same block / finite / parked / remains settled: "
+           << sawPlacement << " / " << sameBlock << " / " << finite << " / "
+           << parkedSledge << " / " << remainsSettled << '\n'
+           << "  post-hold state / count / occupied / active: "
+           << heldState << " / " << heldSettled << " / " << heldOccupied
+           << " / " << heldActive << '\n'
+           << "  one moving cube -> occupied instance handoff: "
+           << cleanRenderHandoff << '\n'
+           << "  final position / orientation error: " << finalError << " / "
+           << orientationError << '\n'
+           << "  reset / deterministic second start / second settlement: "
+           << reset << " / " << secondRunReady << " / " << secondSettled << '\n'
+           << (valid ? "Physical placement checks passed.\n" :
+                       "Physical placement checks failed.\n");
+    return valid;
 }
 
 bool ConstructionLogistics::validateConstructionTrace(std::ostream& output)

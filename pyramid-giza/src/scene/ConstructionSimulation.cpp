@@ -147,11 +147,11 @@ void ConstructionSimulation::collectSceneObjects(std::vector<SceneObject>& objec
         // Apply scale/transform
         glm::mat4 model = glm::translate(glm::mat4(1.0f), block.position);
         
-        // Handle rotation from Euler angles (if any)
+        // Logistics and scene transforms express Euler angles in degrees.
         if (glm::length(block.rotation) > 0.001f) {
-            model = glm::rotate(model, block.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-            model = glm::rotate(model, block.rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-            model = glm::rotate(model, block.rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+            model = glm::rotate(model, glm::radians(block.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::rotate(model, glm::radians(block.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::rotate(model, glm::radians(block.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
         }
 
         const glm::mat4 scaleOnly = glm::scale(glm::mat4(1.0f), block.scale);

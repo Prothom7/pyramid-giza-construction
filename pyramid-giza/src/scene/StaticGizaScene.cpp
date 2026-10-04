@@ -577,6 +577,96 @@ void StaticGizaScene::buildRampNetwork()
 
     }
 
+    // The first physical unload spans only the gap from the parked cargo to
+    // the exposed west edge of its occupied supporting course. The same
+    // descriptor drives the block's support height during Placement.
+    const auto targetIt = std::find_if(pyramidBlocks_.begin(), pyramidBlocks_.end(),
+        [this](const PyramidBlockPlacement& candidate) {
+            const std::size_t index = static_cast<std::size_t>(
+                &candidate - pyramidBlocks_.data());
+            return simulation_.isTargetBuildable(index) &&
+                   !simulation_.isTargetOccupied(index);
+        });
+    if (targetIt != pyramidBlocks_.end())
+    {
+        const LogisticsSnapshot parked = ConstructionLogistics::samplePhysicalRoute(
+            LogisticsState::UpperTransfer, 1.0f, 0.75f);
+        const glm::vec3 cargo = ConstructionLogistics::physicalCargoPosition(parked);
+        const PlacementSkid skid = MonumentalSite::placementSkid(
+            cargo, {2.6f, 1.6f, 2.4f}, *targetIt,
+            ConstructionLogistics::physicalSledgeRoot(parked));
+        const glm::vec2 path = glm::normalize(glm::vec2{
+            skid.end.x - skid.start.x, skid.end.z - skid.start.z});
+        const glm::vec3 lateral{-path.y, 0.0f, path.x};
+        const auto addRail = [&](const glm::vec3& from, const glm::vec3& to,
+                                 float side, float thickness)
+        {
+            const float run = glm::distance(glm::vec2{from.x, from.z},
+                                            glm::vec2{to.x, to.z});
+            const float centerOffset = 0.5f * thickness *
+                std::cos(std::atan2(from.y - to.y, run));
+            const glm::vec3 lateralOffset = lateral *
+                (side * 0.5f * skid.railSpacing);
+            const RampDescriptor rail{
+                "TargetUnloadSkid",
+                from + lateralOffset - glm::vec3{0.0f, centerOffset, 0.0f},
+                to + lateralOffset - glm::vec3{0.0f, centerOffset, 0.0f},
+                skid.railWidth, thickness, MaterialId::DarkWood, false};
+            addStaged(ScenePrimitive::Cube, MonumentalSite::rampModel(rail),
+                      MaterialId::DarkWood, rail);
+        };
+        for (float side : {-1.0f, 1.0f})
+        {
+            addRail(skid.start, skid.gradeStart, side, skid.railThickness);
+            addRail(skid.gradeStart, skid.courseEdge, side, skid.railThickness);
+            // On the occupied course, the short timber wedge tapers into the
+            // stone surface. Its shims visibly rest on the real course top.
+            constexpr int taperSegments = 8;
+            for (int segment = 0; segment < taperSegments; ++segment)
+            {
+                const glm::vec3 from = glm::mix(skid.courseEdge, skid.end,
+                    static_cast<float>(segment) / taperSegments);
+                const glm::vec3 to = glm::mix(skid.courseEdge, skid.end,
+                    static_cast<float>(segment + 1) / taperSegments);
+                const float thickness = std::min(skid.railThickness,
+                    std::max(0.005f, to.y - skid.courseTop));
+                addRail(from, to, side, thickness);
+            }
+            for (float t : {0.20f, 0.45f, 0.70f})
+            {
+                const glm::vec3 top = glm::mix(skid.courseEdge, skid.end, t) +
+                    lateral * (side * 0.5f * skid.railSpacing);
+                const float height = top.y - skid.courseTop - 0.08f;
+                if (height > 0.02f)
+                    addStaged(ScenePrimitive::Cylinder,
+                        makeTransform({top.x, skid.courseTop + 0.5f * height,
+                                       top.z}, {}, {0.14f, height, 0.14f}),
+                        MaterialId::Wood, MonumentalSite::targetLevelLanding());
+            }
+        }
+        const float flatRun = glm::distance(
+            glm::vec2{skid.start.x, skid.start.z},
+            glm::vec2{skid.gradeStart.x, skid.gradeStart.z});
+        const float totalRun = glm::distance(
+            glm::vec2{skid.start.x, skid.start.z},
+            glm::vec2{skid.end.x, skid.end.z});
+        for (int roller = 1; roller <= 5; ++roller)
+        {
+            const float distance = totalRun * roller / 6.0f;
+            const glm::vec3 top = distance <= flatRun ?
+                glm::mix(skid.start, skid.gradeStart, distance / flatRun) :
+                glm::mix(skid.gradeStart, skid.end,
+                         (distance - flatRun) / (totalRun - flatRun));
+            addStaged(ScenePrimitive::Cylinder,
+                ConstructionAnimationController::cylinderBetween(
+                    top - lateral * (0.5f * skid.railSpacing + 0.10f) -
+                        glm::vec3{0.0f, 0.08f, 0.0f},
+                    top + lateral * (0.5f * skid.railSpacing + 0.10f) -
+                        glm::vec3{0.0f, 0.08f, 0.0f}, 0.08f),
+                MaterialId::Wood, MonumentalSite::targetLevelLanding());
+        }
+    }
+
     stats_.rampComponents = stagedObjects_.size() - start;
 }
 
@@ -1803,7 +1893,10 @@ void StaticGizaScene::update(float deltaTime)
     
     const float simulationMultiplier = constructionTimeline_.playing() ? constructionTimeline_.speed() * 60.0f : 1.0f;
     const float simDelta = deltaTime * simulationMultiplier;
-    quarry_.update(simDelta, simulation_);
+    // A single authoritative physical cycle owns the quarry. Once its block
+    // leaves staging, do not auto-spawn block 1001 during the long haul.
+    if (!physicalConstructionMode() || logistics_.activeBlockId() == 0)
+        quarry_.update(simDelta, simulation_);
     // Staged geometry is rendered with this same timeline value.
     logistics_.setSupportProgress(constructionTimeline_.progress());
     logistics_.update(simDelta, simulation_, quarry_, constructionTimeline_,
@@ -2553,7 +2646,9 @@ void StaticGizaScene::collectFrameObjects()
         (logSnap.state == LogisticsState::Hauling ||
          logSnap.state == LogisticsState::RampApproach ||
          logSnap.state == LogisticsState::RampAscent ||
-         logSnap.state == LogisticsState::UpperTransfer);
+         logSnap.state == LogisticsState::UpperTransfer ||
+         logSnap.state == LogisticsState::Placement ||
+         logSnap.state == LogisticsState::Settled);
     std::vector<Worker::EvaluatedPose> evaluatedWorkers(workers_.size());
     for (std::size_t index = 0; index < workers_.size(); ++index)
     {
@@ -2603,7 +2698,8 @@ void StaticGizaScene::collectFrameObjects()
                 index == static_cast<std::size_t>(WorkerRole::PullerLeft)
                     ? 0u
                     : 1u;
-            const bool moving = logSnap.state != LogisticsState::SledgeLoading;
+            const bool moving = logSnap.state != LogisticsState::Placement &&
+                                logSnap.state != LogisticsState::Settled;
             const float phase = crewIndex == 0u ? 0.0f : 0.63f;
             angles = moving
                          ? ConstructionAnimationController::walkingPose(

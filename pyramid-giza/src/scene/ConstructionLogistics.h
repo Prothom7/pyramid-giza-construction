@@ -74,12 +74,14 @@ public:
     // pulling crew, evaluated hands, and tow ropes in one transport frame.
     static bool isPhysicalHaulingState(LogisticsState state);
     static glm::mat4 physicalSledgeRoot(const LogisticsSnapshot& snapshot);
+    static glm::vec3 physicalCargoPosition(const LogisticsSnapshot& snapshot);
     static std::vector<glm::vec2> physicalRouteWaypoints(LogisticsState state);
     static LogisticsSnapshot samplePhysicalRoute(LogisticsState state, float progress,
                                                  float constructionProgress = 0.0f);
     static bool validatePhysicalRoute(std::ostream& output);
     static bool validateUpperAccessStageOne(std::ostream& output);
     static bool validateUpperAccessStageTwo(std::ostream& output);
+    static bool validatePhysicalPlacement(std::ostream& output);
     void setSupportProgress(float progress) { supportProgress_ = progress; }
     static glm::vec3 haulingDirection(const LogisticsSnapshot& snapshot);
     static float haulingSupportHeight(const LogisticsSnapshot& snapshot,
@@ -105,7 +107,6 @@ private:
                       bool physicalLiftEnabled);
     glm::vec3 computeHaulPosition(float progress) const;
     glm::vec3 computeRampPosition(float progress) const;
-    glm::vec3 computePlacementPosition(float progress, ConstructionSimulation& simulation) const;
     void settlePlacementIfSpatiallyReady(
         ConstructionSimulation& simulation,
         ConstructionTimelineController& timeline);
@@ -130,4 +131,7 @@ private:
     float largestPostLiftDisplacement_ = 0.0f;
     bool hasPreviousPostLiftPosition_ = false;
     float supportProgress_ = 0.0f;
+    glm::vec3 placementStartPosition_{0.0f};
+    glm::vec3 placementStartRotation_{0.0f};
+    unsigned int detachCount_ = 0;
 };

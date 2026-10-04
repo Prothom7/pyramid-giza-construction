@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "objects/Scaffold.h"
+#include "objects/Sledge.h"
 #include "scene/PyramidLayout.h"
 #include "scene/PyramidInterior.h"
 
@@ -207,6 +208,88 @@ const RampDescriptor& MonumentalSite::targetLevelLanding()
         0.62f, 0.90f, 0.0f, 0.0f, false, "Target-course sledge staging deck"
     };
     return landing;
+}
+
+PlacementSkid MonumentalSite::placementSkid(
+    const glm::vec3& cargoCenter, const glm::vec3& cargoScale,
+    const PyramidBlockPlacement& target, const glm::mat4& parkedSledgeRoot)
+{
+    if (target.level == 0u)
+        throw std::invalid_argument("Placement skid requires an occupied supporting course");
+    const float courseTop = target.position.y - 0.5f * target.scale.y;
+    const glm::vec2 travel = glm::normalize(glm::vec2{
+        target.position.x - cargoCenter.x, target.position.z - cargoCenter.z});
+    static const auto layout = PyramidLayout::generateComplete(PyramidLayoutConfig{});
+    float westEdge = std::numeric_limits<float>::infinity();
+    for (const PyramidBlockPlacement& block : layout)
+        if (block.level + 1u == target.level &&
+            !PyramidInterior::blockIntersectsVoid(block) &&
+            std::abs(block.position.z - target.position.z) <
+                0.5f * (block.scale.z + target.scale.z))
+            westEdge = std::min(westEdge,
+                block.position.x - 0.5f * block.scale.x);
+    if (!std::isfinite(westEdge) || travel.x < 0.5f ||
+        westEdge <= cargoCenter.x || westEdge >= target.position.x)
+        throw std::runtime_error("Assigned target has no reachable west course edge");
+    static const auto sledgeParts = Sledge::create(false);
+    float deckEdgeDistance = -std::numeric_limits<float>::infinity();
+    for (const ObjectPart& part : sledgeParts)
+    {
+        if (part.name != "Platform") continue;
+        const glm::mat4 deck = parkedSledgeRoot * part.localTransform;
+        for (float x : {-0.5f, 0.5f})
+            for (float z : {-0.5f, 0.5f})
+            {
+                const glm::vec3 point{deck * glm::vec4{x, 0.0f, z, 1.0f}};
+                deckEdgeDistance = std::max(deckEdgeDistance,
+                    glm::dot(glm::vec2{point.x - cargoCenter.x,
+                                       point.z - cargoCenter.z}, travel));
+            }
+    }
+    const float courseEdgeDistance = (westEdge - cargoCenter.x) / travel.x;
+    const float endDistance = courseEdgeDistance + 1.06f / travel.x;
+    const float gradeStartDistance = deckEdgeDistance + 0.05f;
+    if (!std::isfinite(deckEdgeDistance) ||
+        gradeStartDistance >= courseEdgeDistance ||
+        endDistance >= glm::distance(glm::vec2{cargoCenter.x, cargoCenter.z},
+                                     glm::vec2{target.position.x, target.position.z}) - 0.2f)
+        throw std::runtime_error("Placement skid cannot clear the parked sledge and course");
+    const glm::vec3 start{cargoCenter.x,
+                          cargoCenter.y - 0.5f * cargoScale.y,
+                          cargoCenter.z};
+    const glm::vec3 flatEnd = start +
+        glm::vec3{travel.x * gradeStartDistance, 0.0f,
+                  travel.y * gradeStartDistance};
+    const float edgeT = (courseEdgeDistance - gradeStartDistance) /
+        (endDistance - gradeStartDistance);
+    const glm::vec3 courseEdge{westEdge,
+        glm::mix(start.y, courseTop, edgeT),
+        cargoCenter.z + travel.y * courseEdgeDistance};
+    const glm::vec3 end{cargoCenter.x + travel.x * endDistance,
+                        courseTop, cargoCenter.z + travel.y * endDistance};
+    return {start, flatEnd, courseEdge, end, courseTop};
+}
+
+float MonumentalSite::placementSupportHeight(
+    const PlacementSkid& skid, glm::vec2 blockCenter,
+    float halfExtentAlongRoute)
+{
+    const glm::vec2 start{skid.start.x, skid.start.z};
+    const glm::vec2 end{skid.end.x, skid.end.z};
+    const glm::vec2 direction = glm::normalize(end - start);
+    const float railLength = glm::distance(start, end);
+    const float flatLength = glm::distance(start,
+        glm::vec2{skid.gradeStart.x, skid.gradeStart.z});
+    const float centerDistance = glm::dot(blockCenter - start, direction);
+    // The rear of the rigid block stays on the higher rail until it clears
+    // that point. Then the occupied course carries the whole footprint.
+    if (centerDistance - halfExtentAlongRoute >= railLength)
+        return skid.courseTop;
+    const float rearContact = std::clamp(
+        centerDistance - halfExtentAlongRoute, 0.0f, railLength);
+    if (rearContact <= flatLength) return skid.start.y;
+    return glm::mix(skid.start.y, skid.end.y,
+                    (rearContact - flatLength) / (railLength - flatLength));
 }
 
 float MonumentalSite::occupiedCourseTopUnder(glm::vec2 point, float margin)

@@ -93,6 +93,20 @@ struct UpperSupportFooting
     bool valid = false;
 };
 
+struct PyramidBlockPlacement;
+
+struct PlacementSkid
+{
+    glm::vec3 start{0.0f}; // Visible rail top below the parked cargo.
+    glm::vec3 gradeStart{0.0f}; // Remains level until clear of the sledge deck.
+    glm::vec3 courseEdge{0.0f}; // West edge of the occupied supporting course.
+    glm::vec3 end{0.0f};   // Tapers onto the occupied course top.
+    float courseTop = 0.0f;
+    float railSpacing = 1.45f;
+    float railWidth = 0.22f;
+    float railThickness = 0.12f;
+};
+
 struct SiteZoneDescriptor
 {
     const char* id;
@@ -116,6 +130,13 @@ public:
     static const RampDescriptor& upperRampA();
     static const RampDescriptor& upperRampB();
     static const RampDescriptor& targetLevelLanding();
+    static PlacementSkid placementSkid(const glm::vec3& cargoCenter,
+                                       const glm::vec3& cargoScale,
+                                       const PyramidBlockPlacement& target,
+                                       const glm::mat4& parkedSledgeRoot);
+    static float placementSupportHeight(const PlacementSkid& skid,
+                                        glm::vec2 blockCenter,
+                                        float halfExtentAlongRoute);
     static float occupiedCourseTopUnder(glm::vec2 point, float margin);
     static UpperSupportFooting upperSupportFooting(glm::vec2 preferred,
                                                    float undersideY);
