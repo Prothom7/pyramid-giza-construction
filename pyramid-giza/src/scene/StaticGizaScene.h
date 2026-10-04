@@ -339,6 +339,7 @@ private:
     ShadowMap shadowMap_;
     ShadowSettings shadowSettings_;
     Mesh plane_;
+    Mesh nileSurface_;
     Mesh cube_;
     Mesh cylinder_;
     Mesh sphere_;

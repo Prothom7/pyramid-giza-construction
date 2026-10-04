@@ -8,6 +8,8 @@
 
 #include "scene/SceneTypes.h"
 
+struct MeshData;
+
 struct QuarryConfig
 {
     glm::vec3 center{-128.0f, 0.0f, -15.0f};
@@ -65,9 +67,29 @@ struct EnvironmentalContext
 {
     glm::vec3 nileCenter{0.0f, 0.03f, -166.0f};
     glm::vec2 nileSize{330.0f, 26.0f};
-    glm::vec3 floodplainCenter{0.0f, 0.02f, -143.0f};
+    float nileEndTaperLength = 25.0f;
+    float nileTerminalWidth = 0.6f;
     glm::vec2 floodplainSize{340.0f, 20.0f};
+    float floodplainY = 0.02f;
     glm::vec3 sphinxCenter{92.0f, 0.0f, -105.0f};
+};
+
+// Derived from EnvironmentalContext; there is no second authored water level
+// or footprint. The rendered strip and bounded queries use these same banks.
+struct NileSurfaceBounds
+{
+    float minX;
+    float maxX;
+    float minZ;
+    float maxZ;
+    float waterY;
+    float endTaperLength;
+    float terminalWidth;
+
+    bool contains(float x, float z) const;
+    float northBankAt(float x) const;
+    float southBankAt(float x) const;
+    float signedBankDistance(float x, float z) const;
 };
 
 class IndustrialLandscape
@@ -80,6 +102,12 @@ public:
     static const std::vector<LogisticsStageDescriptor>& logisticsStages();
     static const HeavyLiftingRigDescriptor& liftingRig();
     static const EnvironmentalContext& environment();
+    static NileSurfaceBounds nileSurface();
+    static glm::mat4 nileSurfaceModel();
+    static MeshData nileSurfaceMesh();
+    static glm::mat4 floodplainModel();
+    static bool isInsideNile(float x, float z);
+    static bool waterHeightAt(float x, float z, float& height);
     static const std::vector<glm::vec3>& treePositions();
     static std::size_t repositoryBlockCount(const RepositoryDescriptor& repository);
 };

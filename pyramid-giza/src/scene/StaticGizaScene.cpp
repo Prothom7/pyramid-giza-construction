@@ -41,6 +41,7 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
       instancedDepthShader_("shaders/shadow_depth_instanced.vert",
                             "shaders/shadow_depth.frag"),
       plane_(PrimitiveGenerator::createPlane()),
+      nileSurface_(IndustrialLandscape::nileSurfaceMesh()),
       cube_(PrimitiveGenerator::createCube()),
       cylinder_(PrimitiveGenerator::createCylinder()),
       sphere_(PrimitiveGenerator::createSphere()),
@@ -1083,14 +1084,11 @@ void StaticGizaScene::buildTimberAndCamp()
 void StaticGizaScene::buildNileAndContext()
 {
     const std::size_t start = objects_.size();
-    const EnvironmentalContext& context = IndustrialLandscape::environment();
-    addObject(ScenePrimitive::Plane,
-              makeTransform(context.nileCenter, {},
-                            {context.nileSize.x, 1.0f, context.nileSize.y}),
+    addObject(ScenePrimitive::NileSurface,
+              IndustrialLandscape::nileSurfaceModel(),
               MaterialId::Water);
     addObject(ScenePrimitive::Plane,
-              makeTransform(context.floodplainCenter, {},
-                            {context.floodplainSize.x, 1.0f, context.floodplainSize.y}),
+              IndustrialLandscape::floodplainModel(),
               MaterialId::Floodplain);
 
     const std::vector<glm::vec3>& trees = IndustrialLandscape::treePositions();
@@ -2359,6 +2357,8 @@ const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
     {
     case ScenePrimitive::Plane:
         return plane_;
+    case ScenePrimitive::NileSurface:
+        return nileSurface_;
     case ScenePrimitive::Cylinder:
         return cylinder_;
     case ScenePrimitive::Sphere:
@@ -2438,6 +2438,7 @@ float StaticGizaScene::primitiveLocalRadius(ScenePrimitive primitive) const
     {
     case ScenePrimitive::Sphere: return 0.5f;
     case ScenePrimitive::Plane:
+    case ScenePrimitive::NileSurface:
     case ScenePrimitive::Cylinder: return 0.7071068f;
     case ScenePrimitive::Cube:
     default: return 0.8660254f;

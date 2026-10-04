@@ -1,10 +1,13 @@
 #include "scene/IndustrialLandscape.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <ostream>
 
 #include "objects/Scaffold.h"
+#include "graphics/Mesh.h"
 #include "objects/Sledge.h"
 #include "objects/Worker.h"
 #include "scene/MonumentalSite.h"
@@ -92,6 +95,137 @@ const EnvironmentalContext& IndustrialLandscape::environment()
 {
     static const EnvironmentalContext value;
     return value;
+}
+
+bool NileSurfaceBounds::contains(float x, float z) const
+{
+    return std::isfinite(x) && std::isfinite(z) &&
+           x >= minX && x <= maxX &&
+           z >= southBankAt(x) && z <= northBankAt(x);
+}
+
+namespace
+{
+// Linear control stations are shared by the indexed strip and all queries.
+// They retain the full 26 m channel through the center and round it down to a
+// 0.6 m terminal edge over the last 25 m at either end.
+constexpr std::array<float, 6> endWidthFractions{
+    0.0f, 0.17f, 0.43f, 0.70f, 0.91f, 1.0f};
+}
+
+float NileSurfaceBounds::northBankAt(float x) const
+{
+    const float endDistance = std::clamp(std::min(x - minX, maxX - x),
+                                         0.0f, endTaperLength);
+    const float station = endDistance * 5.0f / endTaperLength;
+    const int index = std::min(static_cast<int>(station), 4);
+    const float fraction = endWidthFractions[index] +
+        (endWidthFractions[index + 1] - endWidthFractions[index]) *
+        (station - static_cast<float>(index));
+    const float width = terminalWidth +
+        ((maxZ - minZ) - terminalWidth) * fraction;
+    return 0.5f * (minZ + maxZ) + 0.5f * width;
+}
+
+float NileSurfaceBounds::southBankAt(float x) const
+{
+    return minZ + maxZ - northBankAt(x);
+}
+
+float NileSurfaceBounds::signedBankDistance(float x, float z) const
+{
+    const float clampedX = std::clamp(x, minX, maxX);
+    const float north = northBankAt(clampedX);
+    const float south = southBankAt(clampedX);
+    const float outsideX = std::max({minX - x, x - maxX, 0.0f});
+    const float outsideZ = std::max({south - z, z - north, 0.0f});
+    if (outsideX > 0.0f || outsideZ > 0.0f)
+        return -glm::length(glm::vec2{outsideX, outsideZ});
+    return std::min({x - minX, maxX - x, z - south, north - z});
+}
+
+NileSurfaceBounds IndustrialLandscape::nileSurface()
+{
+    const EnvironmentalContext& context = environment();
+    const glm::vec2 halfSize = context.nileSize * 0.5f;
+    return {context.nileCenter.x - halfSize.x,
+            context.nileCenter.x + halfSize.x,
+            context.nileCenter.z - halfSize.y,
+            context.nileCenter.z + halfSize.y,
+            context.nileCenter.y,
+            context.nileEndTaperLength,
+            context.nileTerminalWidth};
+}
+
+glm::mat4 IndustrialLandscape::nileSurfaceModel()
+{
+    const NileSurfaceBounds surface = nileSurface();
+    return makeTransform({0.5f * (surface.minX + surface.maxX), surface.waterY,
+                          0.5f * (surface.minZ + surface.maxZ)}, {},
+                         {surface.maxX - surface.minX, 1.0f,
+                          surface.maxZ - surface.minZ});
+}
+
+MeshData IndustrialLandscape::nileSurfaceMesh()
+{
+    const NileSurfaceBounds surface = nileSurface();
+    const float centerX = 0.5f * (surface.minX + surface.maxX);
+    const float centerZ = 0.5f * (surface.minZ + surface.maxZ);
+    const float width = surface.maxX - surface.minX;
+    const float length = surface.maxZ - surface.minZ;
+    MeshData mesh{"NileSurface"};
+    std::array<float, 12> columns{};
+    for (int station = 0; station <= 5; ++station)
+    {
+        const float offset = surface.endTaperLength *
+                             static_cast<float>(station) / 5.0f;
+        columns[station] = surface.minX + offset;
+        columns[11 - station] = surface.maxX - offset;
+    }
+    for (float x : columns)
+    {
+        for (float z : {surface.southBankAt(x), surface.northBankAt(x)})
+            mesh.vertices.push_back({
+                {(x - centerX) / width, 0.0f, (z - centerZ) / length},
+                {0.0f, 1.0f, 0.0f},
+                {(x - surface.minX) / width, (z - surface.minZ) / length}});
+    }
+    for (std::uint32_t station = 0; station + 1 < columns.size(); ++station)
+    {
+        const std::uint32_t south = 2 * station;
+        const std::uint32_t north = south + 1;
+        const std::uint32_t nextSouth = south + 2;
+        const std::uint32_t nextNorth = south + 3;
+        // +Z then +X is counter-clockwise when viewed from above (+Y).
+        mesh.indices.insert(mesh.indices.end(),
+                            {south, north, nextSouth,
+                             north, nextNorth, nextSouth});
+    }
+    return mesh;
+}
+
+glm::mat4 IndustrialLandscape::floodplainModel()
+{
+    const EnvironmentalContext& context = environment();
+    const NileSurfaceBounds surface = nileSurface();
+    return makeTransform({context.nileCenter.x, context.floodplainY,
+                          surface.maxZ + 0.5f * context.floodplainSize.y}, {},
+                         {context.floodplainSize.x, 1.0f,
+                          context.floodplainSize.y});
+}
+
+bool IndustrialLandscape::isInsideNile(float x, float z)
+{
+    return nileSurface().contains(x, z);
+}
+
+bool IndustrialLandscape::waterHeightAt(float x, float z, float& height)
+{
+    const NileSurfaceBounds surface = nileSurface();
+    if (!surface.contains(x, z))
+        return false;
+    height = surface.waterY;
+    return true;
 }
 
 const std::vector<glm::vec3>& IndustrialLandscape::treePositions()

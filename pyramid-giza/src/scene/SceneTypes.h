@@ -9,7 +9,8 @@ enum class ScenePrimitive
     Plane,
     Cube,
     Cylinder,
-    Sphere
+    Sphere,
+    NileSurface
 };
 
 enum class MaterialId

@@ -60,8 +60,13 @@ float mobilityAt(const glm::vec2& point)
         roundedBoxMask(point, {0.0f, -42.0f}, {68.0f, 70.0f}, 20.0f));
     protection = std::max(protection,
         roundedBoxMask(point, {-128.0f, -15.0f}, {35.0f, 37.0f}, 10.0f));
+    const NileSurfaceBounds nile = IndustrialLandscape::nileSurface();
     protection = std::max(protection,
-        roundedBoxMask(point, {0.0f, -157.0f}, {185.0f, 32.0f}, 10.0f));
+        roundedBoxMask(point,
+                       {0.5f * (nile.minX + nile.maxX),
+                        0.5f * (nile.minZ + nile.maxZ) + 9.0f},
+                       {0.5f * (nile.maxX - nile.minX) + 20.0f,
+                        0.5f * (nile.maxZ - nile.minZ) + 19.0f}, 10.0f));
     for (const RampDescriptor& ramp : MonumentalSite::ramps())
         protection = std::max(protection,
             capsuleMask(point, {ramp.base.x, ramp.base.z}, {ramp.top.x, ramp.top.z},
@@ -117,17 +122,36 @@ float baseSurfaceFormula(float worldX, float worldZ)
                         roundedBoxMask(point, {-55.0f, 25.0f}, {48.0f, 28.0f}, 14.0f));
     flatMask = std::max(flatMask,
                         roundedBoxMask(point, {92.0f, -105.0f}, {24.0f, 20.0f}, 16.0f));
+    const EnvironmentalContext& context = IndustrialLandscape::environment();
+    const NileSurfaceBounds nile = IndustrialLandscape::nileSurface();
     flatMask = std::max(flatMask,
-                        roundedBoxMask(point, {0.0f, -143.0f}, {175.0f, 14.0f}, 10.0f));
+                        roundedBoxMask(point,
+                                       {context.nileCenter.x,
+                                        nile.maxZ + 0.5f * context.floodplainSize.y},
+                                       0.5f * context.floodplainSize + glm::vec2{5.0f, 4.0f},
+                                       10.0f));
     height = glm::mix(height, 0.0f, flatMask);
 
     const float quarryMask =
         roundedBoxMask(point, {-128.0f, -15.0f}, {21.0f, 17.0f}, 20.0f);
     height = glm::mix(height, -7.50f, quarryMask);
 
-    const float nileMask =
-        roundedBoxMask(point, {0.0f, -166.0f}, {180.0f, 13.0f}, 7.0f);
-    return glm::mix(height, -0.35f, nileMask);
+    // The channel is deep in its interior and shoals to a shallow lip at the
+    // exact water-plane edges. Beyond the plane, the same bank blends back
+    // into the surrounding graded terrain. No dry, deep channel extends past
+    // either river end.
+    constexpr float bankWidth = 6.0f;
+    constexpr float outerBankWidth = 8.0f;
+    constexpr float channelBedY = -0.35f;
+    const float bankLipY = nile.waterY - 0.055f;
+    const float bankDistance = nile.signedBankDistance(worldX, worldZ);
+    if (bankDistance >= 0.0f)
+    {
+        return glm::mix(bankLipY, channelBedY,
+                        smoothStep(0.0f, bankWidth, bankDistance));
+    }
+    return glm::mix(bankLipY, height,
+                    smoothStep(0.0f, outerBankWidth, -bankDistance));
 }
 
 float triangleInterpolate(float topLeft, float topRight, float bottomLeft,

@@ -24,7 +24,6 @@ struct SimulatedBoatState
 class WaterSimulation
 {
 public:
-    static constexpr float BaseWaterLevel = 0.03f;
     static constexpr float DominantFlowSpeed = 0.85f; // meters / second
 
     WaterSimulation();

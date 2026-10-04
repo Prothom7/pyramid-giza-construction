@@ -73,6 +73,7 @@ const char* primitiveName(ScenePrimitive primitive)
     case ScenePrimitive::Cube: return "Cube";
     case ScenePrimitive::Cylinder: return "Cylinder";
     case ScenePrimitive::Sphere: return "Sphere";
+    case ScenePrimitive::NileSurface: return "NileSurface";
     default: throw std::out_of_range("Unknown scene primitive");
     }
 }
