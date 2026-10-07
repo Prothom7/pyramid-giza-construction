@@ -27,12 +27,6 @@
 namespace
 {
 constexpr std::size_t heroWorkerCount = static_cast<std::size_t>(WorkerRole::Count);
-
-glm::vec3 rampSide(const RampDescriptor& ramp)
-{
-    const glm::vec3 direction = glm::normalize(ramp.top - ramp.base);
-    return glm::normalize(glm::cross(glm::vec3{0.0f, 1.0f, 0.0f}, direction));
-}
 } // namespace
 
 StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapacity)
@@ -337,30 +331,14 @@ void StaticGizaScene::buildPyramidInstanceBatches()
 
 void StaticGizaScene::buildTransportLanes()
 {
-    // A broad deterministic road follows the full quarry-to-loading material flow.
-    const RampDescriptor quarryRoad{
-        "QuarryHaulRoad", {-91.0f, 0.04f, 9.0f}, {-10.0f, 0.04f, 42.0f},
-        8.0f, 0.08f, MaterialId::RampEarth, false};
+    // The old straight QuarryHaulRoad crossed all three stone depots. The
+    // physical haul route and its sand tracks own quarry-to-pyramid travel;
+    // this short lane only connects the loading station to pyramid staging.
     const RampDescriptor loadingRoad{
         "LoadingToRamp", {-10.0f, 0.045f, 42.0f}, {0.0f, 0.045f, 45.0f},
         8.0f, 0.09f, MaterialId::RampEarth, false};
-    addObject(ScenePrimitive::Cube, MonumentalSite::rampModel(quarryRoad),
-              MaterialId::RampEarth);
     addObject(ScenePrimitive::Cube, MonumentalSite::rampModel(loadingRoad),
               MaterialId::RampEarth);
-
-    const glm::vec3 side = rampSide(quarryRoad);
-    for (int marker = 0; marker <= 9; ++marker)
-    {
-        const float t = static_cast<float>(marker) / 9.0f;
-        const glm::vec3 center = glm::mix(quarryRoad.base, quarryRoad.top, t);
-        for (float sign : {-1.0f, 1.0f})
-            addObject(ScenePrimitive::Cylinder,
-                      makeTransform(center + side * sign * 4.6f +
-                                        glm::vec3{0.0f, 1.25f, 0.0f},
-                                    {}, {0.18f, 2.5f, 0.18f}),
-                      MaterialId::Wood);
-    }
 }
 
 void StaticGizaScene::buildRampNetwork()
@@ -811,8 +789,9 @@ void StaticGizaScene::buildQuarryAndCutting()
             const float x = -151.0f + group * 13.0f + (rock % 5) * 1.65f;
             const float z = 2.0f + (rock / 5) * 1.8f;
             const float size = 0.65f + 0.12f * static_cast<float>((rock + group) % 4);
+            const float ground = sand_.terrainHeightAt(x, z);
             addObject(ScenePrimitive::Cube,
-                      makeTransform({x, -6.95f + size * 0.5f, z},
+                      makeTransform({x, ground + size * 0.5f, z},
                                     {0.0f, static_cast<float>(rock * 17), 0.0f},
                                     {size * 1.3f, size, size}),
                       MaterialId::QuarryStone);
@@ -929,25 +908,34 @@ void StaticGizaScene::buildStockpiles()
 {
     const std::size_t start = objects_.size();
     std::size_t repositoryBlocks = 0;
-    for (const RepositoryDescriptor& repository : IndustrialLandscape::repositories())
+    const auto& repositories = IndustrialLandscape::repositories();
+    for (std::size_t repositoryIndex = 0; repositoryIndex < repositories.size();
+         ++repositoryIndex)
     {
+        const RepositoryDescriptor& repository = repositories[repositoryIndex];
         const float stepX = repository.blockScale.x + repository.spacing;
         const float stepZ = repository.blockScale.z + repository.spacing;
         for (unsigned int level = 0; level < repository.levels; ++level)
             for (unsigned int row = 0; row < repository.rows; ++row)
                 for (unsigned int column = 0; column < repository.columns; ++column)
                 {
+                    const int seed = static_cast<int>(repositoryIndex * 43u +
+                        row * 17u + column * 31u);
+                    const float rowStagger = (row % 2 == 0 ? -0.20f : 0.20f);
                     const float x = repository.center.x +
                         (static_cast<float>(column) -
-                         0.5f * static_cast<float>(repository.columns - 1)) * stepX;
+                         0.5f * static_cast<float>(repository.columns - 1)) * stepX +
+                        rowStagger +
+                        0.018f * static_cast<float>((seed * 7) % 9 - 4);
                     const float z = repository.center.z +
                         (static_cast<float>(row) -
-                         0.5f * static_cast<float>(repository.rows - 1)) * stepZ;
-                    const float yaw = std::string(repository.id) == "RoughDepot"
-                                          ? static_cast<float>((row * 13 + column * 7) % 17) - 8.0f
-                                          : 0.0f;
+                         0.5f * static_cast<float>(repository.rows - 1)) * stepZ +
+                        0.018f * static_cast<float>((seed * 11 + 3) % 9 - 4);
+                    const float yaw = 0.45f * static_cast<float>(
+                        (seed * 13 + 5) % 17 - 8);
+                    const float ground = sand_.terrainHeightAt(x, z);
                     addObject(ScenePrimitive::Cube,
-                              makeTransform({x, repository.center.y +
+                              makeTransform({x, ground +
                                                    repository.blockScale.y *
                                                        (0.5f + static_cast<float>(level)), z},
                                             {0.0f, yaw, 0.0f}, repository.blockScale),
@@ -982,10 +970,14 @@ void StaticGizaScene::buildStockpiles()
                                     {0.20f, 2.9f, 0.20f}),
                       MaterialId::Wood);
     for (int waiting = 0; waiting < 4; ++waiting)
+    {
+        const float x = -18.0f + waiting * 3.0f;
+        const float z = 48.5f;
         addObject(ScenePrimitive::Cube,
-                  makeTransform({-18.0f + waiting * 3.0f, 0.92f, 48.5f}, {},
+                  makeTransform({x, sand_.terrainHeightAt(x, z) + 0.675f, z}, {},
                                 {2.55f, 1.35f, 2.35f}),
                   MaterialId::PreparedStone);
+    }
     addObject(ScenePrimitive::Cylinder,
               makeTransform({-15.2f, 1.05f, 39.2f}, {0.0f, 0.0f, 68.0f},
                             {0.16f, 4.8f, 0.16f}),
@@ -1097,23 +1089,33 @@ void StaticGizaScene::buildNileAndContext()
     const std::vector<glm::vec3>& trees = IndustrialLandscape::treePositions();
     for (std::size_t index = 0; index < trees.size(); ++index)
     {
-        const float height = 4.6f + 0.35f * static_cast<float>(index % 4);
+        const float height = 4.45f + 0.24f * static_cast<float>(index % 5);
+        const float leanX = 0.10f * static_cast<float>(static_cast<int>(index * 7 % 5) - 2);
+        const float leanZ = 0.09f * static_cast<float>(static_cast<int>(index * 11 % 5) - 2);
+        const glm::vec3 crown = trees[index] + glm::vec3{leanX, height, leanZ};
         addObject(ScenePrimitive::Cylinder,
-                  makeTransform(trees[index] + glm::vec3{0.0f, height * 0.5f, 0.0f}, {},
-                                {0.34f, height, 0.34f}),
+                  ConstructionAnimationController::cylinderBetween(
+                      trees[index], crown, 0.34f),
                   MaterialId::Wood);
-        for (int leaf = 0; leaf < 5; ++leaf)
+        const int frondCount = (index % 3 == 0) ? 6 : 5;
+        const float crownYaw = static_cast<float>((index * 37) % 47) - 23.0f;
+        for (int leaf = 0; leaf < frondCount; ++leaf)
         {
+            const float yaw = crownYaw + 360.0f * leaf / frondCount +
+                static_cast<float>((index + leaf * 3) % 7) - 3.0f;
+            const float droop = 11.0f + 1.8f * static_cast<float>((index + leaf) % 5);
+            const float length = 3.55f + 0.17f * static_cast<float>((index * 3 + leaf) % 5);
             const glm::mat4 leafModel =
-                makeTransform(trees[index] + glm::vec3{0.0f, height + 0.15f, 0.0f},
-                              {-12.0f, static_cast<float>(leaf) * 72.0f, 16.0f},
-                              {0.48f, 0.16f, 4.0f});
+                makeTransform(crown + glm::vec3{0.0f, 0.15f, 0.0f},
+                              {-12.0f, yaw, droop},
+                              {0.44f + 0.025f * static_cast<float>((index + leaf) % 4),
+                               0.16f, length});
             const std::size_t objectIndex = objects_.size();
             addObject(ScenePrimitive::Cube,
                       leafModel,
                       MaterialId::Foliage);
             treeMotionParts_.push_back({objectIndex, index, leafModel,
-                                        trees[index] + glm::vec3{0.0f, height, 0.0f}});
+                                        crown});
         }
     }
     stats_.treeInstances = trees.size();
