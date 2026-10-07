@@ -1898,6 +1898,7 @@ void StaticGizaScene::update(float deltaTime)
     if (sand_.revision() != previousSandRevision)
         sandMesh_.updateVertices(sand_.generateTerrainMesh().vertices);
     water_.update(deltaTime);
+    clouds_.update(deltaTime);
     nileSurface_.updateVertices(water_.surfaceVertices());
     if (deltaTime > 1.0e-5f)
         currentFps_ = 0.9f * currentFps_ + 0.1f * (1.0f / deltaTime);
@@ -2137,6 +2138,7 @@ void StaticGizaScene::seekPresentationEnvironment(float elapsedTime)
 {
     if (!std::isfinite(elapsedTime))
         return;
+    clouds_.seek(elapsedTime);
     environmentTime_ = std::fmod(std::max(0.0f, elapsedTime), 400.0f);
     // The quarry shots begin at five seconds. Seeking the presentation must
     // therefore also seek this independent cycle rather than accumulating
@@ -2158,6 +2160,7 @@ void StaticGizaScene::cycleDemoPose()
 
 void StaticGizaScene::resetAnimation()
 {
+    clouds_.reset();
     animationController_.reset();
     quarryPulleyController_.reset();
     quarry_.reset();
@@ -2828,6 +2831,13 @@ void StaticGizaScene::collectFrameObjects()
     simulation_.collectSceneObjects(frameObjects_);
     logistics_.collectSceneObjects(frameObjects_);
     water_.collectSceneObjects(frameObjects_);
+}
+
+void StaticGizaScene::renderClouds(const glm::mat4& view,
+                                   const glm::mat4& projection,
+                                   const glm::vec3& cameraPosition) const
+{
+    clouds_.render(sunController_.state(), view, projection, cameraPosition);
 }
 
 void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,

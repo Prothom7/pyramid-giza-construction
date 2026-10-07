@@ -22,6 +22,7 @@
 #include "graphics/Frustum.h"
 #include "graphics/InstanceBatch.h"
 #include "graphics/SkyBackground.h"
+#include "graphics/CloudLayer.h"
 #include "graphics/Texture.h"
 #include "lighting/ShadowMap.h"
 #include "lighting/SunController.h"
@@ -657,6 +658,7 @@ int main(int argc, char** argv)
     bool inputValidationOnly = false;
     bool hudValidationOnly = false;
     bool skyValidationOnly = false;
+    bool cloudValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -712,6 +714,8 @@ int main(int argc, char** argv)
             lightingValidationOnly = true;
         else if (option == "--validate-sky")
             skyValidationOnly = true;
+        else if (option == "--validate-clouds")
+            cloudValidationOnly = true;
         else if (option == "--validate-shadows")
             shadowValidationOnly = true;
         else if (option == "--validate-construction")
@@ -1076,6 +1080,8 @@ int main(int argc, char** argv)
         return validatePhase7Lighting(std::cout) ? 0 : 1;
     if (skyValidationOnly)
         return validateSkyBackground(std::cout) ? 0 : 1;
+    if (cloudValidationOnly)
+        return validateCloudLayer(std::cout) ? 0 : 1;
     if (shadowValidationOnly)
         return validatePhase8Shadows(std::cout) ? 0 : 1;
     if (constructionValidationOnly)
@@ -1433,6 +1439,11 @@ int main(int argc, char** argv)
             const Camera& activeCamera = state.cameraController.camera();
             const glm::mat4 view = activeCamera.GetViewMatrix();
             sky.render(scene.sunState(), view, projection);
+            const glm::mat4 cloudProjection = glm::perspective(
+                glm::radians(state.cameraController.fovDegrees()),
+                static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight),
+                CameraController::nearPlane, 2200.0f);
+            scene.renderClouds(view, cloudProjection, activeCamera.Position);
             scene.setInteriorInspectionActive(
                 state.cameraController.mode() == CameraMode::InteriorWalk);
             scene.render(view, projection, activeCamera.Position,

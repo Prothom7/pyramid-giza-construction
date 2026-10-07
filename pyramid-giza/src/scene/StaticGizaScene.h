@@ -14,6 +14,7 @@
 #include "animation/QuarryPulleyAnimation.h"
 #include "effects/ParticleSystem.h"
 #include "graphics/Frustum.h"
+#include "graphics/CloudLayer.h"
 #include "graphics/InstanceBatch.h"
 #include "graphics/Mesh.h"
 #include "graphics/Texture.h"
@@ -108,6 +109,8 @@ public:
     void render(const glm::mat4& view, const glm::mat4& projection,
                 const glm::vec3& cameraPosition,
                 int viewportWidth, int viewportHeight);
+    void renderClouds(const glm::mat4& view, const glm::mat4& projection,
+                      const glm::vec3& cameraPosition) const;
     void update(float deltaTime);
     void togglePlayback();
     void toggleCoordinatedAnimation();
@@ -380,6 +383,7 @@ private:
     QuarryPulleyAnimationController quarryPulleyController_;
     ConstructionTimelineController constructionTimeline_;
     SunController sunController_;
+    CloudLayer clouds_;
     WorkerPose demoPose_ = WorkerPose::Standing;
     float articulationTime_ = 0.0f;
     float articulationSpeed_ = 1.0f;
