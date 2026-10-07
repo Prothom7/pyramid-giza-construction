@@ -32,6 +32,7 @@ add_executable(PyramidGiza
     src/graphics/GeometryValidation.cpp
     src/graphics/Texture.cpp
     src/graphics/Frustum.cpp
+    src/graphics/SkyBackground.cpp
     src/graphics/InstanceBatch.cpp
     src/effects/ParticleSystem.cpp
     src/presentation/ShowcaseController.cpp
@@ -146,3 +147,4 @@ add_test(NAME Phase13BoatWakeValidation COMMAND PyramidGiza --validate-boat-wake
 add_test(NAME Phase13SphinxValidation COMMAND PyramidGiza --validate-sphinx)
 add_test(NAME Phase13InputValidation COMMAND PyramidGiza --validate-input)
 add_test(NAME Phase13SimulationHUDValidation COMMAND PyramidGiza --validate-simulation-hud)
+add_test(NAME Phase13SkyBackgroundValidation COMMAND PyramidGiza --validate-sky)

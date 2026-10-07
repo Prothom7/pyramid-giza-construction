@@ -21,6 +21,7 @@
 #include "graphics/GeometryValidation.h"
 #include "graphics/Frustum.h"
 #include "graphics/InstanceBatch.h"
+#include "graphics/SkyBackground.h"
 #include "graphics/Texture.h"
 #include "lighting/ShadowMap.h"
 #include "lighting/SunController.h"
@@ -655,6 +656,7 @@ int main(int argc, char** argv)
     bool sphinxValidationOnly = false;
     bool inputValidationOnly = false;
     bool hudValidationOnly = false;
+    bool skyValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
     bool renderStatsRequested = false;
@@ -708,6 +710,8 @@ int main(int argc, char** argv)
             enrichmentValidationOnly = true;
         else if (option == "--validate-lighting")
             lightingValidationOnly = true;
+        else if (option == "--validate-sky")
+            skyValidationOnly = true;
         else if (option == "--validate-shadows")
             shadowValidationOnly = true;
         else if (option == "--validate-construction")
@@ -1070,6 +1074,8 @@ int main(int argc, char** argv)
         return validateObjectEnrichment(std::cout) ? 0 : 1;
     if (lightingValidationOnly)
         return validatePhase7Lighting(std::cout) ? 0 : 1;
+    if (skyValidationOnly)
+        return validateSkyBackground(std::cout) ? 0 : 1;
     if (shadowValidationOnly)
         return validatePhase8Shadows(std::cout) ? 0 : 1;
     if (constructionValidationOnly)
@@ -1285,6 +1291,7 @@ int main(int argc, char** argv)
     try
     {
         StaticGizaScene scene(shadowResolution, particleCapacity);
+        SkyBackground sky;
         state.scene = &scene;
         if (initialAnimationTime > 0.0f)
         {
@@ -1424,9 +1431,11 @@ int main(int argc, char** argv)
                 static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight),
                 CameraController::nearPlane, CameraController::farPlane);
             const Camera& activeCamera = state.cameraController.camera();
+            const glm::mat4 view = activeCamera.GetViewMatrix();
+            sky.render(scene.sunState(), view, projection);
             scene.setInteriorInspectionActive(
                 state.cameraController.mode() == CameraMode::InteriorWalk);
-            scene.render(activeCamera.GetViewMatrix(), projection, activeCamera.Position,
+            scene.render(view, projection, activeCamera.Position,
                          framebufferWidth, framebufferHeight);
 
             ++renderedFrames;
