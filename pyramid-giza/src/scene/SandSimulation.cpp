@@ -9,6 +9,7 @@
 #include "scene/MonumentalSite.h"
 #include "scene/SupportSystem.h"
 #include "scene/IndustrialLandscape.h"
+#include "scene/SphinxMonument.h"
 
 
 
@@ -187,8 +188,8 @@ void SandSimulation::initGrid()
             const bool inPyramid = std::abs(wPos.x) < 54.0f && std::abs(wPos.y - (-42.0f)) < 54.0f;
             // Quarry hole (-128, -15, size 64x72)
             const bool inQuarry = std::abs(wPos.x - (-128.0f)) < 32.0f && std::abs(wPos.y - (-15.0f)) < 36.0f;
-            // Sphinx area (92, -105, radius 18)
-            const bool nearSphinx = glm::distance(wPos, glm::vec2{92.0f, -105.0f}) < 18.0f;
+            const bool nearSphinx = SphinxMonument::containsStructuralFootprint(
+                wPos.x, wPos.y, 1.5f);
 
             cell.isObstacle = inPyramid || inQuarry || nearSphinx;
 

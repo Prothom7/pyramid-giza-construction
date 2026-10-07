@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 
 #include "scene/SceneTypes.h"
+#include "graphics/Mesh.h"
 
 struct SphinxBounds
 {
@@ -22,6 +23,13 @@ class SphinxMonument
 {
 public:
     static constexpr glm::vec3 DefaultCenter{92.0f, 0.0f, -105.0f};
+    static constexpr float StructuralHalfWidth = 7.25f;
+    static constexpr float StructuralFront = -20.0f;
+    static constexpr float StructuralRear = 24.0f;
+    static constexpr float StructuralHeight = 12.65f;
+
+    static bool containsStructuralFootprint(float x, float z, float margin = 0.0f);
+    static MeshData createFormMesh();
 
     SphinxMonument(const glm::vec3& center = DefaultCenter);
 

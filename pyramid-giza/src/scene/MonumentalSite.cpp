@@ -13,6 +13,7 @@
 #include "objects/Sledge.h"
 #include "scene/PyramidLayout.h"
 #include "scene/PyramidInterior.h"
+#include "scene/SphinxMonument.h"
 
 namespace
 {
@@ -365,7 +366,10 @@ const std::vector<SiteZoneDescriptor>& MonumentalSite::zones()
         {"TimberYard", {48.0f, 2.0f, 7.0f}, {13.0f, 4.0f, 14.0f}, "Wood and scaffold storage"},
         {"WorkCamp", {51.0f, 2.5f, -25.0f}, {14.0f, 5.0f, 12.0f}, "Shelter and tools"},
         {"NileContext", {0.0f, 0.0f, -155.0f}, {170.0f, 1.0f, 24.0f}, "Water and floodplain"},
-        {"SphinxContext", {92.0f, 2.0f, -105.0f}, {16.0f, 5.0f, 12.0f}, "Secondary Giza landmark"}
+        {"SphinxContext", SphinxMonument::DefaultCenter +
+             glm::vec3{0.0f, 6.325f, 2.0f},
+             {SphinxMonument::StructuralHalfWidth, 6.325f, 22.0f},
+             "Secondary Giza landmark"}
     };
     return values;
 }

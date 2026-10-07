@@ -10,6 +10,7 @@ enum class ScenePrimitive
     Cube,
     Cylinder,
     Sphere,
+    SphinxForm,
     NileSurface
 };
 

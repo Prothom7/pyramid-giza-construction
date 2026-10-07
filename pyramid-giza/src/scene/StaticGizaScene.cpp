@@ -46,6 +46,7 @@ StaticGizaScene::StaticGizaScene(int shadowResolution, std::size_t particleCapac
       cube_(PrimitiveGenerator::createCube()),
       cylinder_(PrimitiveGenerator::createCylinder()),
       sphere_(PrimitiveGenerator::createSphere()),
+      sphinxForm_(SphinxMonument::createFormMesh()),
       particles_(particleCapacity)
 {
     nileSurface_.updateVertices(water_.surfaceVertices());
@@ -2352,6 +2353,8 @@ const Mesh& StaticGizaScene::meshFor(ScenePrimitive primitive) const
         return cylinder_;
     case ScenePrimitive::Sphere:
         return sphere_;
+    case ScenePrimitive::SphinxForm:
+        return sphinxForm_;
     case ScenePrimitive::Cube:
     default:
         return cube_;
@@ -2426,6 +2429,7 @@ float StaticGizaScene::primitiveLocalRadius(ScenePrimitive primitive) const
     switch (primitive)
     {
     case ScenePrimitive::Sphere: return 0.5f;
+    case ScenePrimitive::SphinxForm: return 0.8660254f;
     case ScenePrimitive::Plane:
     case ScenePrimitive::NileSurface:
     case ScenePrimitive::Cylinder: return 0.7071068f;

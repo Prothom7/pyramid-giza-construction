@@ -1,10 +1,13 @@
 #include "scene/SphinxMonument.h"
 
 #include <cmath>
+#include <array>
+#include <algorithm>
 #include <iomanip>
 #include <ostream>
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/constants.hpp>
 
 
 
@@ -17,12 +20,87 @@ SphinxBounds SphinxMonument::bounds() const
 {
     SphinxBounds b;
     b.center = center_;
-    b.minBound = center_ - glm::vec3{8.0f, 0.0f, 21.0f};
-    b.maxBound = center_ + glm::vec3{8.0f, 13.5f, 24.0f};
+    b.minBound = center_ + glm::vec3{-StructuralHalfWidth, 0.0f,
+                                     StructuralFront};
+    b.maxBound = center_ + glm::vec3{StructuralHalfWidth, StructuralHeight,
+                                     StructuralRear};
     b.height = b.maxBound.y - b.minBound.y;
     b.length = b.maxBound.z - b.minBound.z;
     b.width = b.maxBound.x - b.minBound.x;
     return b;
+}
+
+bool SphinxMonument::containsStructuralFootprint(float x, float z, float margin)
+{
+    return std::isfinite(x) && std::isfinite(z) &&
+           x >= DefaultCenter.x - StructuralHalfWidth - margin &&
+           x <= DefaultCenter.x + StructuralHalfWidth + margin &&
+           z >= DefaultCenter.z + StructuralFront - margin &&
+           z <= DefaultCenter.z + StructuralRear + margin;
+}
+
+MeshData SphinxMonument::createFormMesh()
+{
+    // One reusable, closed, low-poly loft replaces the silhouette's cuboids.
+    // Scaling this mesh makes the torso, shoulders, limbs, and cloth forms.
+    constexpr int slices = 20;
+    constexpr std::array<float, 7> heights{
+        -0.5f, -0.43f, -0.22f, 0.08f, 0.28f, 0.43f, 0.5f};
+    constexpr std::array<float, 7> radii{
+        0.55f, 0.82f, 0.98f, 1.0f, 0.90f, 0.65f, 0.08f};
+    MeshData mesh{"SphinxForm"};
+    for (std::size_t ring = 0; ring < heights.size(); ++ring)
+        for (int slice = 0; slice < slices; ++slice)
+        {
+            const float angle = glm::two_pi<float>() * slice / slices;
+            mesh.vertices.push_back({{0.5f * radii[ring] * std::cos(angle),
+                                      heights[ring],
+                                      0.5f * radii[ring] * std::sin(angle)},
+                                     {0.0f, 0.0f, 0.0f},
+                                     {static_cast<float>(slice) / slices,
+                                      static_cast<float>(ring) /
+                                          (heights.size() - 1)}});
+        }
+    for (std::size_t ring = 0; ring + 1 < heights.size(); ++ring)
+        for (int slice = 0; slice < slices; ++slice)
+        {
+            const auto lower = static_cast<std::uint32_t>(ring * slices + slice);
+            const auto upper = lower + slices;
+            const auto next = static_cast<std::uint32_t>(
+                ring * slices + (slice + 1) % slices);
+            const auto upperNext = next + slices;
+            mesh.indices.insert(mesh.indices.end(),
+                                {lower, upper, next, next, upper, upperNext});
+        }
+    const auto bottomCenter = static_cast<std::uint32_t>(mesh.vertices.size());
+    mesh.vertices.push_back({{0.0f, -0.5f, 0.0f}, {}, {0.5f, 0.5f}});
+    const auto topCenter = static_cast<std::uint32_t>(mesh.vertices.size());
+    mesh.vertices.push_back({{0.0f, 0.5f, 0.0f}, {}, {0.5f, 0.5f}});
+    const auto top = static_cast<std::uint32_t>((heights.size() - 1) * slices);
+    for (int slice = 0; slice < slices; ++slice)
+    {
+        const auto current = static_cast<std::uint32_t>(slice);
+        const auto next = static_cast<std::uint32_t>((slice + 1) % slices);
+        mesh.indices.insert(mesh.indices.end(),
+                            {bottomCenter, current, next,
+                             topCenter, top + next, top + current});
+    }
+    for (std::size_t i = 0; i < mesh.indices.size(); i += 3)
+    {
+        const auto a = mesh.indices[i];
+        const auto b = mesh.indices[i + 1];
+        const auto c = mesh.indices[i + 2];
+        const glm::vec3 face = glm::cross(mesh.vertices[b].position -
+                                             mesh.vertices[a].position,
+                                         mesh.vertices[c].position -
+                                             mesh.vertices[a].position);
+        mesh.vertices[a].normal += face;
+        mesh.vertices[b].normal += face;
+        mesh.vertices[c].normal += face;
+    }
+    for (Vertex& vertex : mesh.vertices)
+        vertex.normal = glm::normalize(vertex.normal);
+    return mesh;
 }
 
 std::size_t SphinxMonument::partCount() const
@@ -49,29 +127,29 @@ void SphinxMonument::collectSceneObjects(std::vector<SceneObject>& objects) cons
                        MaterialId::PreparedStone});
 
     // 2. Lion Body: Elongated recumbent torso
-    objects.push_back({ScenePrimitive::Cube,
+    objects.push_back({ScenePrimitive::SphinxForm,
                        makeTransform(s + glm::vec3{0.0f, 3.4f, 5.0f}, {},
-                                     {8.4f, 4.4f, 26.0f}),
+                                     {9.4f, 4.8f, 27.0f}),
                        MaterialId::LimestoneVariation});
 
     // Flank/Neck transitions (procedural transitions)
-    objects.push_back({ScenePrimitive::Cube,
+    objects.push_back({ScenePrimitive::SphinxForm,
                        makeTransform(s + glm::vec3{0.0f, 4.4f, -1.0f}, {},
-                                     {8.0f, 4.0f, 6.0f}),
+                                     {8.4f, 4.4f, 8.0f}),
                        MaterialId::Limestone});
 
     // Rear haunches and muscular lion thighs
     for (float xSign : {-1.0f, 1.0f})
     {
-        objects.push_back({ScenePrimitive::Cube,
+        objects.push_back({ScenePrimitive::SphinxForm,
                            makeTransform(s + glm::vec3{xSign * 4.3f, 3.2f, 15.0f},
                                          {0.0f, xSign * 12.0f, 0.0f},
-                                         {2.6f, 3.8f, 7.5f}),
+                                         {3.3f, 3.8f, 7.5f}),
                            MaterialId::Limestone});
         // Tucked rear paws
-        objects.push_back({ScenePrimitive::Cube,
+        objects.push_back({ScenePrimitive::SphinxForm,
                            makeTransform(s + glm::vec3{xSign * 4.2f, 1.6f, 11.5f}, {},
-                                         {2.0f, 0.8f, 3.0f}),
+                                         {2.6f, 0.8f, 3.5f}),
                            MaterialId::Limestone});
     }
 
@@ -87,24 +165,24 @@ void SphinxMonument::collectSceneObjects(std::vector<SceneObject>& objects) cons
     }
 
     // 3. Forequarters: Powerful broad chest and shoulders
-    objects.push_back({ScenePrimitive::Cube,
+    objects.push_back({ScenePrimitive::SphinxForm,
                        makeTransform(s + glm::vec3{0.0f, 5.0f, -4.2f}, {},
-                                     {9.2f, 6.4f, 7.2f}),
+                                     {8.2f, 5.8f, 7.5f}),
                        MaterialId::LimestoneVariation});
 
     // Left and Right Forelegs extending straight forward across the plinth
     for (float x : {-3.6f, 3.6f})
     {
         // Foreleg body
-        objects.push_back({ScenePrimitive::Cube,
+        objects.push_back({ScenePrimitive::SphinxForm,
                            makeTransform(s + glm::vec3{x, 1.95f, -10.5f}, {},
-                                         {2.4f, 1.7f, 13.0f}),
+                                         {3.0f, 1.8f, 13.0f}),
                            MaterialId::Limestone});
 
         // Extended front paws with carved toe segments
-        objects.push_back({ScenePrimitive::Cube,
+        objects.push_back({ScenePrimitive::SphinxForm,
                            makeTransform(s + glm::vec3{x, 1.75f, -17.5f}, {},
-                                         {2.5f, 1.3f, 2.6f}),
+                                         {3.4f, 1.3f, 3.5f}),
                            MaterialId::Limestone});
         for (int toe = 0; toe < 3; ++toe)
         {
@@ -118,7 +196,7 @@ void SphinxMonument::collectSceneObjects(std::vector<SceneObject>& objects) cons
 
     // 4. Neck transition rising from broad shoulders
     // Neck base blending
-    objects.push_back({ScenePrimitive::Cube,
+    objects.push_back({ScenePrimitive::SphinxForm,
                        makeTransform(s + glm::vec3{0.0f, 7.2f, -4.5f}, {},
                                      {3.8f, 2.0f, 4.2f}),
                        MaterialId::LimestoneVariation});
@@ -129,36 +207,44 @@ void SphinxMonument::collectSceneObjects(std::vector<SceneObject>& objects) cons
                        MaterialId::Limestone});
 
     // 5. Humanoid Head & Regal Cranium
-    objects.push_back({ScenePrimitive::Sphere,
+    objects.push_back({ScenePrimitive::SphinxForm,
                        makeTransform(s + glm::vec3{0.0f, 10.4f, -4.8f}, {},
-                                     {3.2f, 3.6f, 3.0f}),
-                       MaterialId::Limestone});
+                                     {3.2f, 3.8f, 3.1f}),
+                       MaterialId::PreparedStone});
+
+    // Cheek masses project beyond the cranium, giving the face a legible
+    // human profile without adding a disconnected mask in front of it.
+    for (float cheekX : {-0.8f, 0.8f})
+        objects.push_back({ScenePrimitive::SphinxForm,
+                           makeTransform(s + glm::vec3{cheekX, 9.9f, -6.0f}, {},
+                                         {1.2f, 1.1f, 1.35f}),
+                           MaterialId::PreparedStone});
 
     // Jaw / Chin structure
-    objects.push_back({ScenePrimitive::Cube,
-                       makeTransform(s + glm::vec3{0.0f, 9.2f, -5.9f}, {},
-                                     {1.9f, 1.3f, 1.4f}),
-                       MaterialId::Limestone});
+    objects.push_back({ScenePrimitive::SphinxForm,
+                       makeTransform(s + glm::vec3{0.0f, 9.2f, -6.1f}, {},
+                                     {2.0f, 1.4f, 1.5f}),
+                       MaterialId::PreparedStone});
 
     // 6. Facial Features
     // Nose bridge and profile
     objects.push_back({ScenePrimitive::Cube,
-                       makeTransform(s + glm::vec3{0.0f, 10.3f, -6.6f}, {},
+                       makeTransform(s + glm::vec3{0.0f, 10.3f, -6.9f}, {},
                                      {0.55f, 1.3f, 0.7f}),
-                       MaterialId::Limestone});
+                       MaterialId::PreparedStone});
     // Mouth / Lips
     objects.push_back({ScenePrimitive::Cube,
-                       makeTransform(s + glm::vec3{0.0f, 9.5f, -6.4f}, {},
+                       makeTransform(s + glm::vec3{0.0f, 9.5f, -6.9f}, {},
                                      {1.1f, 0.35f, 0.45f}),
-                       MaterialId::Limestone});
+                       MaterialId::QuarryStone});
     // Almond-shaped eyes and brow ridges
     for (float eyeX : {-0.85f, 0.85f})
     {
         objects.push_back({ScenePrimitive::Cube,
-                           makeTransform(s + glm::vec3{eyeX, 10.7f, -6.3f},
+                           makeTransform(s + glm::vec3{eyeX, 10.7f, -6.75f},
                                          {0.0f, 0.0f, (eyeX < 0 ? -12.0f : 12.0f)},
                                          {0.75f, 0.28f, 0.35f}),
-                           MaterialId::PreparedStone});
+                           MaterialId::QuarryStone});
     }
 
     // Left and Right Royal Ears
@@ -179,15 +265,15 @@ void SphinxMonument::collectSceneObjects(std::vector<SceneObject>& objects) cons
 
     // 7. Nemes Royal Headdress
     // Arched crown hood draped over skull
-    objects.push_back({ScenePrimitive::Cube,
-                       makeTransform(s + glm::vec3{0.0f, 11.8f, -4.6f}, {},
-                                     {4.6f, 1.4f, 3.8f}),
+    objects.push_back({ScenePrimitive::SphinxForm,
+                       makeTransform(s + glm::vec3{0.0f, 11.8f, -4.0f}, {},
+                                     {4.6f, 1.4f, 3.2f}),
                        MaterialId::PreparedStone});
 
     // Characteristic Nemes side wings / lappets hanging down over shoulders
     for (float lappetX : {-2.6f, 2.6f})
     {
-        objects.push_back({ScenePrimitive::Cube,
+        objects.push_back({ScenePrimitive::SphinxForm,
                            makeTransform(s + glm::vec3{lappetX, 9.1f, -4.8f},
                                          {0.0f, 0.0f, lappetX * 2.8f},
                                          {1.2f, 4.2f, 3.4f}),
@@ -230,7 +316,52 @@ bool SphinxMonument::validateSphinxMonument(std::ostream& output)
                     allTransformsValid = false;
     }
 
-    const bool valid = hasParts && dimensionsValid && allTransformsValid;
+    const MeshData form = createFormMesh();
+    bool meshValid = !form.vertices.empty() && !form.indices.empty() &&
+                     form.indices.size() % 3 == 0;
+    for (const Vertex& vertex : form.vertices)
+        meshValid = meshValid &&
+            std::isfinite(vertex.position.x) && std::isfinite(vertex.position.y) &&
+            std::isfinite(vertex.position.z) &&
+            std::isfinite(vertex.normal.x) && std::isfinite(vertex.normal.y) &&
+            std::isfinite(vertex.normal.z) &&
+            std::abs(glm::length(vertex.normal) - 1.0f) < 0.01f;
+    for (std::size_t i = 0; i < form.indices.size(); i += 3)
+    {
+        const auto a = form.indices[i];
+        const auto bIndex = form.indices[i + 1];
+        const auto c = form.indices[i + 2];
+        if (a >= form.vertices.size() || bIndex >= form.vertices.size() ||
+            c >= form.vertices.size())
+        {
+            meshValid = false;
+            continue;
+        }
+        const glm::vec3 face = glm::cross(form.vertices[bIndex].position -
+                                             form.vertices[a].position,
+                                         form.vertices[c].position -
+                                             form.vertices[a].position);
+        meshValid = meshValid && glm::length(face) > 1.0e-7f;
+        const std::size_t triangle = i / 3;
+        if (triangle < 240)
+        {
+            const glm::vec3 middle = (form.vertices[a].position +
+                form.vertices[bIndex].position + form.vertices[c].position) / 3.0f;
+            meshValid = meshValid &&
+                glm::dot(face, glm::vec3{middle.x, 0.0f, middle.z}) > 0.0f;
+        }
+        else
+            meshValid = meshValid &&
+                ((triangle - 240) % 2 == 0 ? face.y < 0.0f : face.y > 0.0f);
+    }
+    const bool footprintValid = containsStructuralFootprint(92.0f, -105.0f) &&
+        containsStructuralFootprint(92.0f, -125.0f) &&
+        containsStructuralFootprint(92.0f, -81.0f) &&
+        !containsStructuralFootprint(92.0f, -126.0f) &&
+        !containsStructuralFootprint(110.0f, -105.0f);
+
+    const bool valid = hasParts && dimensionsValid && allTransformsValid &&
+                       meshValid && footprintValid;
 
     output << "Phase 13 Sphinx Monument Validation\n"
            << "  procedural anatomical components (" << objects.size() << " >= 25): "
@@ -239,6 +370,12 @@ bool SphinxMonument::validateSphinxMonument(std::ostream& output)
            << (dimensionsValid ? "PASS" : "FAIL") << '\n'
            << "  all component transforms finite and well-conditioned: "
            << (allTransformsValid ? "PASS" : "FAIL") << '\n'
+           << "  closed indexed loft triangles, finite unit normals: "
+           << (meshValid ? "PASS" : "FAIL") << " ("
+           << form.vertices.size() << " vertices, " << form.indices.size() / 3
+           << " triangles)\n"
+           << "  structural footprint includes both plinth ends: "
+           << (footprintValid ? "PASS" : "FAIL") << '\n'
            << (valid ? "Sphinx monument validation passed.\n"
                      : "Sphinx monument validation failed.\n");
 

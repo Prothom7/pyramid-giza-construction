@@ -361,6 +361,7 @@ private:
     Mesh cube_;
     Mesh cylinder_;
     Mesh sphere_;
+    Mesh sphinxForm_;
     Mesh sandMesh_;
     TextureLibrary textures_;
     ParticleSystem particles_;

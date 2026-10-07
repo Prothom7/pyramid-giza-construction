@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include "scene/SphinxMonument.h"
 
 #include "scene/SceneTypes.h"
 
@@ -71,7 +72,7 @@ struct EnvironmentalContext
     float nileTerminalWidth = 0.6f;
     glm::vec2 floodplainSize{340.0f, 20.0f};
     float floodplainY = 0.02f;
-    glm::vec3 sphinxCenter{92.0f, 0.0f, -105.0f};
+    glm::vec3 sphinxCenter{SphinxMonument::DefaultCenter};
 };
 
 // Derived from EnvironmentalContext; there is no second authored water level
