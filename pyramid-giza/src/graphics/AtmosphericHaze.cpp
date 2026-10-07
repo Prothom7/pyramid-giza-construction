@@ -84,12 +84,16 @@ bool validateAtmosphericHaze(std::ostream& output)
     const glm::vec3 m = AtmosphericHaze::color(morning);
     const glm::vec3 n = AtmosphericHaze::color(noon);
     const glm::vec3 e = AtmosphericHaze::color(evening);
-    for (const glm::vec3 color : {m, n, e})
+    const SunState midnight = SunController::evaluate(0.0f);
+    const glm::vec3 night = AtmosphericHaze::color(midnight);
+    for (const glm::vec3 color : {m, n, e, night})
         valid = valid && std::isfinite(color.r) && std::isfinite(color.g) &&
                 std::isfinite(color.b) && glm::all(glm::greaterThanEqual(color, glm::vec3{0.0f})) &&
                 glm::all(glm::lessThanEqual(color, glm::vec3{1.0f}));
     valid = valid && m == skyColors(morning).horizon &&
             n == skyColors(noon).horizon && e == skyColors(evening).horizon &&
+            night == skyColors(midnight).horizon &&
+            glm::length(night) < glm::length(n) * 0.5f &&
             AtmosphericHaze::color(noon) == n &&
             glm::distance(m, n) > 0.02f && glm::distance(n, e) > 0.02f;
     output << "  low-camera finite-ground edge factor: " << edgeFactor << '\n'

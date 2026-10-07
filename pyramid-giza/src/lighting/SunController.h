@@ -15,6 +15,9 @@ struct DirectionalLight
 struct SunState
 {
     float timeOfDay = 8.0f;
+    float solarElevationDegrees = 0.0f;
+    float daylightFactor = 1.0f;
+    float nightFactor = 0.0f;
     DirectionalLight light;
     glm::vec3 ambientColor{0.75f, 0.78f, 0.82f};
     float ambientIntensity = 0.85f;
@@ -34,6 +37,8 @@ enum class LightingDebugMode
 class SunController
 {
 public:
+    static constexpr float dayStart = 0.0f;
+    static constexpr float dayEnd = 24.0f;
     static constexpr float daylightStart = 6.0f;
     static constexpr float daylightEnd = 18.0f;
     static constexpr float morningTime = 8.0f;
@@ -68,9 +73,11 @@ public:
 
 private:
     SunState state_;
+    double preciseTimeHours_ = morningTime;
     bool automatic_ = true;
     float timeScale_ = defaultHoursPerSecond;
     LightingDebugMode debugMode_ = LightingDebugMode::Normal;
 };
 
 bool validatePhase7Lighting(std::ostream& output);
+bool validate24HourEnvironment(std::ostream& output);

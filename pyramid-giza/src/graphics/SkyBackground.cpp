@@ -100,6 +100,8 @@ void SkyBackground::render(const SunState& sun, const glm::mat4& view,
     const SkyColors colors = skyColors(sun);
     shader_.setVec3("horizonColor", colors.horizon);
     shader_.setVec3("zenithColor", colors.zenith);
+    shader_.setFloat("nightFactor", sun.nightFactor);
+    shader_.setVec3("moonDirection", sun.light.direction);
     shader_.setFloat("zenithElevationScale", ZenithElevationScale);
     shader_.setMat3("cameraToWorld", glm::transpose(glm::mat3(view)));
     shader_.setVec2("projectionScale",
@@ -126,6 +128,8 @@ bool validateSkyBackground(std::ostream& output)
     const SkyColors m = skyColors(morning);
     const SkyColors n = skyColors(noon);
     const SkyColors e = skyColors(evening);
+    const SunState midnight = SunController::evaluate(0.0f);
+    const SkyColors night = skyColors(midnight);
     const bool finite = finiteColor(m.horizon) && finiteColor(m.zenith) &&
                         finiteColor(n.horizon) && finiteColor(n.zenith) &&
                         finiteColor(e.horizon) && finiteColor(e.zenith);
@@ -182,11 +186,19 @@ bool validateSkyBackground(std::ostream& output)
                       finiteColor(skyColorAt(n, ray));
         }
     }
+    const bool nightSky = finiteColor(night.horizon) &&
+        finiteColor(night.zenith) && midnight.nightFactor == 1.0f &&
+        night.zenith.b < n.zenith.b * 0.2f &&
+        night.horizon.b < n.horizon.b * 0.45f &&
+        skyColorAt(night, {0.0f, 1.0f, 0.0f}) == night.zenith;
     const bool valid = indexedQuad && finite && deterministic && daylight &&
+                       nightSky &&
                        worldHorizon && translation && rotation && aspect && presets;
     output << "Sun-driven sky-background validation\n"
            << "  indexed 4-vertex/6-index background: " << (indexedQuad ? "PASS" : "FAIL") << '\n'
            << "  finite deterministic daylight colors: " << (finite && deterministic && daylight ? "PASS" : "FAIL") << '\n'
+           << "  dim night zenith/horizon from the same SunState: "
+           << (nightSky ? "PASS" : "FAIL") << '\n'
            << "  world horizon and below-horizon continuation: " << (worldHorizon ? "PASS" : "FAIL") << '\n'
            << "  translation invariant / pitch responsive / aspect aware: "
            << (translation && rotation && aspect ? "PASS" : "FAIL") << '\n'

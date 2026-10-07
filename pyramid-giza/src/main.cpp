@@ -659,6 +659,7 @@ int main(int argc, char** argv)
     bool inputValidationOnly = false;
     bool hudValidationOnly = false;
     bool skyValidationOnly = false;
+    bool dayNightValidationOnly = false;
     bool hazeValidationOnly = false;
     bool cloudValidationOnly = false;
     bool smokeTest = false;
@@ -716,6 +717,8 @@ int main(int argc, char** argv)
             lightingValidationOnly = true;
         else if (option == "--validate-sky")
             skyValidationOnly = true;
+        else if (option == "--validate-day-night")
+            dayNightValidationOnly = true;
         else if (option == "--validate-haze")
             hazeValidationOnly = true;
         else if (option == "--validate-clouds")
@@ -966,13 +969,14 @@ int main(int argc, char** argv)
             }
             catch (...)
             {
-                std::cerr << "Sun time must be between 6 and 18 hours.\n";
+                std::cerr << "Sun time must be between 0 and 24 hours.\n";
                 return 2;
             }
-            if (initialSunTime < SunController::daylightStart ||
-                initialSunTime > SunController::daylightEnd)
+            if (!std::isfinite(initialSunTime) ||
+                initialSunTime < SunController::dayStart ||
+                initialSunTime > SunController::dayEnd)
             {
-                std::cerr << "Sun time must be between 6 and 18 hours.\n";
+                std::cerr << "Sun time must be between 0 and 24 hours.\n";
                 return 2;
             }
             sunTimeSpecified = true;
@@ -1084,6 +1088,8 @@ int main(int argc, char** argv)
         return validatePhase7Lighting(std::cout) ? 0 : 1;
     if (skyValidationOnly)
         return validateSkyBackground(std::cout) ? 0 : 1;
+    if (dayNightValidationOnly)
+        return validate24HourEnvironment(std::cout) ? 0 : 1;
     if (hazeValidationOnly)
         return validateAtmosphericHaze(std::cout) ? 0 : 1;
     if (cloudValidationOnly)

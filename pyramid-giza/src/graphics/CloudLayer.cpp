@@ -80,8 +80,11 @@ glm::vec3 CloudField::tint(const SunState& sun)
     // Existing sunlight and ambient supply the only daylight palette.
     const glm::vec3 lit = 0.66f * sun.light.color +
                           0.34f * sun.ambientColor;
-    return glm::clamp(glm::mix(glm::vec3{0.86f, 0.87f, 0.86f}, lit,
-                               0.36f * std::clamp(sun.light.intensity, 0.0f, 1.0f)),
+    const glm::vec3 daylightTint = glm::mix(
+        glm::vec3{0.86f, 0.87f, 0.86f}, lit,
+        0.36f * std::clamp(sun.light.intensity, 0.0f, 1.0f));
+    const glm::vec3 moonlitTint = 0.78f * sun.ambientColor;
+    return glm::clamp(glm::mix(daylightTint, moonlitTint, sun.nightFactor),
                       0.0f, 0.96f);
 }
 
@@ -196,7 +199,10 @@ bool validateCloudLayer(std::ostream& output)
     const glm::vec3 morning = CloudField::tint(SunController::evaluate(8.0f));
     const glm::vec3 noon = CloudField::tint(SunController::evaluate(12.0f));
     const glm::vec3 evening = CloudField::tint(SunController::evaluate(17.0f));
+    const glm::vec3 midnight = CloudField::tint(SunController::evaluate(0.0f));
     valid = valid && finite(morning) && finite(noon) && finite(evening) &&
+            finite(midnight) && glm::length(midnight) < glm::length(noon) * 0.6f &&
+            CloudField::tint(SunController::evaluate(0.0f)) == midnight &&
             glm::all(glm::lessThanEqual(morning, glm::vec3{1.0f})) &&
             glm::all(glm::lessThanEqual(noon, glm::vec3{1.0f})) &&
             glm::all(glm::lessThanEqual(evening, glm::vec3{1.0f})) &&

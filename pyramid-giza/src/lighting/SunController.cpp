@@ -1,6 +1,7 @@
 #include "lighting/SunController.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <ostream>
 
@@ -22,19 +23,28 @@ bool finiteVector(const glm::vec3& value)
 
 bool finiteState(const SunState& state)
 {
-    return std::isfinite(state.timeOfDay) && finiteVector(state.light.direction) &&
+    return std::isfinite(state.timeOfDay) &&
+           std::isfinite(state.solarElevationDegrees) &&
+           std::isfinite(state.daylightFactor) &&
+           std::isfinite(state.nightFactor) &&
+           finiteVector(state.light.direction) &&
            finiteVector(state.light.color) && std::isfinite(state.light.intensity) &&
            finiteVector(state.ambientColor) && std::isfinite(state.ambientIntensity) &&
            finiteVector(state.skyColor);
 }
 
-float wrapDaylight(float hours)
+double wrapDay(double hours)
 {
-    const float span = SunController::daylightEnd - SunController::daylightStart;
-    float offset = std::fmod(hours - SunController::daylightStart, span);
-    if (offset < 0.0f)
-        offset += span;
-    return SunController::daylightStart + offset;
+    double wrapped = std::fmod(hours, static_cast<double>(SunController::dayEnd));
+    if (wrapped < 0.0f)
+        wrapped += static_cast<double>(SunController::dayEnd);
+    return wrapped;
+}
+
+float smoothstep(float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
 }
 
 glm::vec3 daylightBlend(const glm::vec3& morning, const glm::vec3& noon,
@@ -53,11 +63,21 @@ SunController::SunController()
 
 SunState SunController::evaluate(float timeOfDay)
 {
-    const float time = std::clamp(timeOfDay, daylightStart, daylightEnd);
-    const float progress = (time - daylightStart) / (daylightEnd - daylightStart);
+    const float time = std::clamp(timeOfDay, dayStart, dayEnd);
+    const float daylightTime = std::clamp(time, daylightStart, daylightEnd);
+    const float progress = (daylightTime - daylightStart) /
+        (daylightEnd - daylightStart);
     const float solarArc = std::sin(glm::pi<float>() * progress);
-    const float elevationDegrees = 12.0f + 66.0f * solarArc;
-    const float azimuthDegrees = -105.0f + 210.0f * progress;
+    // The established 06:00–18:00 arc is unchanged. Below the horizon, the
+    // same solar direction continues through midnight and meets dawn again.
+    const float nightHours = time >= daylightEnd ? time - daylightEnd : time + 6.0f;
+    const float elevationDegrees = time >= daylightStart && time <= daylightEnd
+        ? 12.0f + 66.0f * solarArc
+        : 12.0f - 67.0f * std::sin(glm::pi<float>() * nightHours / 12.0f);
+    const float azimuthDegrees = time >= daylightStart && time <= daylightEnd
+        ? -105.0f + 210.0f * progress
+        : (time > daylightEnd ? 105.0f + 12.5f * (time - daylightEnd)
+                              : -180.0f + 12.5f * time);
     const float elevation = glm::radians(elevationDegrees);
     const float azimuth = glm::radians(azimuthDegrees);
 
@@ -71,18 +91,33 @@ SunState SunController::evaluate(float timeOfDay)
 
     SunState state;
     state.timeOfDay = time;
+    state.solarElevationDegrees = elevationDegrees;
+    // 04:30–06:00 and 18:00–19:30 remain twilight. The accepted daylight
+    // states inside 06:00–18:00 retain their original exact palette and power.
+    state.daylightFactor = time < daylightStart
+        ? smoothstep((time - 4.5f) / 1.5f)
+        : (time <= daylightEnd ? 1.0f :
+            1.0f - smoothstep((time - daylightEnd) / 1.5f));
+    state.nightFactor = 1.0f - state.daylightFactor;
     state.light.direction = -glm::normalize(toSun);
-    state.light.color = daylightBlend(
+    const glm::vec3 daylightLight = daylightBlend(
         {1.00f, 0.78f, 0.60f}, {1.00f, 0.96f, 0.86f},
         {1.00f, 0.70f, 0.52f}, progress);
-    state.light.intensity = 0.72f + 0.38f * solarArc;
-    state.ambientColor = daylightBlend(
+    state.light.color = glm::mix(glm::vec3{0.26f, 0.31f, 0.43f},
+                                 daylightLight, state.daylightFactor);
+    state.light.intensity = (0.72f + 0.38f * solarArc) * state.daylightFactor;
+    const glm::vec3 daylightAmbient = daylightBlend(
         {0.78f, 0.74f, 0.70f}, {0.72f, 0.82f, 1.00f},
         {0.76f, 0.69f, 0.68f}, progress);
-    state.ambientIntensity = 0.78f + 0.12f * solarArc;
-    state.skyColor = daylightBlend(
+    state.ambientColor = glm::mix(glm::vec3{0.45f, 0.48f, 0.54f},
+                                  daylightAmbient, state.daylightFactor);
+    state.ambientIntensity = glm::mix(0.62f, 0.78f + 0.12f * solarArc,
+                                      state.daylightFactor);
+    const glm::vec3 daylightSky = daylightBlend(
         {0.62f, 0.67f, 0.76f}, {0.45f, 0.68f, 0.90f},
         {0.72f, 0.56f, 0.48f}, progress);
+    state.skyColor = glm::mix(glm::vec3{0.035f, 0.055f, 0.105f},
+                              daylightSky, state.daylightFactor);
     return state;
 }
 
@@ -90,15 +125,19 @@ void SunController::update(float deltaTime)
 {
     if (!automatic_ || !std::isfinite(deltaTime) || deltaTime <= 0.0f)
         return;
-    const float next = state_.timeOfDay + timeScale_ * deltaTime;
-    state_ = evaluate(next > daylightEnd ? wrapDaylight(next) : next);
+    preciseTimeHours_ = wrapDay(preciseTimeHours_ +
+        static_cast<double>(timeScale_) * static_cast<double>(deltaTime));
+    state_ = evaluate(static_cast<float>(preciseTimeHours_));
 }
 
 void SunController::setTimeOfDay(float hours)
 {
     if (!std::isfinite(hours))
         return;
-    state_ = evaluate(hours);
+    preciseTimeHours_ = std::clamp(static_cast<double>(hours),
+                                   static_cast<double>(dayStart),
+                                   static_cast<double>(dayEnd));
+    state_ = evaluate(static_cast<float>(preciseTimeHours_));
 }
 
 void SunController::adjustTime(float hours)
@@ -106,7 +145,8 @@ void SunController::adjustTime(float hours)
     if (!std::isfinite(hours))
         return;
     automatic_ = false;
-    state_ = evaluate(std::clamp(state_.timeOfDay + hours, daylightStart, daylightEnd));
+    preciseTimeHours_ = wrapDay(preciseTimeHours_ + static_cast<double>(hours));
+    state_ = evaluate(static_cast<float>(preciseTimeHours_));
 }
 
 void SunController::setTimeScale(float hoursPerSecond)
@@ -118,19 +158,19 @@ void SunController::setTimeScale(float hoursPerSecond)
 void SunController::selectMorning()
 {
     automatic_ = false;
-    state_ = evaluate(morningTime);
+    setTimeOfDay(morningTime);
 }
 
 void SunController::selectNoon()
 {
     automatic_ = false;
-    state_ = evaluate(noonTime);
+    setTimeOfDay(noonTime);
 }
 
 void SunController::selectEvening()
 {
     automatic_ = false;
-    state_ = evaluate(eveningTime);
+    setTimeOfDay(eveningTime);
 }
 
 void SunController::cycleDebugMode()
@@ -194,11 +234,11 @@ bool validatePhase7Lighting(std::ostream& output)
                                            thirtySteps.state().timeOfDay) < 1.0e-4f;
 
     SunController looped;
-    looped.setTimeOfDay(SunController::daylightEnd - 0.1f);
+    looped.setTimeOfDay(SunController::dayEnd - 0.1f);
     looped.setAutomatic(true);
     looped.update(1.0f);
     const bool automaticLoopValid = std::abs(looped.state().timeOfDay -
-                                             (SunController::daylightStart + 0.15f)) < 1.0e-4f;
+                                             0.15f) < 1.0e-4f;
 
     SunController staticClock;
     staticClock.setTimeOfDay(SunController::noonTime);
@@ -272,7 +312,7 @@ bool validatePhase7Lighting(std::ostream& output)
            << (trajectoryValid ? "PASS\n" : "FAIL\n")
            << "  automatic time frame independence: "
            << (frameIndependent ? "PASS\n" : "FAIL\n")
-           << "  automatic daylight loop: "
+           << "  automatic 24-hour loop: "
            << (automaticLoopValid ? "PASS\n" : "FAIL\n")
            << "  static daylight clock remains fixed: "
            << (staticClockValid ? "PASS\n" : "FAIL\n")
@@ -286,5 +326,94 @@ bool validatePhase7Lighting(std::ostream& output)
            << (debugModesValid ? "PASS\n" : "FAIL\n")
            << (valid ? "Phase 7 lighting checks passed.\n"
                      : "Phase 7 lighting checks failed.\n");
+    return valid;
+}
+
+bool validate24HourEnvironment(std::ostream& output)
+{
+    constexpr std::array<float, 8> hours{0.0f, 5.0f, 8.0f, 12.0f,
+                                         17.0f, 19.0f, 21.0f, 23.0f};
+    bool finite = true;
+    for (const float hour : hours)
+    {
+        const SunState state = SunController::evaluate(hour);
+        finite = finite && finiteState(state) &&
+            std::abs(glm::length(state.light.direction) - 1.0f) < 1.0e-5f &&
+            state.daylightFactor >= 0.0f && state.daylightFactor <= 1.0f &&
+            state.nightFactor >= 0.0f && state.nightFactor <= 1.0f &&
+            std::abs(state.daylightFactor + state.nightFactor - 1.0f) < 1.0e-6f;
+    }
+    bool daylightPreserved = true;
+    for (const float hour : {8.0f, 12.0f, 17.0f})
+    {
+        const float progress = (hour - SunController::daylightStart) /
+            (SunController::daylightEnd - SunController::daylightStart);
+        const float arc = std::sin(glm::pi<float>() * progress);
+        const SunState state = SunController::evaluate(hour);
+        daylightPreserved = daylightPreserved &&
+            state.daylightFactor == 1.0f && state.nightFactor == 0.0f &&
+            std::abs(state.solarElevationDegrees - (12.0f + 66.0f * arc)) < 1.0e-5f &&
+            std::abs(state.light.intensity - (0.72f + 0.38f * arc)) < 1.0e-5f;
+    }
+    const SunState midnight = SunController::evaluate(0.0f);
+    const SunState evening = SunController::evaluate(19.0f);
+    const SunState late = SunController::evaluate(21.0f);
+    const SunState end = SunController::evaluate(24.0f);
+    const bool night = midnight.solarElevationDegrees < -40.0f &&
+        midnight.light.direction.y > 0.0f &&
+        evening.solarElevationDegrees < 0.0f &&
+        late.light.intensity == 0.0f && midnight.light.intensity == 0.0f &&
+        midnight.ambientIntensity > 0.25f &&
+        midnight.skyColor.b < SunController::evaluate(12.0f).skyColor.b * 0.2f;
+    const bool loop = glm::distance(midnight.light.direction,
+                                    end.light.direction) < 1.0e-5f &&
+        midnight.skyColor == end.skyColor;
+    bool continuous = true;
+    for (const float boundary : {6.0f, 18.0f, 24.0f})
+    {
+        const SunState before = SunController::evaluate(boundary - 0.001f);
+        const SunState after = SunController::evaluate(boundary == 24.0f
+            ? 0.001f : boundary + 0.001f);
+        continuous = continuous &&
+            glm::distance(before.light.direction, after.light.direction) < 0.01f &&
+            glm::distance(before.skyColor, after.skyColor) < 0.01f &&
+            std::abs(before.light.intensity - after.light.intensity) < 0.01f;
+    }
+    SunController thirty, sixty;
+    thirty.setTimeOfDay(23.9f);
+    sixty.setTimeOfDay(23.9f);
+    for (int i = 0; i < 30; ++i) thirty.update(1.0f / 30.0f);
+    for (int i = 0; i < 60; ++i) sixty.update(1.0f / 60.0f);
+    const bool frameIndependent =
+        std::abs(thirty.state().timeOfDay - sixty.state().timeOfDay) < 1.0e-4f &&
+        thirty.state().timeOfDay < 1.0f;
+    SunController longThirty, longSixty;
+    longThirty.setTimeOfDay(0.0f);
+    longSixty.setTimeOfDay(0.0f);
+    for (int i = 0; i < 3000; ++i) longThirty.update(1.0f / 30.0f);
+    for (int i = 0; i < 6000; ++i) longSixty.update(1.0f / 60.0f);
+    const bool longRun = std::abs(longThirty.state().timeOfDay -
+                                  longSixty.state().timeOfDay) < 1.0e-4f &&
+                         std::abs(longThirty.state().timeOfDay - 1.0f) < 1.0e-4f;
+    SunController manual;
+    manual.setTimeOfDay(0.25f);
+    manual.adjustTime(-0.5f);
+    const bool manualWrap = !manual.automatic() &&
+        std::abs(manual.state().timeOfDay - 23.75f) < 1.0e-5f;
+    const bool valid = finite && daylightPreserved && night && loop &&
+        continuous && frameIndependent && longRun && manualWrap;
+    output << "Full 24-hour SunController validation\n"
+           << "  finite representative times and normalized orbit: "
+           << (finite ? "PASS" : "FAIL") << '\n'
+           << "  08:00 / 12:00 / 17:00 daylight preserved: "
+           << (daylightPreserved ? "PASS" : "FAIL") << '\n'
+           << "  below-horizon night, dim sky, nonzero ambient: "
+           << (night ? "PASS" : "FAIL") << '\n'
+           << "  dawn/dusk/midnight continuity and 00:00/24:00 agreement: "
+           << (continuous && loop ? "PASS" : "FAIL") << '\n'
+           << "  30/60 FPS, full-day wrap, and manual midnight wrapping: "
+           << (frameIndependent && longRun && manualWrap ? "PASS" : "FAIL") << '\n'
+           << (valid ? "24-hour environment validation passed.\n"
+                     : "24-hour environment validation failed.\n");
     return valid;
 }

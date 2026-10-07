@@ -152,3 +152,4 @@ add_test(NAME Phase13SimulationHUDValidation COMMAND PyramidGiza --validate-simu
 add_test(NAME Phase13SkyBackgroundValidation COMMAND PyramidGiza --validate-sky)
 add_test(NAME Phase13CloudLayerValidation COMMAND PyramidGiza --validate-clouds)
 add_test(NAME Phase13AtmosphericHazeValidation COMMAND PyramidGiza --validate-haze)
+add_test(NAME Phase15DayNightValidation COMMAND PyramidGiza --validate-day-night)
