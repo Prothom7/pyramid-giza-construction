@@ -22,6 +22,7 @@
 #include "graphics/Frustum.h"
 #include "graphics/InstanceBatch.h"
 #include "graphics/SkyBackground.h"
+#include "graphics/AtmosphericHaze.h"
 #include "graphics/CloudLayer.h"
 #include "graphics/Texture.h"
 #include "lighting/ShadowMap.h"
@@ -658,6 +659,7 @@ int main(int argc, char** argv)
     bool inputValidationOnly = false;
     bool hudValidationOnly = false;
     bool skyValidationOnly = false;
+    bool hazeValidationOnly = false;
     bool cloudValidationOnly = false;
     bool smokeTest = false;
     bool benchmarkRender = false;
@@ -714,6 +716,8 @@ int main(int argc, char** argv)
             lightingValidationOnly = true;
         else if (option == "--validate-sky")
             skyValidationOnly = true;
+        else if (option == "--validate-haze")
+            hazeValidationOnly = true;
         else if (option == "--validate-clouds")
             cloudValidationOnly = true;
         else if (option == "--validate-shadows")
@@ -1080,6 +1084,8 @@ int main(int argc, char** argv)
         return validatePhase7Lighting(std::cout) ? 0 : 1;
     if (skyValidationOnly)
         return validateSkyBackground(std::cout) ? 0 : 1;
+    if (hazeValidationOnly)
+        return validateAtmosphericHaze(std::cout) ? 0 : 1;
     if (cloudValidationOnly)
         return validateCloudLayer(std::cout) ? 0 : 1;
     if (shadowValidationOnly)

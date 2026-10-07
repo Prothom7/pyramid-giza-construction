@@ -16,6 +16,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "graphics/PrimitiveGenerator.h"
+#include "graphics/AtmosphericHaze.h"
 #include "objects/ConstructionProps.h"
 #include "objects/Scaffold.h"
 #include "objects/Sledge.h"
@@ -2955,6 +2956,21 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         program.setMat4("projection", projection);
         program.setMat4("lightSpaceMatrix", lightSpace.matrix);
         program.setVec3("viewPosition", cameraPosition);
+        program.setVec3("hazeColor", AtmosphericHaze::color(sun));
+        program.setFloat("hazeStart", AtmosphericHaze::startDistance);
+        program.setFloat("hazeEnd", AtmosphericHaze::endDistance);
+        program.setFloat("hazeMaximumBlend", AtmosphericHaze::maximumBlend);
+        program.setInt("terrainHazeEnabled", 0);
+        program.setVec2("terrainBoundsMin", {SandSimulation::WorldMinX,
+                                               SandSimulation::WorldMinZ});
+        program.setVec2("terrainBoundsMax", {SandSimulation::WorldMaxX,
+                                               SandSimulation::WorldMaxZ});
+        program.setVec2("terrainEdgeWidth", {AtmosphericHaze::terrainEdgeWidthX,
+                                              AtmosphericHaze::terrainEdgeWidthZ});
+        program.setVec2("terrainEdgeGate", {AtmosphericHaze::terrainEdgeGateStart,
+                                              AtmosphericHaze::terrainEdgeGateEnd});
+        program.setFloat("terrainEdgeMaximumBlend",
+                         AtmosphericHaze::terrainEdgeMaximumBlend);
         program.setVec3("sunDirection", sun.light.direction);
         program.setVec3("sunColor", sun.light.color);
         program.setFloat("sunIntensity", sun.light.intensity);
@@ -3082,7 +3098,9 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
             applyMaterial(shader_, MaterialId::Sand, false);
             activeMaterial = MaterialId::Sand;
         }
+        shader_.setInt("terrainHazeEnabled", 1);
         sandMesh_.draw();
+        shader_.setInt("terrainHazeEnabled", 0);
         ++renderStats_.visibleDrawCalls;
         ++renderStats_.visibleInstances;
         renderStats_.visibleTriangles += sandMesh_.indexCount() / 3u;

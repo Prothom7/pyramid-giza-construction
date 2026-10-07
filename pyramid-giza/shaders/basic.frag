@@ -24,6 +24,16 @@ uniform float sunIntensity;
 uniform vec3 ambientColor;
 uniform float ambientIntensity;
 uniform vec3 viewPosition;
+uniform vec3 hazeColor;
+uniform float hazeStart;
+uniform float hazeEnd;
+uniform float hazeMaximumBlend;
+uniform int terrainHazeEnabled;
+uniform vec2 terrainBoundsMin;
+uniform vec2 terrainBoundsMax;
+uniform vec2 terrainEdgeWidth;
+uniform vec2 terrainEdgeGate;
+uniform float terrainEdgeMaximumBlend;
 uniform int lightingDebugMode;
 uniform sampler2D shadowMap;
 uniform int shadowsEnabled;
@@ -124,5 +134,33 @@ void main()
         result = surfaceColor;
     else
         result = ambient + visibility * (diffuse + specular) + inspection;
+    // Lighting and shadowing finish before atmospheric perspective. Horizontal
+    // world distance avoids over-hazing elevated camera views.
+    if (lightingDebugMode == 0 && shadowDebugMode == 0)
+    {
+        float distanceXZ = length(viewPosition.xz - WorldPosition.xz);
+        float distanceFraction = clamp((distanceXZ - hazeStart) /
+                                       (hazeEnd - hazeStart), 0.0, 1.0);
+        float haze = hazeMaximumBlend * distanceFraction * distanceFraction *
+                     (3.0 - 2.0 * distanceFraction);
+        if (terrainHazeEnabled != 0)
+        {
+            float edgeFraction = min(min((WorldPosition.x - terrainBoundsMin.x) /
+                                         terrainEdgeWidth.x,
+                                         (terrainBoundsMax.x - WorldPosition.x) /
+                                         terrainEdgeWidth.x),
+                                     min((WorldPosition.z - terrainBoundsMin.y) /
+                                         terrainEdgeWidth.y,
+                                         (terrainBoundsMax.y - WorldPosition.z) /
+                                         terrainEdgeWidth.y));
+            float edgeT = clamp(edgeFraction, 0.0, 1.0);
+            float edgeFade = 1.0 - edgeT * edgeT * (3.0 - 2.0 * edgeT);
+            float gateT = clamp((distanceXZ - terrainEdgeGate.x) /
+                                (terrainEdgeGate.y - terrainEdgeGate.x), 0.0, 1.0);
+            float distanceGate = gateT * gateT * (3.0 - 2.0 * gateT);
+            haze = max(haze, terrainEdgeMaximumBlend * edgeFade * distanceGate);
+        }
+        result = mix(result, hazeColor, haze);
+    }
     FragColor = vec4(result, 1.0);
 }

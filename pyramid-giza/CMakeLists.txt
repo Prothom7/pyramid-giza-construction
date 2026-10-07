@@ -33,6 +33,7 @@ add_executable(PyramidGiza
     src/graphics/Texture.cpp
     src/graphics/Frustum.cpp
     src/graphics/SkyBackground.cpp
+    src/graphics/AtmosphericHaze.cpp
     src/graphics/CloudLayer.cpp
     src/graphics/InstanceBatch.cpp
     src/effects/ParticleSystem.cpp
@@ -150,3 +151,4 @@ add_test(NAME Phase13InputValidation COMMAND PyramidGiza --validate-input)
 add_test(NAME Phase13SimulationHUDValidation COMMAND PyramidGiza --validate-simulation-hud)
 add_test(NAME Phase13SkyBackgroundValidation COMMAND PyramidGiza --validate-sky)
 add_test(NAME Phase13CloudLayerValidation COMMAND PyramidGiza --validate-clouds)
+add_test(NAME Phase13AtmosphericHazeValidation COMMAND PyramidGiza --validate-haze)
