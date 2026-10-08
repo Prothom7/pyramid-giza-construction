@@ -122,6 +122,7 @@ public:
     void setAnimationLooping(bool looping) { animationController_.setLooping(looping); }
     void seekAnimation(float elapsedTime, bool playing);
     void seekPresentationEnvironment(float elapsedTime);
+    void restartNileBoatForShowcase();
     void cycleDemoPose();
     void resetAnimation();
     void toggleQuarryPulley() { quarryPulleyController_.togglePaused(); }

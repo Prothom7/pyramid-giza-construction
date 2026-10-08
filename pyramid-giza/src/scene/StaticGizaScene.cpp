@@ -2159,6 +2159,14 @@ void StaticGizaScene::seekPresentationEnvironment(float elapsedTime)
         animationController_.snapshot().loadedSledgeRoot[3]};
 }
 
+void StaticGizaScene::restartNileBoatForShowcase()
+{
+    // Showcase Nile shots are hard cuts. Replay the unchanged one-way trip
+    // from its original pose without affecting the normal physical mode.
+    water_.reset();
+    nileSurface_.updateVertices(water_.surfaceVertices());
+}
+
 void StaticGizaScene::cycleDemoPose()
 {
     demoPose_ = Worker::nextPose(demoPose_);

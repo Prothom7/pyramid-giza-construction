@@ -1,307 +1,48 @@
-# Pyramid at Giza - Construction Site
+# Pyramid at Giza — Construction Site
 
-Course project status:
-
-- **Phase 1 - Complete:** reusable indexed primitive geometry
-- **Phase 2 - Complete:** static Giza world
-- **Phase 3 - Complete:** composite workers and equipment
-- **Phase 4 - Complete:** hierarchical articulated workers
-- **Phase 5 - Complete:** coordinated 28.5-second construction animation
-- **Phase 5.5 - Complete:** monumental scale and expanded site
-- **Phase 5.6 - Complete:** quarry, stone logistics, Nile, and environmental context
-- **Phase 6 - Complete:** camera navigation, inspection modes, and guided presentation
-- **Phase 6.5 - Complete:** pre-Phase 7 machinery, access, workshop, repair, and river-logistics enrichment
-- **Phase 7 - Complete:** directional sun lighting, material response, and daylight control
-- **Phase 8 - Complete:** moving directional-sun shadow mapping with bias and 3x3 PCF
-- **Phase 9 - Complete:** scene integrity, independent construction timelapse, dynamic infrastructure, animation refinement, and procedural UV textures
-- **Phase 10 - Complete:** indexed GPU instancing, construction-aware batching, conservative frustum culling, and render statistics
-- **Phase 11 - Complete:** instanced construction dust, animated Nile UVs, and subtle vegetation motion
-- **Phase 12 - Complete:** deterministic synchronized cinematic showcase and final presentation flow
-- **Phase 12.5 - Complete:** post-showcase construction playback and ramp/scaffold clearance repair
-- **Phase 12.6 - Complete:** grounding, support, and construction-stage spatial stability repair
-- **Phase 12.7 - Complete:** deterministic quarry pulley rock-lifting visualization
-- **Phase 12.8 - Complete:** carved pyramid passage network, tomb chamber, interior navigation, and cutaway inspection
-- **Phase 12.8.1 - Complete:** flush recessed north entrance integrated into stepped masonry
-- **Phase 13 - Complete:** realistic functional construction site expansion (functional quarry extraction, rock shaping & staging, connected sledge transport & ramp hauling, pulley integration & block settlement into pyramid, deterministic sand physics & repose simulation, Nile water flow & boat dynamics, procedural anatomical Sphinx monument, OpenGL 3.3 in-window HUD, GLFW cursor-enter/focus management, and 15-shot cinematic showcase)
-
-The application is now a full ancient industrial landscape. A 7,561-block unfinished
-pyramid remains the focal point, while a recessed open-cut quarry, four extraction bays,
-three stone repositories, loading station, long haul road, worker-access infrastructure,
-an experimental rope-redirection rig, Nile/floodplain, 18 trees, support camp, and a
-secondary stylized Sphinx-context landmark explain the wider site. Phase 6.5 adds three
-new experimental rope-redirection rigs (four frames total), 14 anchor posts, eight
-ladders, four access walkways, a tool workshop, stone inspection station, sledge repair
-yard, organized lever racks, an upper-platform handling cluster, and a Nile landing with
-two primitive-built boats.
-
-All objects reuse four uploaded primitive meshes (plane, cube, cylinder, sphere). Filled
-rendering remains indexed `GL_TRIANGLES`; scene instances only supply model transforms and
-materials. The original Phase 5 animation remains a focused local transport stage within
-the longer static quarry-to-pyramid logistics chain.
-
-Phase 6 adds three movement speeds, smooth/instant curated presets, pyramid orbit,
-transport follow, a seven-shot guided demo, safe FOV zoom, and debug pose output without
-changing world geometry or the rendering pipeline.
-
-The enrichment/support pass now contains 349 static primitive instances and four support workers. The
-visible pass has approximately 9,463 maximum draw calls, while all scene objects still
-share the same four uploaded meshes. Pulley/roller rigs are explicitly presented as
-speculative graphics demonstrations rather than historically certain Khufu-era machinery.
-
-Phase 7 replaces the earlier fixed light with a world-space directional sun and
-centralized ambient/diffuse/specular material properties. The daylight controller
-provides deterministic morning, noon, and evening states plus a slow automatic cycle
-that is independent of the 28.5-second construction animation. Lighting debug outputs
-make diffuse, specular, world-normal, and unlit-base-color behavior easy to inspect.
-
-Phase 8 adds one 4096 x 4096 directional depth map, a stable world-centered orthographic
-light camera, slope-aware bias, and manual 3x3 percentage-closer filtering. The existing
-sun moves the shadows from long morning silhouettes through shorter noon contact shadows
-to long evening shadows in the opposite direction. Static and animated geometry use one
-shared per-frame transform list in both passes. With shadows enabled the depth and visible
-passes total approximately 18,926 maximum indexed draw calls.
-
-Phase 9 preserves the exact 7,561-block Phase 5.6 scene as the default 75-percent
-construction checkpoint and adds a deterministic 90-second timeline from foundation to
-the complete 7,714-block pyramid. Temporary ramps, scaffolds, repository stones,
-background workers, parked sledges, and speculative pulley wheels respond to the
-construction stage. The world ground now covers the calculated content bounds with
-34-71 units of horizontal margin and a presentation skirt.
-
-Seven deterministic procedural material textures use the existing UV attribute plus a
-shared white fallback. Textures are uploaded once, reused by all matching materials, and
-bound separately from the shadow map. The sphere now has an intentional U=0/U=1 seam
-duplicate. Maximum estimates are approximately 9,690 visible indexed draws and 19,380
-combined shadow plus visible draws.
-
-Phase 10 uploads the complete pyramid once as eight static material/spatial instance
-batches and updates at most two small animated-frontier batches. Both lit and shadow
-passes call indexed `glDrawElementsInstanced(GL_TRIANGLES)`, while all other objects keep
-the indexed normal path. The default overview measured 1,942 visible and 1,954 shadow
-draws at 75-percent construction; the complete pyramid measured 1,760 and 1,772, an
-81.8-percent combined reduction from the Phase 9 maximum estimate. Camera and light
-frusta use conservative bounding spheres, and compatible normal draws are sorted to
-reduce material uploads and texture binds.
-
-Phase 11 adds a fixed 512-slot deterministic CPU particle pool rendered in one indexed
-instanced billboard draw. Restrained emissions follow the moving loaded sledge, quarry
-mallet impacts, frontier-block settlement, and active work zones. The procedural Nile
-texture scrolls slowly and tree foliage sways around fixed trunk-top pivots; the same
-foliage transforms feed both the visible and shadow passes. Dust is alpha blended after
-opaque geometry, keeps depth testing, disables only depth writes and culling temporarily,
-and never enters the shadow map.
-
-Phase 12 adds a 101-second, 14-shot final showcase driven by a CPU-only
-`ShowcaseController`. It coordinates the existing camera, 28.5-second hero sequence,
-90-second construction timeline, sun, shadows, and atmospheric effects without adding
-a render pass or owning their simulation logic. The narrative covers the site, quarry,
-extraction, repositories, loading, transport, ramp, upper work, accelerated build,
-completed 7,714-block pyramid, Nile/Sphinx context, and a six-second golden-hour final
-hold. Direct time seek and 0.25x-4x playback support repeatable testing and recording.
-
-Phase 12.5 repairs the visible build sequence without replacing the Phase 12
-coordinator. Shot entry and direct seek still synchronize once, while ordinary frames
-advance `ConstructionTimelineController::update`. Fine deterministic thresholds spread
-each legacy 12-wave batch inside its original interval; 4-12 exterior frontier blocks
-then pass through queued, approach, lift/slide, alignment, and settlement transforms.
-The exact 70/4,734/6,964/7,561/7,714 checkpoint counts remain unchanged.
-
-The same repair replaces overlapping permanent access slabs with low, middle, hero,
-landing, west-access, and quarry ramp descriptors. Phase 12.6 then grounds those routes
-with fine stepped earth fill, removes unsupported side stairs and the late upper
-connector, starts all remaining scaffolds on terrain, and gives the upper work zone an
-eight-post deck. Queued stones use a ground lane, workers stand on active ramp surfaces,
-and frontier stones retain lower-course footprint overlap. CPU validation reports no
-unintended ramp intersections, unsupported samples, excessive support gaps, or
-stage-support visibility violations at 0, 25, 50, 75, and 100 percent.
-
-Phase 12.7 adds a supported quarry gantry, moving trolley, pulley wheel, dynamic
-rope/sling, lifted limestone block, and an independently supported receiving
-platform. Its deterministic 14-second cycle covers Idle, Attach, Tension, Lift,
-UpperHold, GuideToPlatform, Lower, Release, and Complete. This is explicitly a
-speculative/experimental graphics visualization, not archaeological proof of
-Khufu-era pulley machinery. All 33 maximum component instances reuse existing
-cube and cylinder meshes and enter the same visible/shadow frame list.
-
-Phase 12.8 carves a real north-face passage void through the GPU-instanced
-pyramid. One authoritative classifier removes 255 of the conceptual 7,714
-blocks from both stable and animated-frontier batches, leaving 7,459 structural
-instances at completion. Four connected passage volumes lead through a gallery
-and antechamber to a plain tomb chamber with an open stone sarcophagus. F8
-provides slope-following confined interior walking and a short-range inspection
-light; F9 exposes the route with a deterministic visible/shadow-consistent
-cutaway. The interior is a stylized historically inspired reconstruction, not
-an exact archaeological survey.
-
-Phase 12.8.1 replaces the former protruding three-piece doorway with a
-descriptor-driven six-piece stepped reveal. The lower and upper portal surfaces
-are derived from the actual level-3 and level-4 north block rows at z=-78.44
-and z=-76.98. Their front faces sit 0.05 units inward, the passage begins 0.30
-units behind the upper facade, and exactly three central shell blocks form the
-single intended opening.
+A C++17 / OpenGL 3.3 Core graphics project showing a Giza construction site. The normal physical simulation follows one authoritative limestone block from quarry extraction through pulley lifting, sledge loading, desert haul, the main and upper ramps, a supported local unload, and settlement into the pyramid. The separate 125-second showcase presents the wider site from morning through night.
 
 ## Build and run
 
+On Windows with CMake and MinGW installed:
+
 ```powershell
 cmake -S . -B build -G "MinGW Makefiles"
-cmake --build build -j
+cmake --build build -j4
 ctest --test-dir build --output-on-failure
 build\PyramidGiza.exe
 ```
 
+Use `build\PyramidGiza.exe --showcase` for the 18-shot presentation. `--showcase-time 0..125` seeks to a presentation time; `--showcase-speed 0.25..4` changes playback speed. `--sun-time HOURS --static-sun` starts a reproducible time-of-day view. The default run is normal physical mode.
+
 ## Controls
 
-- `W/A/S/D`: move; `Q/E`: move down/up; mouse: look
-- `Shift + movement`: fast (56 units/s); `Ctrl + movement`: precision (7 units/s)
-- mouse wheel: FOV zoom; in orbit mode: radius
-- `1`: monumental pyramid overview
-- `2`: pyramid base
-- `3`: quarry overview
-- `4`: extraction bays
-- `5`: repositories and transport
-- `6`: scaffold and upper construction
-- `7`: complete site overview
-- `8`: Nile and floodplain
-- `9`: Sphinx-context landmark
-- `Shift + 1-9`: instant preset instead of the normal one-second transition
-- `0`: reset camera to overview and normal speed
-- `O`: toggle pyramid orbit
-- `T`: toggle animated transport follow
-- `G`: start/stop the guided seven-shot demo
-- `F5`: start/restart the full synchronized Phase 12 showcase
-- `Shift + F5`: cancel the showcase and return to manual camera control
-- `F6`: pause/resume the showcase presentation clock
-- `F7`: pause/resume the independent quarry pulley cycle
-- `F8`: toggle confined pyramid-interior inspection mode
-- `F9`: toggle pyramid cutaway inspection
-- `K`: print camera position, yaw, pitch, FOV, and mode
-- `C`: toggle back-face culling; `F`: toggle filled/wireframe
-- `Space`: pause/resume; `N`: next state; `R`: reset; `L`: loop
-- `M`: coordinated animation/pose-preview mode; `+/-`: animation speed
-- `P`: cycle debug pose; `Esc`: exit
-- `U`: toggle automatic daylight motion
-- `[` / `]`: move the sun backward/forward by 0.5 simulated hours
-- `F1` / `F2` / `F3`: morning (08:00) / noon (12:00) / evening (17:00)
-- `V`: cycle normal, diffuse-only, specular-only, world-normal, and unlit lighting output
-- `H`: toggle directional shadows
-- `J`: toggle normal rendering / shadow-factor visualization
+| Keys | Action |
+| --- | --- |
+| W/A/S/D, Q/E, mouse | Move, descend/ascend, look |
+| Shift / Ctrl while moving | Fast / precise movement |
+| Wheel | Field-of-view zoom (orbit radius in orbit mode) |
+| 1–9 | Curated camera presets; Shift+1–9 selects instantly |
+| 0, O, T, G | Reset camera, orbit, transport follow, guided camera demo |
+| F5, Shift+F5, F6 | Start/restart, cancel, pause/resume showcase |
+| U, [ / ], F1/F2/F3 | Automatic sun, adjust time, 08:00/12:00/17:00 presets |
+| Space, N, R, L | Pause/resume animation, next state, reset, loop |
+| B, Home/End, , / . | Timelapse play/pause, start/end, slower/faster |
+| F7, F8, F9 | Quarry pulley pause, pyramid interior, cutaway |
+| F10, F11, Tab | Debug overlay, simulation HUD, HUD help |
+| C, F, H, J, V, X | Culling, wireframe, shadows, shadow debug, lighting debug, textures |
+| Esc | Release mouse; press again to exit |
 
-- `X`: toggle procedural material textures
-- `B`: play/pause the independent construction timelapse
-- `,` / `.`: decrease/increase timelapse speed (0.25x to 8x)
-- `Home` / `End`: set construction progress to 0 / 100 percent
-- `Y`: toggle conservative camera/light frustum culling
-- `I`: print current-frame render statistics
-- `F4`: toggle all atmospheric effects, Nile motion, and foliage sway
-- `Shift + F4`: print particle activity, memory, draw, and CPU-update statistics
+The in-window help panel lists the complete current bindings. Click the viewport to recapture the mouse.
 
-## Validation
+## Scene and rendering
 
-```powershell
-build\PyramidGiza.exe --validate-geometry
-build\PyramidGiza.exe --validate-scene
-build\PyramidGiza.exe --validate-composites
-build\PyramidGiza.exe --validate-hierarchy
-build\PyramidGiza.exe --validate-animation
-build\PyramidGiza.exe --validate-site
-build\PyramidGiza.exe --validate-industrial
-build\PyramidGiza.exe --validate-camera
-build\PyramidGiza.exe --validate-enrichment
-build\PyramidGiza.exe --validate-lighting
-build\PyramidGiza.exe --validate-shadows
-build\PyramidGiza.exe --validate-construction
-build\PyramidGiza.exe --validate-textures
-build\PyramidGiza.exe --validate-layout
-build\PyramidGiza.exe --validate-instancing
-build\PyramidGiza.exe --validate-frustum
-build\PyramidGiza.exe --validate-renderer-structure
-build\PyramidGiza.exe --validate-particles
-build\PyramidGiza.exe --validate-effect-events
-build\PyramidGiza.exe --validate-environment-motion
-build\PyramidGiza.exe --validate-effects
-build\PyramidGiza.exe --validate-showcase
-build\PyramidGiza.exe --validate-timelapse-repair
-build\PyramidGiza.exe --validate-ramp-clearance
-build\PyramidGiza.exe --validate-supports
-build\PyramidGiza.exe --validate-grounding
-build\PyramidGiza.exe --validate-stage-dependencies
-build\PyramidGiza.exe --validate-quarry-pulley
-build\PyramidGiza.exe --validate-quarry-pulley-support
-build\PyramidGiza.exe --validate-interior
-build\PyramidGiza.exe --validate-entrance
-build\PyramidGiza.exe --validate-quarry
-build\PyramidGiza.exe --validate-logistics
-build\PyramidGiza.exe --validate-sand
-build\PyramidGiza.exe --validate-water
-build\PyramidGiza.exe --validate-sphinx
-build\PyramidGiza.exe --validate-input
-build\PyramidGiza.exe --validate-simulation-hud
-build\PyramidGiza.exe --smoke-test --preset 1
-```
+- **Construction:** Block 1000 has one physical transform owner at a time: quarry, pulley, sledge cargo socket, supported unloading route, then permanent pyramid occupancy. The transport includes sand tracks, the main ramp, Ramp A, Ramp B, and a 24 m target landing. Reset restores the first-block cycle. Cinematic timelapse is separate from the physical path.
+- **Ground and monuments:** A terrain and dynamic-sand simulation support quarry and site props. The procedural Sphinx and its grounded base are scene landmarks. Indexed pyramid blocks use instanced rendering; the passage and chamber remain inspectable.
+- **Nile and boats:** One shaped, indexed Nile mesh animates from the same wave field used by the bounded `waterSurfaceAt` query. Both boats follow the surface for height, pitch, and roll. The supply boat navigates a one-way route and leaves a deterministic stern wake; the cargo boat remains moored. Showcase Nile hard cuts explicitly replay that one-way trip for presentation; normal physical mode never loops it.
+- **Atmosphere:** One SunController drives 24-hour directional lighting, sky gradient, moon/stars, cloud tint, and distance haze. Eight deterministic cloud groups drift and wrap. Three grounded night fires have animated flames, embers, smoke, and local point lights.
+- **Materials and techniques:** Procedural textures and restrained stone/wood variation complement Blinn–Phong lighting, a directional shadow map with PCF, frustum culling, instanced geometry, and indexed triangle meshes. Water adds flow-aligned normal detail, modest Fresnel, and night highlights without changing its physical surface query.
 
-`--wireframe`, `--no-cull`, `--animation-time SECONDS`, `--camera-mode
-free|orbit|follow|demo|interior`, `--cutaway`, and `--capture output.ppm`
-support deterministic runtime checks.
-`--entrance-view front|left|right|low|high` provides deterministic facade
-inspection poses for the repaired north entrance.
-`--sun-time HOURS`, `--auto-sun`, `--static-sun`, and `--lighting-mode
-normal|diffuse|specular|normals|unlit` support deterministic lighting checks.
-`--shadows`, `--no-shadows`, `--shadow-debug-factor`, and
-`--shadow-resolution 2048|4096` support deterministic shadow checks.
-`--smoke-duration SECONDS` keeps the hidden smoke-test renderer active for a timed
-animation regression (up to 60 seconds).
-Construction startup options are --construction-progress 0..1, --timelapse, and
---timelapse-speed 0.25..8. Use --textures or --no-textures for A/B runtime checks.
-Use `--render-stats` to print the latest frame, `--benchmark-render` for a two-second
-hidden benchmark, and `--no-frustum-culling` for a visibility-control comparison.
-`--effects` and `--no-effects` provide deterministic A/B startup, while
-`--particle-capacity 64..2048` changes the fixed pool capacity (default 512).
-`--showcase` starts the complete automated presentation,
-`--showcase-time 0..101` seeks its coordinated state directly, and
-`--showcase-speed 0.25..4` accelerates or slows its independent presentation clock.
-The older `G` mode remains a camera-only guided tour; F5 is the synchronized showcase.
-`F10` toggles the simulation debug overlay, `F11` toggles the in-window simulation HUD, and `Tab` toggles the HUD help panel.
-`ESC` cleanly releases cursor capture to normal OS mode without closing; pressing `ESC` while already released exits the application. Clicking into the viewport re-captures the mouse.
-Build output and captures are ignored by Git.
+The complete CTest suite includes construction settlement/reset, Nile and boat coupling, day/night, fires, sky, clouds, haze, Sphinx, renderer structure, and showcase validation. For a quick real-OpenGL check, run `build\PyramidGiza.exe --smoke-test --preset 1`. Captures and build output live under ignored `build/`.
 
-## Documentation
-
-- [Phase 1](docs/PHASE1_PRIMITIVE_FOUNDATION.md)
-- [Phase 2](docs/PHASE2_STATIC_GIZA_WORLD.md)
-- [Phase 3](docs/PHASE3_COMPOSITE_OBJECTS.md)
-- [Phase 4](docs/PHASE4_HIERARCHICAL_MODELING.md)
-- [Phase 5](docs/PHASE5_CONSTRUCTION_ANIMATION.md)
-- [Phase 5.5](docs/PHASE5_5_MONUMENTAL_SCALE.md)
-- [Phase 5.6](docs/PHASE5_6_QUARRY_LOGISTICS_ENVIRONMENT.md)
-- [Phase 6](docs/PHASE6_CAMERA_NAVIGATION.md)
-- [Phase 6.5 object enrichment](docs/PHASE6_5_OBJECT_ENRICHMENT.md)
-- [Phase 7 lighting and sun](docs/PHASE7_LIGHTING_AND_SUN.md)
-- [Phase 8 directional shadow mapping](docs/PHASE8_SHADOW_MAPPING.md)
-- [Phase 9 integration, timelapse, and textures](docs/PHASE9_INTEGRATION_TIMELAPSE_TEXTURES.md)
-- [Phase 10 renderer optimization](docs/PHASE10_RENDERER_OPTIMIZATION.md)
-- [Phase 11 atmospheric effects](docs/PHASE11_ATMOSPHERIC_EFFECTS.md)
-- [Phase 12 cinematic showcase](docs/PHASE12_CINEMATIC_SHOWCASE.md)
-- [Phase 12.5 construction repair](docs/PHASE12_5_CONSTRUCTION_REPAIR.md)
-- [Phase 12.6 grounding and support repair](docs/PHASE12_6_GROUNDING_AND_SUPPORT_REPAIR.md)
-- [Phase 12.7 quarry pulley lift](docs/PHASE12_7_QUARRY_PULLEY_LIFT.md)
-- [Phase 12.8 pyramid interior](docs/PHASE12_8_PYRAMID_INTERIOR.md)
-- [Phase 12.8.1 entrance facade repair](docs/PHASE12_8_1_ENTRANCE_FACADE_REPAIR.md)
-- [Phase 13 functional construction site expansion](docs/PHASE13_FUNCTIONAL_CONSTRUCTION_EXPANSION.md)
-
-Excel-compatible records are stored in `docs/*.csv`, including the quarry, extraction,
-repository, logistics, environment, lifting-mechanism, ramp, world-scale, enrichment,
-pulley-rig, river-landing, workshop/repair, scaffold-access, material, sun-state, and
-lighting-control, shadow-setting, shadow-validation, and shadow-control tables.
-Phase 9 adds world-bounds, layout-validation, construction-timeline, construction-stage,
-infrastructure-stage, texture, UV-mapping, material-texture, and texture-control tables.
-Phase 10 adds instance-batch, instance-attribute, frustum-culling, and measured
-render-performance tables.
-Phase 11 adds particle-system, effect-control, environmental-motion, and effect-performance
-tables.
-Phase 12 adds showcase-shot, action, control, and camera-path-validation tables.
-Phase 12.5 updates the ramp, scaffold, and infrastructure-stage records and adds
-timelapse-playback and geometric-clearance validation tables.
-Phase 12.6 adds support-validation and stage-support-dependency tables and updates the
-authoritative ramp/scaffold records.
-Phase 12.7 adds quarry-pulley component, animation-state, and validation tables and
-extends the support records with conditional floor/suspension/platform dependencies.
+Historical phase notes and design records remain in [docs](docs/).

@@ -133,6 +133,9 @@ void synchronizeShowcase(AppState& state, bool synchronizeSimulation)
     state.scene->setAnimationLooping(false);
     state.scene->seekAnimation(frame.heroTime, frame.heroPlaying);
     state.scene->seekPresentationEnvironment(frame.showcaseTime);
+    const char* shotId = ShowcaseController::shots()[frame.shotIndex].id;
+    if (std::string(shotId) == "Nile" || std::string(shotId) == "NightNile")
+        state.scene->restartNileBoatForShowcase();
 }
 
 void announceShowcaseShot(const AppState& state)
