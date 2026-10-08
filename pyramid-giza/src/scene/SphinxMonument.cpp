@@ -315,17 +315,13 @@ void SphinxMonument::collectSceneObjects(std::vector<SceneObject>& objects) cons
                            MaterialId::Limestone});
     }
 
-    // A low tail follows the right rear flank and curls back over the rump.
+    // A low tail follows the right flank and tucks into the rear haunch.
     for (int t = 0; t < 4; ++t)
         objects.push_back({ScenePrimitive::SphinxForm,
-                           makeTransform(s + glm::vec3{4.55f, 2.05f,
+                           makeTransform(s + glm::vec3{4.45f - 0.75f * t, 2.05f,
                                                         10.8f + t * 2.05f}, {},
-                                         {0.62f, 0.58f, 2.65f}),
+                                         {0.80f, 0.65f, 3.10f}),
                            MaterialId::LimestoneVariation});
-    objects.push_back({ScenePrimitive::SphinxForm,
-                       makeTransform(s + glm::vec3{4.45f, 2.56f, 18.65f},
-                                     {28.0f, 0.0f, 0.0f}, {0.73f, 0.70f, 2.0f}),
-                       MaterialId::LimestoneVariation});
 
     // 3. The body loft itself supplies the broad chest and shoulder mass.
     // Left and Right Forelegs extend forward across the plinth.
