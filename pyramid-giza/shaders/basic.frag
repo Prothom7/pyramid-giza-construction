@@ -17,6 +17,8 @@ uniform vec2 materialTextureScale;
 uniform vec2 materialTextureOffset;
 uniform float materialTextureBlend;
 uniform int waterMaterial;
+uniform int stoneMaterial;
+uniform float materialNightVisibility;
 uniform int texturesEnabled;
 
 uniform vec3 sunDirection;
@@ -97,6 +99,14 @@ void main()
     vec3 surfaceColor = texturesEnabled != 0
         ? mix(materialBaseColor, texturedColor, materialTextureBlend)
         : materialBaseColor;
+    if (stoneMaterial != 0)
+    {
+        // Low-contrast world-space variation breaks identical block faces
+        // without changing instance transforms or the settlement handoff.
+        float geology = sin(WorldPosition.x * 0.19 + WorldPosition.z * 0.07) *
+                        sin(WorldPosition.z * 0.23 + WorldPosition.y * 0.12);
+        surfaceColor *= 1.0 + 0.025 * geology;
+    }
     vec3 normal = normalize(WorldNormal);
     if (waterMaterial != 0)
     {
@@ -182,6 +192,8 @@ void main()
         result = surfaceColor;
     else
         result = ambient + visibility * (diffuse + specular) + inspection + fireLighting;
+    if (waterMaterial == 0 && lightingDebugMode == 0 && shadowDebugMode == 0)
+        result += waterNightFactor * materialNightVisibility * surfaceColor;
     if (waterMaterial != 0 && lightingDebugMode == 0 && shadowDebugMode == 0)
     {
         // Moonlit water needs a restrained body color even when direct solar

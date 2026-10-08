@@ -23,6 +23,22 @@ float noise(std::uint32_t x, std::uint32_t y, std::uint32_t seed)
     return static_cast<float>(hash2d(x, y, seed) & 0xffffu) / 65535.0f;
 }
 
+float smoothNoise(std::uint32_t x, std::uint32_t y,
+                  std::uint32_t cellSize, std::uint32_t seed)
+{
+    const std::uint32_t cellX = x / cellSize;
+    const std::uint32_t cellY = y / cellSize;
+    float u = static_cast<float>(x % cellSize) / static_cast<float>(cellSize);
+    float v = static_cast<float>(y % cellSize) / static_cast<float>(cellSize);
+    u = u * u * (3.0f - 2.0f * u);
+    v = v * v * (3.0f - 2.0f * v);
+    const float lower = noise(cellX, cellY, seed) * (1.0f - u) +
+                        noise(cellX + 1u, cellY, seed) * u;
+    const float upper = noise(cellX, cellY + 1u, seed) * (1.0f - u) +
+                        noise(cellX + 1u, cellY + 1u, seed) * u;
+    return lower * (1.0f - v) + upper * v;
+}
+
 std::uint8_t channel(float value)
 {
     return static_cast<std::uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f);
@@ -61,11 +77,13 @@ TextureData TextureGenerator::generate(TextureId id, int size)
             if (id == TextureId::Sand)
                 value *= 0.93f + 0.055f * std::sin((x + y * 0.19f) * 0.16f);
             else if (id == TextureId::Limestone)
-                value *= ((x / 64 + y / 48) % 2 == 0) ? 1.0f : 0.94f;
+                value *= (0.93f + 0.07f * smoothNoise(x, y, 28u, seed + 9u)) *
+                         (0.985f + 0.015f * std::sin(y * 0.075f + x * 0.016f));
             else if (id == TextureId::QuarryStone)
-                value *= 0.86f + 0.14f * noise(x / 4u, y / 4u, seed + 9u);
+                value *= 0.82f + 0.18f * smoothNoise(x, y, 9u, seed + 9u);
             else if (id == TextureId::Wood)
-                value *= 0.86f + 0.12f * std::sin(x * 0.22f + n * 3.0f);
+                value *= 0.86f + 0.12f * std::sin(
+                    x * 0.22f + 2.2f * smoothNoise(x, y, 18u, seed + 19u));
             else if (id == TextureId::Cloth)
                 value *= ((x / 3 + y / 3) % 2 == 0) ? 1.0f : 0.90f;
             else if (id == TextureId::Water)

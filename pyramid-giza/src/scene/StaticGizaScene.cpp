@@ -3039,6 +3039,15 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
                         textureOffset);
         program.setFloat("materialTextureBlend", material.textureBlend);
         program.setInt("waterMaterial", materialId == MaterialId::Water ? 1 : 0);
+        const bool stone = materialId == MaterialId::Limestone ||
+            materialId == MaterialId::LimestoneVariation ||
+            materialId == MaterialId::PreparedStone ||
+            materialId == MaterialId::QuarryStone;
+        program.setInt("stoneMaterial", stone ? 1 : 0);
+        const bool wood = materialId == MaterialId::Wood ||
+                          materialId == MaterialId::DarkWood;
+        program.setFloat("materialNightVisibility",
+            wood ? 0.065f : (stone ? 0.045f : 0.035f));
         if (currentTexture != material.texture)
         {
             textures_.bind(material.texture, 1);
