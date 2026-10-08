@@ -48,6 +48,7 @@ public:
     void reset();
 
     bool enabled() const { return enabled_; }
+    float timeSeconds() const { return simulationTime_; }
     void setEnabled(bool enabled) { enabled_ = enabled; }
     void toggleEnabled() { enabled_ = !enabled_; }
 
@@ -66,6 +67,7 @@ public:
     void collectSceneObjects(std::vector<SceneObject>& objects) const;
 
     static bool validateWaterSimulation(std::ostream& output);
+    static bool validateWaterAppearance(std::ostream& output);
     static bool validateBoatWaterCoupling(std::ostream& output);
     static bool validateBoatNavigation(std::ostream& output);
     static bool validateBoatWake(std::ostream& output);

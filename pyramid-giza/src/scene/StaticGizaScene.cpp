@@ -17,6 +17,7 @@
 
 #include "graphics/PrimitiveGenerator.h"
 #include "graphics/AtmosphericHaze.h"
+#include "graphics/SkyBackground.h"
 #include "objects/ConstructionProps.h"
 #include "objects/Scaffold.h"
 #include "objects/Sledge.h"
@@ -2985,6 +2986,10 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         program.setFloat("sunIntensity", sun.light.intensity);
         program.setVec3("ambientColor", sun.ambientColor);
         program.setFloat("ambientIntensity", sun.ambientIntensity);
+        program.setFloat("waterTime", water_.timeSeconds());
+        program.setVec2("waterFlowVelocity", water_.flowVelocityAt(0.0f, -166.0f));
+        program.setFloat("waterNightFactor", sun.nightFactor);
+        program.setVec3("waterHorizonColor", skyColors(sun).horizon);
         program.setInt("lightingDebugMode", static_cast<int>(sunController_.debugMode()));
         program.setInt("shadowsEnabled", shadowsEnabled_ ? 1 : 0);
         program.setInt("shadowDebugMode", static_cast<int>(shadowDebugMode_));
@@ -3033,6 +3038,7 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         program.setVec2("materialTextureOffset",
                         textureOffset);
         program.setFloat("materialTextureBlend", material.textureBlend);
+        program.setInt("waterMaterial", materialId == MaterialId::Water ? 1 : 0);
         if (currentTexture != material.texture)
         {
             textures_.bind(material.texture, 1);

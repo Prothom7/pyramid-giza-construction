@@ -16,6 +16,7 @@ uniform sampler2D materialTexture;
 uniform vec2 materialTextureScale;
 uniform vec2 materialTextureOffset;
 uniform float materialTextureBlend;
+uniform int waterMaterial;
 uniform int texturesEnabled;
 
 uniform vec3 sunDirection;
@@ -46,6 +47,10 @@ uniform vec3 inspectionLightPosition;
 uniform vec3 inspectionLightColor;
 uniform float inspectionLightRange;
 uniform float inspectionLightIntensity;
+uniform float waterTime;
+uniform vec2 waterFlowVelocity;
+uniform float waterNightFactor;
+uniform vec3 waterHorizonColor;
 struct FirePointLight
 {
     vec3 position;
@@ -93,6 +98,25 @@ void main()
         ? mix(materialBaseColor, texturedColor, materialTextureBlend)
         : materialBaseColor;
     vec3 normal = normalize(WorldNormal);
+    if (waterMaterial != 0)
+    {
+        // The geometric normal still represents the authoritative animated
+        // triangle surface. These small derivatives alter only light response.
+        vec2 flow = normalize(waterFlowVelocity);
+        vec2 crossFlow = vec2(-flow.y, flow.x);
+        float along = dot(WorldPosition.xz, flow);
+        float across = dot(WorldPosition.xz, crossFlow);
+        float medium = along * 0.87 + across * 1.25 - waterTime * 1.38;
+        float fine = along * 2.25 - across * 3.40 - waterTime * 2.72;
+        float shimmer = along * 4.10 + across * 5.30 - waterTime * 3.15;
+        vec2 gradient = 0.020 * cos(medium) * (0.87 * flow + 1.25 * crossFlow) +
+                        0.004 * cos(fine) * (2.25 * flow - 3.40 * crossFlow) +
+                        0.001 * cos(shimmer) * (4.10 * flow + 5.30 * crossFlow);
+        normal = normalize(normal + vec3(-gradient.x, 0.0, -gradient.y));
+        float channel = clamp(1.0 - abs(WorldPosition.z + 166.0) / 13.0, 0.0, 1.0);
+        surfaceColor *= mix(1.04, 0.90, channel);
+        surfaceColor *= mix(1.0, 0.72, waterNightFactor);
+    }
     // All lighting vectors are world-space. sunDirection is the direction in
     // which sunlight rays travel, so L points in the opposite direction.
     vec3 toLight = normalize(-sunDirection);
@@ -158,6 +182,20 @@ void main()
         result = surfaceColor;
     else
         result = ambient + visibility * (diffuse + specular) + inspection + fireLighting;
+    if (waterMaterial != 0 && lightingDebugMode == 0 && shadowDebugMode == 0)
+    {
+        // Moonlit water needs a restrained body color even when direct solar
+        // diffuse is zero. Keep geometric ripples and the original texture.
+        result = mix(result, max(result, vec3(0.055, 0.100, 0.140)),
+                     0.90 * waterNightFactor);
+        vec3 waterView = normalize(viewPosition - WorldPosition);
+        float grazing = 1.0 - clamp(dot(normal, waterView), 0.0, 1.0);
+        float fresnel = 0.13 * grazing * grazing * grazing;
+        result = mix(result, waterHorizonColor, fresnel);
+        vec3 moonDirection = normalize(sunDirection);
+        float moonGlint = pow(max(dot(reflect(-moonDirection, normal), waterView), 0.0), 90.0);
+        result += waterNightFactor * 0.045 * moonGlint * vec3(0.55, 0.65, 0.82);
+    }
     // Lighting and shadowing finish before atmospheric perspective. Horizontal
     // world distance avoids over-hazing elevated camera views.
     if (lightingDebugMode == 0 && shadowDebugMode == 0)

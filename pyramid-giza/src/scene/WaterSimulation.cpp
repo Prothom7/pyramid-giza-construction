@@ -1375,3 +1375,63 @@ bool WaterSimulation::validateBoatWake(std::ostream& output)
                      : "Propulsion-wake validation failed.\n");
     return valid;
 }
+
+bool WaterSimulation::validateWaterAppearance(std::ostream& output)
+{
+    const MeshData mesh = IndustrialLandscape::nileSurfaceMesh();
+    const bool topology = mesh.vertices.size() == 938 &&
+                          mesh.indices.size() == 5148;
+    WaterSimulation water;
+    water.update(0.35f);
+    bool query = true;
+    for (const glm::vec2 p : {glm::vec2{-100.0f, -166.0f},
+                              glm::vec2{0.0f, -166.0f},
+                              glm::vec2{100.0f, -166.0f}})
+    {
+        float y = 0.0f;
+        query = query && water.waterSurfaceAt(p.x, p.y, y) &&
+                std::isfinite(y);
+    }
+    const glm::vec2 flow = glm::normalize(water.flowVelocityAt(0.0f, -166.0f));
+    const glm::vec2 crossFlow{-flow.y, flow.x};
+    float maxTilt = 0.0f;
+    bool finiteDetail = true;
+    for (float x = -100.0f; x <= 100.0f; x += 7.0f)
+        for (float z = -176.0f; z <= -156.0f; z += 5.0f)
+        {
+            const float along = glm::dot(glm::vec2{x, z}, flow);
+            const float across = glm::dot(glm::vec2{x, z}, crossFlow);
+            const float t = water.timeSeconds();
+            const float medium = along * 0.87f + across * 1.25f - t * 1.38f;
+            const float fine = along * 2.25f - across * 3.40f - t * 2.72f;
+            const float shimmer = along * 4.10f + across * 5.30f - t * 3.15f;
+            const glm::vec2 gradient =
+                0.020f * std::cos(medium) * (0.87f * flow + 1.25f * crossFlow) +
+                0.004f * std::cos(fine) * (2.25f * flow - 3.40f * crossFlow) +
+                0.001f * std::cos(shimmer) * (4.10f * flow + 5.30f * crossFlow);
+            const glm::vec3 normal = glm::normalize(water.waveNormalAt(x, z) +
+                glm::vec3{-gradient.x, 0.0f, -gradient.y});
+            finiteDetail = finiteDetail && std::isfinite(normal.x) &&
+                std::isfinite(normal.y) && std::isfinite(normal.z) &&
+                std::abs(glm::length(normal) - 1.0f) < 1.0e-5f &&
+                normal.y > 0.95f;
+            maxTilt = std::max(maxTilt, glm::degrees(std::acos(
+                std::clamp(normal.y, -1.0f, 1.0f))));
+        }
+    bool fresnel = true;
+    for (float cosine = 0.0f; cosine <= 1.0f; cosine += 0.1f)
+    {
+        const float grazing = 1.0f - cosine;
+        const float response = 0.13f * grazing * grazing * grazing;
+        fresnel = fresnel && std::isfinite(response) &&
+                  response >= 0.0f && response <= 0.13f;
+    }
+    const bool time = water.timeSeconds() > 0.34f &&
+        water.timeSeconds() < 0.36f;
+    const bool valid = topology && query && finiteDetail && fresnel && time &&
+        maxTilt < 10.0f;
+    output << "Nile visual-detail validation: " << (valid ? "PASS" : "FAIL")
+           << " topology=" << mesh.vertices.size() << '/' << mesh.indices.size()
+           << " maximum normal tilt=" << maxTilt << " degrees\n";
+    return valid;
+}

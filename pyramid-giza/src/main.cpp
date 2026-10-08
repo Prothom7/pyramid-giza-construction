@@ -652,6 +652,7 @@ int main(int argc, char** argv)
     bool haulRouteValidationOnly = false;
     bool sandValidationOnly = false;
     bool waterValidationOnly = false;
+    bool waterAppearanceValidationOnly = false;
     bool boatWaterValidationOnly = false;
     bool boatNavigationValidationOnly = false;
     bool boatWakeValidationOnly = false;
@@ -798,6 +799,8 @@ int main(int argc, char** argv)
             sandValidationOnly = true;
         else if (option == "--validate-water")
             waterValidationOnly = true;
+        else if (option == "--validate-water-appearance")
+            waterAppearanceValidationOnly = true;
         else if (option == "--validate-boat-water")
             boatWaterValidationOnly = true;
         else if (option == "--validate-boat-navigation")
@@ -1179,6 +1182,8 @@ int main(int argc, char** argv)
         return SandSimulation::validateSandSimulation(std::cout) ? 0 : 1;
     if (waterValidationOnly)
         return WaterSimulation::validateWaterSimulation(std::cout) ? 0 : 1;
+    if (waterAppearanceValidationOnly)
+        return WaterSimulation::validateWaterAppearance(std::cout) ? 0 : 1;
     if (boatWaterValidationOnly)
         return WaterSimulation::validateBoatWaterCoupling(std::cout) ? 0 : 1;
     if (boatNavigationValidationOnly)
