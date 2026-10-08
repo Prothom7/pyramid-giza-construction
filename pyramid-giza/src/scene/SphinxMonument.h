@@ -26,10 +26,13 @@ public:
     static constexpr float StructuralHalfWidth = 7.25f;
     static constexpr float StructuralFront = -20.0f;
     static constexpr float StructuralRear = 24.0f;
-    static constexpr float StructuralHeight = 12.65f;
+    static constexpr float StructuralHeight = 12.70f;
 
     static bool containsStructuralFootprint(float x, float z, float margin = 0.0f);
     static MeshData createFormMesh();
+    static MeshData createBodyMesh();
+    static MeshData createNeckMesh();
+    static MeshData createHeaddressMesh();
 
     SphinxMonument(const glm::vec3& center = DefaultCenter);
 

@@ -74,6 +74,9 @@ const char* primitiveName(ScenePrimitive primitive)
     case ScenePrimitive::Cylinder: return "Cylinder";
     case ScenePrimitive::Sphere: return "Sphere";
     case ScenePrimitive::SphinxForm: return "SphinxForm";
+    case ScenePrimitive::SphinxBody: return "SphinxBody";
+    case ScenePrimitive::SphinxNeck: return "SphinxNeck";
+    case ScenePrimitive::SphinxHeaddress: return "SphinxHeaddress";
     case ScenePrimitive::NileSurface: return "NileSurface";
     default: throw std::out_of_range("Unknown scene primitive");
     }

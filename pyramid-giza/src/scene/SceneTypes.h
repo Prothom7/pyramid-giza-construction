@@ -11,6 +11,9 @@ enum class ScenePrimitive
     Cylinder,
     Sphere,
     SphinxForm,
+    SphinxBody,
+    SphinxNeck,
+    SphinxHeaddress,
     NileSurface
 };
 
