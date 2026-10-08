@@ -1903,6 +1903,7 @@ void StaticGizaScene::update(float deltaTime)
         sandMesh_.updateVertices(sand_.generateTerrainMesh().vertices);
     water_.update(deltaTime);
     clouds_.update(deltaTime);
+    fires_.update(deltaTime);
     nileSurface_.updateVertices(water_.surfaceVertices());
     if (deltaTime > 1.0e-5f)
         currentFps_ = 0.9f * currentFps_ + 0.1f * (1.0f / deltaTime);
@@ -2143,6 +2144,7 @@ void StaticGizaScene::seekPresentationEnvironment(float elapsedTime)
     if (!std::isfinite(elapsedTime))
         return;
     clouds_.seek(elapsedTime);
+    fires_.seek(elapsedTime);
     environmentTime_ = std::fmod(std::max(0.0f, elapsedTime), 400.0f);
     // The quarry shots begin at five seconds. Seeking the presentation must
     // therefore also seek this independent cycle rather than accumulating
@@ -2165,6 +2167,7 @@ void StaticGizaScene::cycleDemoPose()
 void StaticGizaScene::resetAnimation()
 {
     clouds_.reset();
+    fires_.reset();
     animationController_.reset();
     quarryPulleyController_.reset();
     quarry_.reset();
@@ -2997,6 +3000,17 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         program.setFloat("inspectionLightRange", PyramidInterior::inspectionLightRange);
         program.setFloat("inspectionLightIntensity",
                          PyramidInterior::inspectionLightIntensity);
+        const auto fireLights = fires_.lights(sun);
+        for (int index = 0; index < FireSystem::count; ++index)
+        {
+            const std::string prefix = "fireLights[" + std::to_string(index) + "].";
+            const FireLight& light = fireLights[static_cast<std::size_t>(index)];
+            program.setVec3(prefix + "position", light.position);
+            program.setVec3(prefix + "color", light.color);
+            program.setFloat(prefix + "intensity",
+                             effectsEnabled_ ? light.intensity : 0.0f);
+            program.setFloat(prefix + "radius", light.radius);
+        }
     };
     shadowMap_.bindDepthTexture(0);
     TextureId currentTexture = TextureId::Count;
@@ -3119,6 +3133,7 @@ void StaticGizaScene::render(const glm::mat4& view, const glm::mat4& projection,
         shadowDebugMode_ == ShadowDebugMode::Normal;
     if (effectsVisible)
     {
+        fires_.render(sun, view, projection);
         const glm::vec3 effectTint = glm::clamp(
             sun.light.color * (0.42f + 0.40f * sun.light.intensity) +
                 sun.ambientColor * sun.ambientIntensity,

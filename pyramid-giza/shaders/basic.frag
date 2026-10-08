@@ -46,6 +46,14 @@ uniform vec3 inspectionLightPosition;
 uniform vec3 inspectionLightColor;
 uniform float inspectionLightRange;
 uniform float inspectionLightIntensity;
+struct FirePointLight
+{
+    vec3 position;
+    vec3 color;
+    float intensity;
+    float radius;
+};
+uniform FirePointLight fireLights[3];
 
 float calculateShadow(vec3 normal, vec3 toLight)
 {
@@ -121,6 +129,22 @@ void main()
         }
     }
 
+    vec3 fireLighting = vec3(0.0);
+    for (int i = 0; i < 3; ++i)
+    {
+        vec3 delta = fireLights[i].position - WorldPosition;
+        float distanceToFire = length(delta);
+        if (fireLights[i].intensity > 0.0 && distanceToFire < fireLights[i].radius)
+        {
+            float fraction = distanceToFire / fireLights[i].radius;
+            float falloff = 1.0 - fraction * fraction * (3.0 - 2.0 * fraction);
+            float diffuseFire = max(dot(normal, delta / max(distanceToFire, 0.001)), 0.0);
+            fireLighting += surfaceColor * fireLights[i].color *
+                fireLights[i].intensity * falloff *
+                (0.15 + materialDiffuse * diffuseFire);
+        }
+    }
+
     vec3 result;
     if (shadowDebugMode == 1)
         result = vec3(visibility);
@@ -133,7 +157,7 @@ void main()
     else if (lightingDebugMode == 4)
         result = surfaceColor;
     else
-        result = ambient + visibility * (diffuse + specular) + inspection;
+        result = ambient + visibility * (diffuse + specular) + inspection + fireLighting;
     // Lighting and shadowing finish before atmospheric perspective. Horizontal
     // world distance avoids over-hazing elevated camera views.
     if (lightingDebugMode == 0 && shadowDebugMode == 0)

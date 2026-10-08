@@ -13,6 +13,7 @@
 #include "animation/ConstructionTimeline.h"
 #include "animation/QuarryPulleyAnimation.h"
 #include "effects/ParticleSystem.h"
+#include "effects/FireSystem.h"
 #include "graphics/Frustum.h"
 #include "graphics/CloudLayer.h"
 #include "graphics/InstanceBatch.h"
@@ -365,6 +366,7 @@ private:
     Mesh sandMesh_;
     TextureLibrary textures_;
     ParticleSystem particles_;
+    FireSystem fires_;
     PyramidLayoutConfig pyramidConfig_;
     std::vector<PyramidBlockPlacement> pyramidBlocks_;
     std::vector<PyramidInstanceGroup> pyramidInstanceGroups_;

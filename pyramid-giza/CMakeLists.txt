@@ -37,6 +37,7 @@ add_executable(PyramidGiza
     src/graphics/CloudLayer.cpp
     src/graphics/InstanceBatch.cpp
     src/effects/ParticleSystem.cpp
+    src/effects/FireSystem.cpp
     src/presentation/ShowcaseController.cpp
     src/scene/PyramidLayout.cpp
     src/scene/PyramidInterior.cpp
@@ -153,3 +154,4 @@ add_test(NAME Phase13SkyBackgroundValidation COMMAND PyramidGiza --validate-sky)
 add_test(NAME Phase13CloudLayerValidation COMMAND PyramidGiza --validate-clouds)
 add_test(NAME Phase13AtmosphericHazeValidation COMMAND PyramidGiza --validate-haze)
 add_test(NAME Phase15DayNightValidation COMMAND PyramidGiza --validate-day-night)
+add_test(NAME Phase15FireValidation COMMAND PyramidGiza --validate-fire)

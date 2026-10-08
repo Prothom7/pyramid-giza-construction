@@ -660,6 +660,7 @@ int main(int argc, char** argv)
     bool hudValidationOnly = false;
     bool skyValidationOnly = false;
     bool dayNightValidationOnly = false;
+    bool fireValidationOnly = false;
     bool hazeValidationOnly = false;
     bool cloudValidationOnly = false;
     bool smokeTest = false;
@@ -719,6 +720,8 @@ int main(int argc, char** argv)
             skyValidationOnly = true;
         else if (option == "--validate-day-night")
             dayNightValidationOnly = true;
+        else if (option == "--validate-fire")
+            fireValidationOnly = true;
         else if (option == "--validate-haze")
             hazeValidationOnly = true;
         else if (option == "--validate-clouds")
@@ -1090,6 +1093,8 @@ int main(int argc, char** argv)
         return validateSkyBackground(std::cout) ? 0 : 1;
     if (dayNightValidationOnly)
         return validate24HourEnvironment(std::cout) ? 0 : 1;
+    if (fireValidationOnly)
+        return validateFireSystem(std::cout) ? 0 : 1;
     if (hazeValidationOnly)
         return validateAtmosphericHaze(std::cout) ? 0 : 1;
     if (cloudValidationOnly)
