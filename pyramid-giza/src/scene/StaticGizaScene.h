@@ -219,6 +219,13 @@ public:
     SandSimulation& sandSimulation() { return sand_; }
     const WaterSimulation& waterSimulation() const { return water_; }
     WaterSimulation& waterSimulation() { return water_; }
+    void setStoneControlMode(bool enabled) { stoneControlMode_ = enabled; }
+    bool stoneControlMode() const { return stoneControlMode_; }
+    void cycleDemoStone() { selectedDemoStone_ = (selectedDemoStone_ + 1) % demoStoneXZ_.size(); }
+    std::size_t selectedDemoStone() const { return selectedDemoStone_; }
+    void moveSelectedDemoStone(float xAxis, float zAxis, float deltaTime);
+    void resetDemoStones();
+    const std::array<glm::vec2, 3>& demoStonePositions() const { return demoStoneXZ_; }
     const SphinxMonument& sphinxMonument() const { return sphinx_; }
     const SimulationHUD& hud() const { return hud_; }
     SimulationHUD& hud() { return hud_; }
@@ -419,6 +426,11 @@ private:
     ConstructionSimulation simulation_;
     SandSimulation sand_;
     WaterSimulation water_;
+    std::array<glm::vec2, 3> demoStoneXZ_{{{70.0f, 34.0f},
+                                            {74.0f, 34.0f},
+                                            {78.0f, 34.0f}}};
+    std::size_t selectedDemoStone_ = 0;
+    bool stoneControlMode_ = false;
     SphinxMonument sphinx_;
     SimulationHUD hud_;
     bool simulationDebugEnabled_ = false;

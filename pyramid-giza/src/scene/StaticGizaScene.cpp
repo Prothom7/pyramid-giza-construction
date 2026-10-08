@@ -2178,6 +2178,7 @@ void StaticGizaScene::cycleDemoPose()
 
 void StaticGizaScene::resetAnimation()
 {
+    resetDemoStones();
     clouds_.reset();
     fires_.reset();
     animationController_.reset();
@@ -2196,6 +2197,30 @@ void StaticGizaScene::resetAnimation()
     effectEventSerial_ = 1;
     previousSledgePosition_ = glm::vec3{
         animationController_.snapshot().loadedSledgeRoot[3]};
+}
+
+void StaticGizaScene::resetDemoStones()
+{
+    demoStoneXZ_ = {{{70.0f, 34.0f}, {74.0f, 34.0f}, {78.0f, 34.0f}}};
+    selectedDemoStone_ = 0;
+    stoneControlMode_ = false;
+}
+
+void StaticGizaScene::moveSelectedDemoStone(float xAxis, float zAxis,
+                                             float deltaTime)
+{
+    if (!stoneControlMode_ || !std::isfinite(deltaTime) || deltaTime <= 0.0f ||
+        !std::isfinite(xAxis) || !std::isfinite(zAxis))
+        return;
+    glm::vec2 input{glm::clamp(xAxis, -1.0f, 1.0f),
+                    glm::clamp(zAxis, -1.0f, 1.0f)};
+    if (glm::length(input) > 1.0f)
+        input = glm::normalize(input);
+    glm::vec2& position = demoStoneXZ_[selectedDemoStone_];
+    position += input * (4.0f * deltaTime);
+    // This open patch is east of the pyramid and away from all haul routes.
+    position.x = glm::clamp(position.x, 64.0f, 84.0f);
+    position.y = glm::clamp(position.y, 28.0f, 46.0f);
 }
 
 void StaticGizaScene::toggleConstructionTimelapse()
@@ -2541,6 +2566,11 @@ void StaticGizaScene::collectFrameObjects()
 {
     frameObjects_.clear();
     frameObjects_.insert(frameObjects_.end(), objects_.begin(), objects_.end());
+    for (const glm::vec2& stone : demoStoneXZ_)
+        frameObjects_.push_back({ScenePrimitive::Cube,
+            makeTransform({stone.x, sand_.terrainHeightAt(stone.x, stone.y) + 1.0f,
+                           stone.y}, {}, {2.0f, 2.0f, 2.0f}),
+            MaterialId::Limestone});
     if (effectsEnabled_)
     {
         // Only foliage moves. The pivoted mesh transform is used by both the

@@ -46,6 +46,9 @@ public:
 
     void update(float deltaTime);
     void reset();
+    void setSupplyBoatManual(bool manual);
+    bool supplyBoatManual() const { return supplyBoatManual_; }
+    void setManualBoatInput(float throttle, float turn);
 
     bool enabled() const { return enabled_; }
     float timeSeconds() const { return simulationTime_; }
@@ -71,6 +74,7 @@ public:
     static bool validateBoatWaterCoupling(std::ostream& output);
     static bool validateBoatNavigation(std::ostream& output);
     static bool validateBoatWake(std::ostream& output);
+    static bool validateManualBoat(std::ostream& output);
 
 private:
     void initBoats();
@@ -78,6 +82,10 @@ private:
     void updateSurface();
     void updatePropulsionWake(float previousDistance, float currentDistance,
                               float previousTime);
+    void updateManualWake(float previousDistance, float previousTime,
+                          const glm::vec2& previousPosition, float previousYaw);
+    bool manualFootprintInside(const BoatDescriptor& boat,
+                               const glm::vec2& position, float yawDegrees) const;
     float attenuatedWaveHeightAt(float x, float z) const;
 
     float simulationTime_ = 0.0f;
@@ -87,6 +95,14 @@ private:
     std::array<PropulsionWake, 16> wakes_{};
     float nextWakeDistance_ = 1.5f;
     std::size_t wakeEmissionCount_ = 0;
+    bool supplyBoatManual_ = false;
+    glm::vec2 manualPosition_{0.0f};
+    glm::vec2 manualVelocity_{0.0f};
+    float manualYawDegrees_ = 0.0f;
+    float manualThrottle_ = 0.0f;
+    float manualTurn_ = 0.0f;
+    float manualDistance_ = 0.0f;
+    float automaticRouteTime_ = 0.0f;
     MeshData baseSurfaceMesh_{"NileSurface"};
     std::vector<Vertex> surfaceVertices_;
     std::vector<glm::vec2> surfaceWorldXZ_;

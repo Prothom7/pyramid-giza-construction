@@ -311,6 +311,35 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
         state->scene->resetAnimation();
         std::cout << "Animation reset to Idle.\n";
     }
+    else if (key == GLFW_KEY_F12 && state->scene != nullptr)
+    {
+        cancelShowcaseForManualInput(*state, window, "manual boat control");
+        const bool manual = !state->scene->waterSimulation().supplyBoatManual();
+        state->scene->waterSimulation().setSupplyBoatManual(manual);
+        if (manual)
+            state->scene->setStoneControlMode(false);
+        std::cout << "Supply boat: " << (manual ? "MANUAL" : "AUTO (route restarted)")
+                  << ". Arrow Up/Down throttle, Left/Right steer.\n";
+    }
+    else if (key == GLFW_KEY_Z && state->scene != nullptr)
+    {
+        cancelShowcaseForManualInput(*state, window, "stone control");
+        const bool enabled = !state->scene->stoneControlMode();
+        state->scene->setStoneControlMode(enabled);
+        if (enabled && state->scene->waterSimulation().supplyBoatManual())
+            state->scene->waterSimulation().setSupplyBoatManual(false);
+        std::cout << "Demo stone controls: " << (enabled ? "ON" : "OFF")
+                  << ". Insert selects; arrows move; R resets.\n";
+    }
+    else if (key == GLFW_KEY_INSERT && state->scene != nullptr)
+    {
+        if (state->scene->stoneControlMode())
+        {
+            state->scene->cycleDemoStone();
+            std::cout << "Selected demo stone: "
+                      << state->scene->selectedDemoStone() + 1 << "/3.\n";
+        }
+    }
     else if (key == GLFW_KEY_F7 && state->scene != nullptr)
     {
         state->scene->toggleQuarryPulley();
@@ -543,6 +572,18 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int mods)
 
 void processInput(GLFWwindow* window, AppState& state)
 {
+    if (state.scene != nullptr)
+    {
+        const float forward = static_cast<float>(
+            (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) -
+            (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS));
+        const float right = static_cast<float>(
+            (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) -
+            (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS));
+        if (state.scene->stoneControlMode())
+            state.scene->moveSelectedDemoStone(right, -forward, state.deltaTime);
+        state.scene->waterSimulation().setManualBoatInput(forward, right);
+    }
     CameraSpeedMode speedMode = CameraSpeedMode::Normal;
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
         glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS)
@@ -659,6 +700,7 @@ int main(int argc, char** argv)
     bool boatWaterValidationOnly = false;
     bool boatNavigationValidationOnly = false;
     bool boatWakeValidationOnly = false;
+    bool manualBoatValidationOnly = false;
     bool sphinxValidationOnly = false;
     bool inputValidationOnly = false;
     bool hudValidationOnly = false;
@@ -810,6 +852,8 @@ int main(int argc, char** argv)
             boatNavigationValidationOnly = true;
         else if (option == "--validate-boat-wake")
             boatWakeValidationOnly = true;
+        else if (option == "--validate-manual-boat")
+            manualBoatValidationOnly = true;
         else if (option == "--validate-sphinx")
             sphinxValidationOnly = true;
         else if (option == "--validate-input")
@@ -1193,6 +1237,8 @@ int main(int argc, char** argv)
         return WaterSimulation::validateBoatNavigation(std::cout) ? 0 : 1;
     if (boatWakeValidationOnly)
         return WaterSimulation::validateBoatWake(std::cout) ? 0 : 1;
+    if (manualBoatValidationOnly)
+        return WaterSimulation::validateManualBoat(std::cout) ? 0 : 1;
     if (sphinxValidationOnly)
         return SphinxMonument::validateSphinxMonument(std::cout) ? 0 : 1;
     if (inputValidationOnly)
@@ -1301,6 +1347,8 @@ int main(int argc, char** argv)
                      "L loop, M animation mode, +/- speed, P debug pose, "
                      "F7 quarry pulley pause, F8 interior walk, F9 pyramid cutaway, "
                      "F10 simulation debug, F11 HUD toggle, Tab help panel, "
+                     "F12 boat AUTO/MANUAL, arrows throttle/steer, "
+                     "Z stone control, Insert select stone, arrows move stone, R reset, "
                      "ESC release cursor capture / exit.\n";
     }
     glfwSwapInterval(smokeTest ? 0 : 1);
@@ -1324,6 +1372,25 @@ int main(int argc, char** argv)
         StaticGizaScene scene(shadowResolution, particleCapacity);
         SkyBackground sky;
         state.scene = &scene;
+        if (smokeTest)
+        {
+            const auto initialStones = scene.demoStonePositions();
+            scene.setStoneControlMode(true);
+            scene.moveSelectedDemoStone(1.0f, 0.0f, 0.5f);
+            const bool moved = scene.demoStonePositions()[0].x > initialStones[0].x;
+            scene.cycleDemoStone();
+            scene.moveSelectedDemoStone(0.0f, -1.0f, 0.5f);
+            const bool selected = scene.demoStonePositions()[1].y < initialStones[1].y;
+            scene.resetDemoStones();
+            bool restored = scene.selectedDemoStone() == 0 &&
+                            !scene.stoneControlMode();
+            for (std::size_t i = 0; i < initialStones.size(); ++i)
+                restored = restored &&
+                    glm::distance(scene.demoStonePositions()[i], initialStones[i]) < 1.0e-6f;
+            if (!moved || !selected || !restored)
+                throw std::runtime_error("Demo stone move/select/reset failed");
+            std::cout << "Demo stone move/select/reset: PASS (3 shared-cube stones)\n";
+        }
         if (initialAnimationTime > 0.0f)
         {
             scene.update(initialAnimationTime);

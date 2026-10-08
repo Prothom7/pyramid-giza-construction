@@ -32,6 +32,8 @@ constexpr float WakeSpeedThreshold = 0.15f;
 constexpr float WakeLifetime = 5.5f;
 constexpr float WakeSurfaceOffset = 0.008f;
 constexpr float WakeThickness = 0.012f;
+constexpr float ManualTurnDegreesPerSecond = 28.0f;
+constexpr float ManualBankClearance = 0.75f;
 
 struct SupplyRoutePose
 {
@@ -148,6 +150,12 @@ void WaterSimulation::initBoats()
 {
     baseBoats_ = ObjectEnrichment::boats();
     boatStates_.resize(baseBoats_.size());
+    for (const BoatDescriptor& boat : baseBoats_)
+        if (std::strcmp(boat.id, "SupplyBoatOffshore") == 0)
+        {
+            manualPosition_ = {boat.center.x, boat.center.z};
+            manualYawDegrees_ = boat.yawDegrees;
+        }
     updateBoats();
 }
 
@@ -157,8 +165,68 @@ void WaterSimulation::reset()
     wakes_ = {};
     nextWakeDistance_ = WakeSpacing;
     wakeEmissionCount_ = 0;
+    supplyBoatManual_ = false;
+    manualThrottle_ = manualTurn_ = manualDistance_ = automaticRouteTime_ = 0.0f;
+    manualVelocity_ = {0.0f, 0.0f};
+    for (const BoatDescriptor& boat : baseBoats_)
+        if (std::strcmp(boat.id, "SupplyBoatOffshore") == 0)
+        {
+            manualPosition_ = {boat.center.x, boat.center.z};
+            manualYawDegrees_ = boat.yawDegrees;
+        }
     updateSurface();
     updateBoats();
+}
+
+void WaterSimulation::setSupplyBoatManual(bool manual)
+{
+    if (manual == supplyBoatManual_)
+        return;
+    if (manual)
+    {
+        for (std::size_t i = 0; i < baseBoats_.size(); ++i)
+            if (std::strcmp(baseBoats_[i].id, "SupplyBoatOffshore") == 0)
+            {
+                manualPosition_ = {boatStates_[i].position.x, boatStates_[i].position.z};
+                manualYawDegrees_ = boatStates_[i].rotationDegrees.y;
+            }
+    }
+    // Returning to automatic mode deliberately restarts the original route.
+    // Water time and the moored boat remain untouched.
+    else
+        automaticRouteTime_ = 0.0f;
+    supplyBoatManual_ = manual;
+    manualVelocity_ = {0.0f, 0.0f};
+    manualThrottle_ = manualTurn_ = manualDistance_ = 0.0f;
+    wakes_ = {};
+    nextWakeDistance_ = WakeSpacing;
+    wakeEmissionCount_ = 0;
+    updateBoats();
+}
+
+void WaterSimulation::setManualBoatInput(float throttle, float turn)
+{
+    manualThrottle_ = std::isfinite(throttle) ? glm::clamp(throttle, -1.0f, 1.0f) : 0.0f;
+    manualTurn_ = std::isfinite(turn) ? glm::clamp(turn, -1.0f, 1.0f) : 0.0f;
+}
+
+bool WaterSimulation::manualFootprintInside(const BoatDescriptor& boat,
+                                             const glm::vec2& position,
+                                             float yawDegrees) const
+{
+    const float yaw = glm::radians(yawDegrees);
+    const glm::vec2 forward{std::sin(yaw), std::cos(yaw)};
+    const glm::vec2 right{std::cos(yaw), -std::sin(yaw)};
+    const NileSurfaceBounds nile = IndustrialLandscape::nileSurface();
+    for (float longitudinal : {-0.58f * boat.length, 0.58f * boat.length})
+        for (float lateral : {-0.55f * boat.width, 0.55f * boat.width})
+        {
+            const glm::vec2 corner = position + longitudinal * forward + lateral * right;
+            if (!nile.contains(corner.x, corner.y) ||
+                nile.signedBankDistance(corner.x, corner.y) < ManualBankClearance)
+                return false;
+        }
+    return true;
 }
 
 void WaterSimulation::update(float deltaTime)
@@ -167,17 +235,51 @@ void WaterSimulation::update(float deltaTime)
         return;
 
     const float previousTime = simulationTime_;
+    const float previousRouteTime = automaticRouteTime_;
+    const glm::vec2 previousManualPosition = manualPosition_;
+    const float previousManualYaw = manualYawDegrees_;
+    const float previousManualDistance = manualDistance_;
+    const float manualDelta = std::min(deltaTime, 0.05f);
     float previousDistance = 0.0f;
     for (const BoatDescriptor& boat : baseBoats_)
         if (std::strcmp(boat.id, "SupplyBoatOffshore") == 0)
-            previousDistance = supplyDistanceAt(boat, previousTime);
+        {
+            previousDistance = supplyDistanceAt(boat, previousRouteTime);
+            if (supplyBoatManual_)
+            {
+                const float candidateYaw = manualYawDegrees_ +
+                    manualTurn_ * ManualTurnDegreesPerSecond * manualDelta;
+                if (manualFootprintInside(boat, manualPosition_, candidateYaw))
+                    manualYawDegrees_ = candidateYaw;
+                const float yaw = glm::radians(manualYawDegrees_);
+                const glm::vec2 travel = SupplyCruiseSpeed * manualThrottle_ * manualDelta *
+                    glm::vec2{std::sin(yaw), std::cos(yaw)};
+                if (manualFootprintInside(boat, manualPosition_ + travel,
+                                          manualYawDegrees_))
+                {
+                    manualPosition_ += travel;
+                    manualVelocity_ = travel / deltaTime;
+                    manualDistance_ += glm::length(travel);
+                }
+                else
+                    manualVelocity_ = {0.0f, 0.0f};
+            }
+        }
     simulationTime_ += deltaTime;
+    if (!supplyBoatManual_)
+        automaticRouteTime_ += deltaTime;
     updateSurface();
     updateBoats();
     for (const BoatDescriptor& boat : baseBoats_)
         if (std::strcmp(boat.id, "SupplyBoatOffshore") == 0)
-            updatePropulsionWake(previousDistance,
-                                 supplyDistanceAt(boat, simulationTime_), previousTime);
+        {
+            if (supplyBoatManual_)
+                updateManualWake(previousManualDistance, previousTime,
+                                 previousManualPosition, previousManualYaw);
+            else
+                updatePropulsionWake(previousDistance,
+                                     supplyDistanceAt(boat, automaticRouteTime_), previousTime);
+        }
 }
 
 float WaterSimulation::attenuatedWaveHeightAt(float x, float z) const
@@ -293,7 +395,9 @@ void WaterSimulation::updateBoats()
         SimulatedBoatState& state = boatStates_[i];
         const bool navigating = std::strcmp(base.id, "SupplyBoatOffshore") == 0;
         const SupplyRoutePose navigation = navigating
-            ? supplyRoutePose(base, supplyDistanceAt(base, simulationTime_))
+            ? (supplyBoatManual_
+                ? SupplyRoutePose{manualPosition_, manualYawDegrees_}
+                : supplyRoutePose(base, supplyDistanceAt(base, automaticRouteTime_)))
             : SupplyRoutePose{{base.center.x, base.center.z}, base.yawDegrees};
         const glm::mat4 horizontalRoot = makeTransform(
             {navigation.position.x, 0.0f, navigation.position.y},
@@ -325,7 +429,9 @@ void WaterSimulation::updateBoats()
             -5.0f, 5.0f);
         state.swayDegrees = 0.0f;
         state.horizontalVelocity = navigating
-            ? supplyVelocityAt(base, simulationTime_) : glm::vec2{0.0f};
+            ? (supplyBoatManual_ ? manualVelocity_
+                                 : supplyVelocityAt(base, automaticRouteTime_))
+            : glm::vec2{0.0f};
         state.verticalDisplacement = state.centerWaterY -
             IndustrialLandscape::nileSurface().waterY;
         state.position = {navigation.position.x,
@@ -364,7 +470,9 @@ void WaterSimulation::updatePropulsionWake(float previousDistance,
                 (nextWakeDistance_ - previousDistance) /
                     (currentDistance - previousDistance), 0.0f, 1.0f);
             const float birthTime = glm::mix(previousTime, simulationTime_, fraction);
-            const glm::vec2 velocity = supplyVelocityAt(boat, birthTime);
+            const float routeBirthTime = automaticRouteTime_ -
+                (simulationTime_ - birthTime);
+            const glm::vec2 velocity = supplyVelocityAt(boat, routeBirthTime);
             const float speed = glm::length(velocity);
             if (speed > WakeSpeedThreshold)
             {
@@ -384,6 +492,50 @@ void WaterSimulation::updatePropulsionWake(float previousDistance,
                         birthTime, nextWakeDistance_, true};
                 ++wakeEmissionCount_;
             }
+            nextWakeDistance_ += WakeSpacing;
+        }
+    }
+}
+
+void WaterSimulation::updateManualWake(float previousDistance, float previousTime,
+                                        const glm::vec2& previousPosition,
+                                        float previousYaw)
+{
+    for (PropulsionWake& wake : wakes_)
+        if (wake.active && simulationTime_ - wake.birthTime >= WakeLifetime)
+            wake.active = false;
+    const float speed = glm::length(manualVelocity_);
+    if (speed <= WakeSpeedThreshold || manualDistance_ <= previousDistance)
+        return;
+    for (std::size_t boatIndex = 0; boatIndex < baseBoats_.size(); ++boatIndex)
+    {
+        const BoatDescriptor& boat = baseBoats_[boatIndex];
+        if (std::strcmp(boat.id, "SupplyBoatOffshore") != 0)
+            continue;
+        while (nextWakeDistance_ <= manualDistance_ + 1.0e-5f)
+        {
+            const float fraction = glm::clamp(
+                (nextWakeDistance_ - previousDistance) /
+                    (manualDistance_ - previousDistance), 0.0f, 1.0f);
+            const glm::vec2 position = glm::mix(previousPosition, manualPosition_, fraction);
+            const float yaw = glm::mix(previousYaw, manualYawDegrees_, fraction);
+            float surfaceY = 0.0f;
+            if (!waterSurfaceAt(position.x, position.y, surfaceY))
+                throw std::runtime_error("Manual supply wake center leaves Nile");
+            const SimulatedBoatState& state = boatStates_[boatIndex];
+            const glm::mat4 root = makeTransform(
+                {position.x, surfaceY - BoatDescriptor::waterlineLocalY, position.y},
+                {state.pitchDegrees, yaw, state.rollDegrees}, {1.0f, 1.0f, 1.0f});
+            const glm::vec3 stern{root * glm::vec4{sternLocal(boat), 1.0f}};
+            if (!IndustrialLandscape::isInsideNile(stern.x, stern.z))
+                throw std::runtime_error("Manual supply wake stern leaves Nile");
+            PropulsionWake& wake = wakes_[wakeEmissionCount_ % wakes_.size()];
+            if (wake.active)
+                throw std::runtime_error("Manual supply wake pool exhausted");
+            wake = {{stern.x, stern.z}, manualVelocity_ / speed,
+                    glm::mix(previousTime, simulationTime_, fraction),
+                    nextWakeDistance_, true};
+            ++wakeEmissionCount_;
             nextWakeDistance_ += WakeSpacing;
         }
     }
@@ -1433,5 +1585,84 @@ bool WaterSimulation::validateWaterAppearance(std::ostream& output)
     output << "Nile visual-detail validation: " << (valid ? "PASS" : "FAIL")
            << " topology=" << mesh.vertices.size() << '/' << mesh.indices.size()
            << " maximum normal tilt=" << maxTilt << " degrees\n";
+    return valid;
+}
+
+bool WaterSimulation::validateManualBoat(std::ostream& output)
+{
+    WaterSimulation thirty;
+    WaterSimulation sixty;
+    const glm::vec3 original = thirty.boatStates().at(1).position;
+    thirty.update(1.0f);
+    const glm::vec3 beforeToggle = thirty.boatStates().at(1).position;
+    thirty.setSupplyBoatManual(true);
+    const bool noTeleport = glm::length(thirty.boatStates().at(1).position -
+                                         beforeToggle) < 1.0e-4f;
+    thirty.reset();
+    thirty.setSupplyBoatManual(true);
+    sixty.setSupplyBoatManual(true);
+    bool bounded = true;
+    for (int step = 0; step < 120; ++step)
+    {
+        thirty.setManualBoatInput(step < 90 ? 1.0f : -1.0f, 0.35f);
+        thirty.update(1.0f / 30.0f);
+        const auto& state = thirty.boatStates().at(1);
+        bounded = bounded && std::isfinite(state.position.x) &&
+            std::isfinite(state.position.y) && std::isfinite(state.position.z) &&
+            std::isfinite(state.rotationDegrees.y) &&
+            thirty.manualFootprintInside(thirty.baseBoats_.at(1),
+                {state.position.x, state.position.z}, state.rotationDegrees.y);
+    }
+    for (int step = 0; step < 240; ++step)
+    {
+        sixty.setManualBoatInput(step < 180 ? 1.0f : -1.0f, 0.35f);
+        sixty.update(1.0f / 60.0f);
+    }
+    const auto& a = thirty.boatStates().at(1);
+    const auto& b = sixty.boatStates().at(1);
+    const float equalTimeError = glm::length(a.position - b.position) +
+        glm::length(a.rotationDegrees - b.rotationDegrees);
+    const bool moved = glm::distance(glm::vec2{a.position.x, a.position.z},
+                                     glm::vec2{original.x, original.z}) > 2.0f;
+    const bool woke = thirty.propulsionEmissionCount() > 0;
+    const glm::vec3 moored = thirty.boatStates().at(0).position;
+    const bool cargoStayed = glm::distance(
+        glm::vec2{moored.x, moored.z},
+        glm::vec2{thirty.baseBoats_.at(0).center.x,
+                  thirty.baseBoats_.at(0).center.z}) < 1.0e-6f;
+    const std::size_t emissionsBeforeStop = thirty.propulsionEmissionCount();
+    thirty.setManualBoatInput(0.0f, 0.0f);
+    thirty.update(1.0f);
+    const bool stopped = glm::length(thirty.boatStates().at(1).horizontalVelocity) <
+        1.0e-6f && thirty.propulsionEmissionCount() == emissionsBeforeStop;
+    thirty.setSupplyBoatManual(false);
+    const auto& restarted = thirty.boatStates().at(1);
+    const bool routeRestarted = glm::distance(
+        glm::vec2{restarted.position.x, restarted.position.z},
+        glm::vec2{original.x, original.z}) < 1.0e-4f;
+    thirty.reset();
+    const bool reset = !thirty.supplyBoatManual() &&
+        glm::distance(glm::vec2{thirty.boatStates().at(1).position.x,
+                                thirty.boatStates().at(1).position.z},
+                      glm::vec2{original.x, original.z}) < 1.0e-4f;
+    WaterSimulation bank;
+    bank.setSupplyBoatManual(true);
+    bank.setManualBoatInput(1.0f, 0.0f);
+    for (int step = 0; step < 360; ++step)
+        bank.update(1.0f / 30.0f);
+    const auto& bankBoat = bank.boatStates().at(1);
+    const bool blockedAtBank = bank.manualFootprintInside(bank.baseBoats_.at(1),
+        {bankBoat.position.x, bankBoat.position.z},
+        bankBoat.rotationDegrees.y) &&
+        glm::length(bankBoat.horizontalVelocity) < 1.0e-6f;
+    const bool valid = noTeleport && bounded && moved && woke && stopped &&
+        routeRestarted && reset && cargoStayed && blockedAtBank &&
+        equalTimeError < 0.02f;
+    output << "Manual supply-boat validation: " << (valid ? "PASS" : "FAIL")
+           << " no-teleport=" << noTeleport << " bounded=" << bounded
+           << " emissions=" << emissionsBeforeStop
+           << " stopped=" << stopped << " equal-time error=" << equalTimeError
+           << " reset=" << reset << " cargo-still=" << cargoStayed
+           << " bank-blocked=" << blockedAtBank << '\n';
     return valid;
 }

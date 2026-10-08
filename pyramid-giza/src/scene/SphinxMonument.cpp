@@ -359,36 +359,35 @@ void SphinxMonument::collectSceneObjects(std::vector<SceneObject>& objects) cons
                                      {3.45f, 3.9f, 2.9f}),
                        MaterialId::PreparedStone});
 
-    // Cheek masses project beyond the cranium, giving the face a legible
-    // human profile without adding a disconnected mask in front of it.
-    for (float cheekX : {-0.8f, 0.8f})
-        objects.push_back({ScenePrimitive::SphinxForm,
-                           makeTransform(s + glm::vec3{cheekX, 10.0f, -6.25f}, {},
-                                         {1.20f, 1.28f, 0.78f}),
-                           MaterialId::PreparedStone});
+    // A shallow oval human face replaces the two rounded cheek lobes, which
+    // read as a muzzle from the front. Its depth stays close to the cranium.
+    objects.push_back({ScenePrimitive::SphinxForm,
+                       makeTransform(s + glm::vec3{0.0f, 10.18f, -6.57f}, {},
+                                     {2.55f, 2.45f, 0.38f}),
+                       MaterialId::PreparedStone});
 
     // Jaw / Chin structure
     objects.push_back({ScenePrimitive::SphinxForm,
-                       makeTransform(s + glm::vec3{0.0f, 9.22f, -6.28f}, {},
-                                     {1.88f, 1.22f, 0.86f}),
+                       makeTransform(s + glm::vec3{0.0f, 9.18f, -6.57f}, {},
+                                     {1.36f, 0.65f, 0.42f}),
                        MaterialId::PreparedStone});
 
     // 6. Facial Features
     // Nose bridge and profile
     objects.push_back({ScenePrimitive::Cube,
-                       makeTransform(s + glm::vec3{0.0f, 10.38f, -6.85f}, {},
-                                     {0.38f, 1.05f, 0.44f}),
+                       makeTransform(s + glm::vec3{0.0f, 10.38f, -6.82f}, {},
+                                     {0.34f, 0.96f, 0.35f}),
                        MaterialId::PreparedStone});
     // Mouth / Lips
     objects.push_back({ScenePrimitive::Cube,
-                       makeTransform(s + glm::vec3{0.0f, 9.48f, -6.79f}, {},
-                                     {1.02f, 0.14f, 0.20f}),
+                       makeTransform(s + glm::vec3{0.0f, 9.48f, -6.78f}, {},
+                                     {0.84f, 0.12f, 0.17f}),
                        MaterialId::LimestoneVariation});
     // Almond-shaped eyes and brow ridges
     for (float eyeX : {-0.85f, 0.85f})
     {
         objects.push_back({ScenePrimitive::Cube,
-                           makeTransform(s + glm::vec3{eyeX, 10.82f, -6.65f},
+                           makeTransform(s + glm::vec3{eyeX, 10.82f, -6.78f},
                                          {0.0f, 0.0f, (eyeX < 0 ? -12.0f : 12.0f)},
                                          {0.70f, 0.17f, 0.22f}),
                            MaterialId::LimestoneVariation});

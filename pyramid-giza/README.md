@@ -30,6 +30,8 @@ Use `build\PyramidGiza.exe --showcase` for the 18-shot presentation. `--showcase
 | B, Home/End, , / . | Timelapse play/pause, start/end, slower/faster |
 | F7, F8, F9 | Quarry pulley pause, pyramid interior, cutaway |
 | F10, F11, Tab | Debug overlay, simulation HUD, HUD help |
+| F12, Up/Down, Left/Right | Toggle existing supply boat AUTO/MANUAL; throttle/reverse and steer in MANUAL. Returning to AUTO restarts its original route. |
+| Z, Insert, arrow keys | Toggle demo-stone control, select one of three stones, move it on the ground. R restores their initial positions. |
 | C, F, H, J, V, X | Culling, wireframe, shadows, shadow debug, lighting debug, textures |
 | Esc | Release mouse; press again to exit |
 
