@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <ostream>
+#include <string>
 #include <vector>
 
 #include "animation/ConstructionAnimation.h"
@@ -134,7 +135,22 @@ ShowcaseController::shots()
         {"FinalSunsetWide", "Final complete monument, site context, and golden hour",
          93.0f, 8.0f, {120.0f, 58.0f, 90.0f}, {102.0f, 54.0f, 74.0f},
          {0.0f, 25.0f, -42.0f}, {0.0f, 27.0f, -42.0f}, 50.0f, 47.0f,
-         16.60f, 17.0f,
+         16.60f, 18.60f,
+         ShowcaseConstructionAction::KeepCheckpoint, 1.0f, 1.0f, false, true},
+        {"NightFires", "Grounded work fires across the finished site",
+         101.0f, 8.0f, {84.0f, 14.0f, -8.0f}, {75.0f, 10.0f, -20.0f},
+         {69.0f, 1.0f, -37.0f}, {69.0f, 1.0f, -37.0f}, 49.0f, 47.0f,
+         18.60f, 21.0f,
+         ShowcaseConstructionAction::KeepCheckpoint, 1.0f, 1.0f, false, true},
+        {"NightNile", "Moving boat and illuminated night water",
+         109.0f, 8.0f, {-8.0f, 18.0f, -134.0f}, {15.0f, 14.0f, -139.0f},
+         {-20.0f, 0.0f, -166.0f}, {12.0f, 0.0f, -166.0f}, 50.0f, 48.0f,
+         21.0f, 21.5f,
+         ShowcaseConstructionAction::KeepCheckpoint, 1.0f, 1.0f, false, true},
+        {"FinalNightWide", "Completed monument, moonlit Nile, and night fires",
+         117.0f, 8.0f, {112.0f, 65.0f, 100.0f}, {100.0f, 61.0f, 90.0f},
+         {0.0f, 22.0f, -42.0f}, {0.0f, 24.0f, -42.0f}, 50.0f, 48.0f,
+         21.5f, 22.0f,
          ShowcaseConstructionAction::KeepCheckpoint, 1.0f, 1.0f, false, true}
     }};
     return values;
@@ -317,7 +333,8 @@ bool validatePhase12ShowcaseTimeline(std::ostream& output)
                 shot.endFov <= CameraController::maximumFov &&
                 std::isfinite(shot.startSunTime) &&
                 std::isfinite(shot.endSunTime) &&
-                shot.startSunTime >= 6.0f && shot.endSunTime <= 18.0f &&
+                shot.startSunTime >= 0.0f && shot.endSunTime <= 24.0f &&
+                shot.endSunTime >= shot.startSunTime &&
                 std::isfinite(shot.constructionValue) &&
                 shot.constructionValue >= 0.0f &&
                 shot.constructionValue <= 1.0f &&
@@ -326,7 +343,15 @@ bool validatePhase12ShowcaseTimeline(std::ostream& output)
         expectedStart = shot.startTime + shot.duration;
     }
     const bool duration = near(expectedStart, ShowcaseController::totalDuration()) &&
-                          near(ShowcaseController::totalDuration(), 101.0f);
+                          near(ShowcaseController::totalDuration(), 125.0f);
+    const bool nightCoverage =
+        ShowcaseController::shots()[14].id == std::string("FinalSunsetWide") &&
+        ShowcaseController::shots()[15].id == std::string("NightFires") &&
+        ShowcaseController::shots()[16].id == std::string("NightNile") &&
+        ShowcaseController::shots()[17].id == std::string("FinalNightWide") &&
+        ShowcaseController::evaluate(106.0f).sunTime > 19.0f &&
+        ShowcaseController::evaluate(113.0f).sunTime >= 21.0f &&
+        near(ShowcaseController::evaluate(125.0f).sunTime, 22.0f);
     ShowcaseController first;
     ShowcaseController second;
     first.start();
@@ -336,12 +361,14 @@ bool validatePhase12ShowcaseTimeline(std::ostream& output)
     const bool frameRateIndependent =
         near(first.time(), second.time(), 1.0e-3f) &&
         first.shotIndex() == second.shotIndex();
-    const bool valid = table && duration && frameRateIndependent;
+    const bool valid = table && duration && nightCoverage && frameRateIndependent;
     output << "Phase 12 showcase timeline validation\n"
-           << "  15 finite contiguous positive-duration shots: "
+           << "  18 finite contiguous positive-duration shots: "
            << (table ? "PASS" : "FAIL") << '\n'
-           << "  final shot ends at 101 seconds: "
+           << "  final shot ends at 125 seconds: "
            << (duration ? "PASS" : "FAIL") << '\n'
+           << "  sunset, fires, night Nile, and final night coverage: "
+           << (nightCoverage ? "PASS" : "FAIL") << '\n'
            << "  presentation clock frame-rate independence: "
            << (frameRateIndependent ? "PASS" : "FAIL") << '\n'
            << (valid ? "Showcase timeline checks passed.\n"
@@ -389,7 +416,8 @@ bool validatePhase12ShowcaseCamera(std::ostream& output)
 bool validatePhase12ShowcaseState(std::ostream& output)
 {
     bool deterministic = true;
-    for (float time : {0.0f, 12.5f, 31.0f, 58.0f, 76.0f, 90.0f, 101.0f})
+    for (float time : {0.0f, 12.5f, 31.0f, 58.0f, 76.0f, 90.0f,
+                       101.0f, 106.0f, 113.0f, 121.0f, 125.0f})
     {
         const ShowcaseFrame first = ShowcaseController::evaluate(time);
         const ShowcaseFrame second = ShowcaseController::evaluate(time);

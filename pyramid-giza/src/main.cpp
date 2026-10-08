@@ -1427,7 +1427,7 @@ int main(int argc, char** argv)
                 if (state.showcaseController.consumeCompleted())
                 {
                     std::cout << "Final showcase complete; holding the final "
-                                 "golden-hour overview.\n";
+                                 "night overview.\n";
                     setShowcaseWindowTitle(window, state);
                 }
             }
